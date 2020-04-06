@@ -5,6 +5,7 @@ import rospy
 import pybullet as p
 from std_msgs.msg import Float32MultiArray, Float32
 from std_msgs.msg import String, Empty
+from geometry_msgs.msg import Pose
 from abc import abstractmethod
 from cairo_simulator.Simulator import ASSETS_PATH
 from cairo_simulator.Simulator import Simulator
@@ -20,6 +21,11 @@ class Manipulator(Robot):
         self._sub_position_update = rospy.Subscriber('/%s/move_to_joint_pos'%self._name, Float32MultiArray, self.move_to_joint_pos_callback)
         self._sub_position_vel_update = rospy.Subscriber('/%s/move_to_joint_pos_vel'%self._name, Float32MultiArray, self.move_to_joint_pos_vel_callback)
         self._sub_execute_trajectory = rospy.Subscriber('/%s/execute_trajectory'%self._name, String, self.execute_trajectory_callback)
+
+        # self._ik_service = rospy.Service('/%s/ik_service', Pose, self.ik_service)
+
+        self._end_effector_link_index = -1 # Must be set by instantiating class
+
 
         # Record indices of controllable DoF from PyBullet's loaded model.
         self._arm_dof_indices = []
@@ -59,9 +65,55 @@ class Manipulator(Robot):
         '''
         pass
 
+    """
+    def ik_service(self, req):
+        '''
+        ROS Service Wrapper for self.solve_inverse_kinematics
+        Pass (0,0,0,0) for orientation to solve for position only.
+        '''
+        target_position = (req.position.x, req.position.y, req.position.z)
+        target_orientation = (req.orientation.x, req.orientation.y, req.orientation.z, req.orientation.w)
+        if target_orientation == (0,0,0,0): target_orientation = None
+
+        soln = self.solve_inverse_kinematics(target_position, target_orientation)
+        resp = Float32MultiArray()
+        resp.data = soln
+        return resp
+    """        
+
+    def solve_inverse_kinematics(self, target_position, target_orientation=None):
+        '''
+        Returns a robot configuration (list of joint positions) that gets the robot's end_effector_link 
+        as close as possible to target_position at target_orientation.
+        Wraps PyBullet's calculateInverseKinematics function.
+
+        @param target_position List with target [x,y,z] coordinate.
+        @param target_orientation (Optional) List with target orientation either as Euler angles [r,p,y] or a quaternion [x,y,z,w].
+        '''
+        if self._end_effector_link_index == -1:
+            rospy.logerr("Inverse Kinematics solver not initialized properly for robot %s: end effector link index not set!" % self._name)
+            return
+
+        ik_solution = None
+
+        if target_orientation is None:
+            ik_solution = p.calculateInverseKinematics(self._simulator_id, self._end_effector_link_index, target_position)
+        else:
+            if len(target_orientation) == 3: target_orientation = p.getQuaternionFromEuler(target_orientation)
+            ik_solution = p.calculateInverseKinematics(self._simulator_id, self._end_effector_link_index, target_position, targetOrientation=target_orientation)
+
+        # Return a configuration of only the arm's joints.
+        arm_config = [0]*len(self._arm_dof_indices)
+        for i, idx in enumerate(self._arm_dof_indices):
+            arm_config[i] = ik_solution[idx]
+
+        return arm_config        
+
+
     def execute_trajectory(self, trajectory_data):
         '''
-        Execute a trajectory with the manipulator given positions and timings. This function computes the velocities needed to make the timeline.        
+        Execute a trajectory with the manipulator given positions and timings.
+        This function computes the velocities needed to make the timeline.        
         Ex: trajectory_data = [(1., [0,0,0,0,0,0,0]), (2.5, [1,0,0,0,0,0,0]), (4, [1,0,2.9,1.23,1.52,0,0])]
             Sends robot to 3 waypoints over the course of 4 seconds
         @param trajectory_data Vector of (time, joint configuration) tuples, indicating which joint positions the robot should achieve at which times. Set time=0 for each waypoint if you don't care about timing. Joint configuration vector contents should correspond to the parameters that work for for move_to_joint_pos
@@ -140,16 +192,18 @@ class Sawyer(Manipulator):
         self._sub_head_pan = rospy.Subscriber('/%s/set_head_pan'%self._name, Float32, self.set_head_pan)
 
 
+        # Best to do this by name, for flexibility with respect to how the URDF is loaded and whether fixed joint links are merged.
         self._arm_dof_names = ['right_j0', 'right_j1', 'right_j2', 'right_j3', 'right_j4', 'right_j5', 'right_j6']
         self._gripper_dof_names = ['right_gripper_l_finger_joint', 'right_gripper_r_finger_joint']
         self._extra_dof_names = ['head_pan']
-        
+
+
         self._arm_dof_indices = self._populate_dof_indices(self._arm_dof_names) # From base to wrist, j0 through j6 of Sawyer arm
         self._gripper_dof_indices = self._populate_dof_indices(self._gripper_dof_names) # Left finger, Right finger
         self._extra_dof_indices = self._populate_dof_indices(self._extra_dof_names)
 
-        #self._arm_dof_indices = [5, 11, 12, 13, 14, 16, 20] # From base to wrist, j0 through j6 of Sawyer arm
-        #self._gripper_dof_indices = [26, 28] # Left finger, Right finger
+        # Get end effector link index by looking at the parent link for a gripper joint, since links don't have names in PyBullet        
+        self._end_effector_link_index = p.getJointInfo(self._simulator_id, self._gripper_dof_indices[0])[16]
 
         # Initialize joint limits
         self._arm_joint_limits = [] # Seven elements, j0 through j6, containing a tuple with the (min,max) value

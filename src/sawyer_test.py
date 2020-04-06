@@ -14,6 +14,10 @@ def main():
     table = SimObject("Table", ASSETS_PATH + 'table.sdf', (1, 0, .5), (0, 0, 1.5708)) # Table rotated 90deg along z-axis
     sawyer_robot = Sawyer("sawyer0", 0, 0, 0.8)
 
+    joint_config = sawyer_robot.solve_inverse_kinematics([0.9,0,0], [0,0,0,1])
+    import pdb
+    pdb.set_trace()
+
     # Auto-advance the simulation timer
     p.setRealTimeSimulation(use_real_time)
 
