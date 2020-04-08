@@ -7,6 +7,7 @@ import numpy as np
 import rospy
 from std_msgs.msg import Float32MultiArray
 from std_msgs.msg import String, Empty
+from geometry_msgs.msg import PoseStamped
 import pybullet as p
 import pybullet_data
 
@@ -22,23 +23,33 @@ class Simulator:
             from cairo_simulator.Manipulators import Manipulator
             Simulator()
         return Simulator.__instance
-    def __init__(self):
+
+    def __init__(self, use_real_time=True):
         if Simulator.__instance is not None:
             raise Exception("You may only initialize -one- simulator per program! Use get_instance instead.")
         else:
             Simulator.__instance = self
 
         self.__init_bullet()
-        self.__init_vars()
+        self.__init_vars(use_real_time)
         self.__init_ros()
 
-    def __init_vars(self):
+    def __del__(self):
+        p.disconnect()
+
+    def __init_vars(self, use_real_time):
         self._estop = False # Global e-stop
         self._trajectory_queue = {} # Dict mapping robot ids to (joint_positions, joint_velocities) tuple
         self._trajectory_queue_timers = {} # Dict mapping robot ids to the time that their trajectory execution timeout clock started.
         self._robots = {} # Dict mapping robot ids to Robot objects
         self._objects = {} # Dict mapping object ids to SimObject objects
         self._motion_timeout = 10. # 10s timeout from robot motion
+        self._use_real_time = use_real_time
+        self._state_broadcast_rate = .1 # 10Hz Robot + Object state broadcast
+        self.__last_broadcast_time = 0 # Keep track of last time states were broadcast
+        self.__sim_time = 0 # Used if not using real-time simulation. Increments at time_step
+        self._sim_timestep = 1./240. # If not using real-time mode, amount of time to pass per step() call
+        self.set_real_time(use_real_time)
 
     def __init_bullet(self):
         # Simulation world setup
@@ -51,6 +62,32 @@ class Simulator:
         rospy.Subscriber("/sim/estop_set", Empty, self.estop_set_callback)
         rospy.Subscriber("/sim/estop_release", Empty, self.estop_release_callback)
 
+    def set_real_time(self, val):
+        if val is False:
+            p.setRealTimeSimulation(0)
+            self._use_real_time = False
+        elif val is True:
+            p.setRealTimeSimulation(1)
+            self._use_real_time = True
+        else:
+            rospy.logerr("Invalid realtime value given to Simulator.set_real_time: Expected True or False.")
+
+    def step(self):
+        if self._use_real_time is False:
+            p.stepSimulation()
+            self.__sim_time += self._sim_timestep
+        else:
+            self.__sim_time = time.time()
+
+        cur_time = self.__sim_time
+ 
+        if cur_time - self.__last_broadcast_time > self._state_broadcast_rate:
+            self.publish_robot_states()
+            self.publish_object_states()
+            self.__last_broadcast_time = cur_time
+        
+        self.process_trajectory_queues()
+
     def estop_set_callback(self, data):
         self._estop = True
         for id in g_trajectory_queue.keys():
@@ -62,6 +99,10 @@ class Simulator:
     def publish_robot_states(self):
         for id in self._robots.keys():
             self._robots[id].publish_state()
+    
+    def publish_object_states(self):
+        for id in self._objects.keys():
+            self._objects[id].publish_state()
 
     def process_trajectory_queues(self):
         cur_time = time.time()
@@ -128,17 +169,37 @@ class Simulator:
         self._trajectory_queue[id] = (copy.copy(joint_positions), copy.copy(joint_velocities))
         self._trajectory_queue_timers[id] = None
 
+    def load_scene_file(self, sdf_file, obj_name_prefix):
+        sim_id_array = p.loadSDF(sdf_file)
+        for i, id in enum(sim_id_array):
+            obj = SimObject(obj_name_prefix + str(i), id)
+
+
+
 class SimObject():
-    def __init__(self, object_name, model_file, position=(0,0,0), orientation=(0,0,0,1)):
+    def __init__(self, object_name, model_file_or_sim_id, position=(0,0,0), orientation=(0,0,0,1)):
         self._name = object_name
-        self._simulator_id = self._load_model_file_into_sim(model_file)
+
+        if isinstance(model_file_or_sim_id, int):
+            self._simulator_id = model_file_or_sim_id
+        else:
+            self._simulator_id = self._load_model_file_into_sim(model_file_or_sim_id)
+            self.move_to_pose(position, orientation)
+
         if self._simulator_id is None:
             rospy.logerr("Couldn't load object model from %s" % model_file)
             return None
 
         Simulator.get_instance().add_object(self)
 
-        self.move_to_position(position, orientation)
+        self._state_pub = rospy.Publisher("/%s/pose" % self._name, PoseStamped, queue_size=1)
+
+    def publish_state(self):
+        pose = PoseStamped()   
+        pos, ori = self.get_pose()
+        pose.pose.position.x, pose.pose.position.y, pose.pose.position.z = pos
+        pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w = ori
+        self._state_pub.publish(pose)
 
     def get_simulator_id(self):
         return self._simulator_id
@@ -152,14 +213,13 @@ class SimObject():
             if isinstance(sim_id, tuple): sim_id = sim_id[0]
         return sim_id
 
-
-    def get_position(self):
+    def get_pose(self):
         '''
         Returns position and orientation vector, e.g.,: ((x,y,z), (x,y,z,w))
         '''
         return p.getBasePositionAndOrientation(self._simulator_id)    
 
-    def move_to_position(self, position_vec=None, orientation_vec=None):
+    def move_to_pose(self, position_vec=None, orientation_vec=None):
         '''
         Sets an object's position and orientation in the simulation.
         @param position_vec (Optional) Desired [x,y,z] position of the object. Current position otherwise.
