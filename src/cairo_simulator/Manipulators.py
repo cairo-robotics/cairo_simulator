@@ -408,3 +408,65 @@ class Sawyer(Manipulator):
         right_position = total_displacement/-2.
 
         return left_position, right_position
+
+
+
+class Jaco(Manipulator):
+
+    def __init__(self, robot_name, x=0, y=0, z=0.8, publish_full_state=False):
+        asset_path = "/home/jeff/workspaces/cairo_sim_ws/src/cairo_simulator/assets/kinova_description/urdf/test.urdf"
+        super().__init__(robot_name, asset_path , x,y,z)
+        
+        self._publish_full_state = publish_full_state # Should the full robot state be published each cycle (pos/vel/force), or just joint positions
+
+        self._pub_robot_state_full = rospy.Publisher('/%s/robot_state_full'%self._name, String, queue_size=0)
+        #self._sub_head_pan = rospy.Subscriber('/%s/set_head_pan'%self._name, Float32, self.set_head_pan)
+
+        # Best to do this by name, for flexibility with respect to how the URDF is loaded and whether fixed joint links are merged.
+        self._arm_dof_names = ['right_j0', 'right_j1', 'right_j2', 'right_j3', 'right_j4', 'right_j5', 'right_j6']
+        self._gripper_dof_names = ['right_gripper_l_finger_joint', 'right_gripper_r_finger_joint']
+        self._extra_dof_names = ['head_pan']
+    
+    def publish_state(self):
+        pass
+
+    def move_to_joint_pos_callback(self, target_position_float32array):
+        if self._executing_trajectory: rospy.logwarn("Current trajectory for %s not finished executing, but new joint position received!" % self._name)
+        return self.move_to_joint_pos(target_position_float32array.data)
+
+    
+    def move_to_joint_pos(self, target_position):
+        '''
+        Move arm to a target position
+        @param target_position List of floats, indicating joint positions for the manipulator
+        '''
+    def move_to_joint_pos_vel_callback(self, target_position_vel_float32array):
+        if len(target_position_vel_float32array.data) != 18:
+            rospy.logwarn("Invalid position and velocity configuration provided for Sawyer %s. Must have 18 floats for 9 position and 9 velocity targets." % self._name)
+            return
+        return self.move_to_joint_pos_with_vel(target_position_vel_float32array.data[:9], target_position_vel_float32array.data[9:])
+    
+    def move_to_joint_pos_with_vel(self, target_position, target_velocity):
+        '''
+        Move arm to a target position (interpolate) at a given velocity
+        @param target_position List of floats, indicating joint positions for the manipulator
+        @param target_velocities: List of floats, indicating the speed that each joint should move to reach its position.
+        '''
+        pass
+
+    
+    def get_current_joint_states(self):
+        '''
+        Returns a vector of the robot's joint positions
+        '''
+        pass
+
+
+    
+    def execute_trajectory_callback(self, trajectory_json_string):
+        if self._executing_trajectory: rospy.logwarn("Current trajectory for %s not finished executing, but new trajectory received!" % self._name)
+        traj_data = json.loads(trajectory_json_string.data)
+        self.execute_trajectory(traj_data)
+
+    def execute_trajectory(self, trajectory_data):
+        pass
