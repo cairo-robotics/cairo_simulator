@@ -2,7 +2,7 @@ import time
 import json
 import numpy as np
 import rospy
-import pybullet as p
+import pybullet as p 
 from std_msgs.msg import Float32MultiArray, Float32
 from std_msgs.msg import String, Empty
 from geometry_msgs.msg import Pose
@@ -80,6 +80,25 @@ class Manipulator(Robot):
         resp.data = soln
         return resp
     """        
+    def solve_forward_kinematics(self, joint_configuration, terminal_joint_index=None):
+        '''
+        Returns the pose (point,quaternion) of the robot's end-effector given the provided joint_configuration.
+        '''
+        pass
+
+    def get_joint_pose_in_world_frame(self, joint_index=None):
+        '''
+        Returns the pose (point,quaternion) of the robot's joint at joint_index in the world frame. Defaults to end effector.
+        '''
+        if joint_index is None: joint_index = self._end_effector_link_index
+
+        link_state = p.getLinkState(self._simulator_id, joint_index) #In PyBullet, Link Index = Joint Index
+        
+        world_pos = link_state[0]
+        world_quaternion = link_state[1]
+        
+        return world_pos, world_quaternion
+
 
     def solve_inverse_kinematics(self, target_position, target_orientation=None):
         '''
@@ -100,7 +119,7 @@ class Manipulator(Robot):
             ik_solution = p.calculateInverseKinematics(self._simulator_id, self._end_effector_link_index, target_position)
         else:
             if len(target_orientation) == 3: target_orientation = p.getQuaternionFromEuler(target_orientation)
-            ik_solution = p.calculateInverseKinematics(self._simulator_id, self._end_effector_link_index, target_position, targetOrientation=target_orientation)
+            ik_solution = p.calculateInverseKinematics(self._simulator_id, self._end_effector_link_index, target_position, targetOrientation=target_orientation, maxNumIterations=120)
 
         # Return a configuration of only the arm's joints.
         arm_config = [0]*len(self._arm_dof_indices)
@@ -203,7 +222,7 @@ class Sawyer(Manipulator):
         self._extra_dof_indices = self._populate_dof_indices(self._extra_dof_names)
 
         # Get end effector link index by looking at the parent link for a gripper joint, since links don't have names in PyBullet        
-        self._end_effector_link_index = p.getJointInfo(self._simulator_id, self._gripper_dof_indices[0])[16]
+        self._end_effector_link_index = self._arm_dof_indices[-1]
 
         # Initialize joint limits
         self._arm_joint_limits = [] # Seven elements, j0 through j6, containing a tuple with the (min,max) value
