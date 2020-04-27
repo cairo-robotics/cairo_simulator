@@ -243,7 +243,7 @@ class Robot(ABC):
                 print("Joint %d: %s" % (i, str(p.getJointInfo(self._simulator_id,i))))
             pdb.set_trace()
     '''
-    def __init__(self, robot_name, urdf_file, x, y, z, urdf_flags=p.URDF_MERGE_FIXED_LINKS):   
+    def __init__(self, robot_name, urdf_file, x, y, z, urdf_flags):   
         """
         Initialize a Robot at coordinates (x,y,z) and add it to the simulator manager
 
