@@ -2,6 +2,7 @@ import time
 import json
 import os
 import sys
+import copy
 from abc import ABC, abstractmethod
 import numpy as np
 import rospy
@@ -11,8 +12,9 @@ from geometry_msgs.msg import PoseStamped
 import pybullet as p
 import pybullet_data
 
-
 ASSETS_PATH = os.path.dirname(os.path.abspath(__file__)) + '/../../assets/' # Find ./cairo_simulator/assets/ from ./cairo_simulator/src/cairo_simulator/
+
+
 
 class Simulator:
     __instance = None    
@@ -20,7 +22,6 @@ class Simulator:
     @staticmethod
     def get_instance():
         if Simulator.__instance is None:
-            from cairo_simulator.Manipulators import Manipulator
             Simulator()
         return Simulator.__instance
 
@@ -105,36 +106,49 @@ class Simulator:
             self._objects[id].publish_state()
 
     def process_trajectory_queues(self):
-        cur_time = time.time()
-
+        cur_time = self.__sim_time
         for id in self._trajectory_queue.keys():
             if self._trajectory_queue[id] is None: continue # Nothing on queue
 
-            # Check if robot is at the first pos vector off the robot's pos/vel tuple
+            if self._trajectory_queue_timers[id] is not None and cur_time - self._trajectory_queue_timers[id] > self._motion_timeout:
+                # Action timed out, abort trajectory
+                rospy.logwarn("Trajectory for robot %d timed out! Aborting remainder of trajectory." % id)
+                self.clear_trajectory_queue(id)
+                continue
+
+
+            # Check if robot is at the first position entry off the robot's pos/vel tuple
+            # to see if they reached their target waypoint and are ready for the next
+
+            # pos_vector and vel_vector layout: [ original_pos, target_pos, future pos, future pos, ...]
             pos_vector, vel_vector = self._trajectory_queue[id]
-            next_pos = pos_vector[0] # First entry of trajectory's position vector
-            assigned_time = self._trajectory_queue_timers[id] # Time last commanded
-            if assigned_time is None or self._robots[id].check_if_at_position(next_pos) is True:
+
+            # Check if trajectory is finished
+            if len(pos_vector) == 1: # Only have original_pos, therefore we reached the last position in the trajectory
+                self.clear_trajectory_queue(id)
+                continue
+
+            prev_pos = pos_vector[0] # Original position or last commanded position
+            next_pos = pos_vector[1] # First entry of trajectory's position vector
+            next_vel = vel_vector[1] # First entry of the trajectory's joint velocity vector
+
+
+            at_pos = self._robots[id].check_if_at_position(prev_pos)
+            if (self._trajectory_queue_timers[id] is None) or (at_pos is True):
                 # Robot is at this position, get the next position and velocity targets and remove from trajectory_queue
-
-                # Check if trajectory is finished
-                if len(pos_vector) == 1: # Reached the last position in the trajectory
-                    self.clear_trajectory_queue(id)
-                    continue
-
-                next_vel = vel_vector[0] # First entry of the trajectory's joint velocity vector
-                # Send command to the robot controller
-                self._robots[id]._executing_trajectory = True
+                self._trajectory_queue_timers[id] = cur_time
 
                 if isinstance(self._robots[id], Manipulator):
                     self._robots[id].move_to_joint_pos_with_vel(next_pos, next_vel)
+                    self._trajectory_queue[id][0] = self._trajectory_queue[id][0][1:] # Increment progress in the trajectory
+                    self._trajectory_queue[id][1] = self._trajectory_queue[id][1][1:] # Increment progress in the trajectory
                 else:
                     rospy.logerr("No mechanism for handling trajectory execution for Robot Type %s" % (str(type(self._robots[id]))))
+                    self.clear_trajectory_queue(id)
                     continue
 
                 # Update trajectory_queue_timer
-                self._trajectory_queue_timers[id] = cur_time
-            elif cur_time - assigned_time > self._motion_timeout:
+            elif cur_time - self._trajectory_queue_timers[id] > self._motion_timeout:
                 # Action timed out, abort trajectory
                 rospy.logwarn("Trajectory for robot %d timed out! Aborting remainder of trajectory." % id)
                 self.clear_trajectory_queue(id)
@@ -163,10 +177,9 @@ class Simulator:
         if id not in self._trajectory_queue.keys(): return
         self._trajectory_queue[id] = None
         self._trajectory_queue_timers[id] = None
-        self._robots[id]._executing_trajectory = False
 
     def set_robot_trajectory(self, id, joint_positions, joint_velocities):        
-        self._trajectory_queue[id] = (copy.copy(joint_positions), copy.copy(joint_velocities))
+        self._trajectory_queue[id] = [list(joint_positions), list(joint_velocities)]
         self._trajectory_queue_timers[id] = None
 
     def load_scene_file(self, sdf_file, obj_name_prefix):
@@ -251,7 +264,6 @@ class Robot(ABC):
         """ 
         super().__init__()
         self._name = robot_name
-        self._executing_trajectory = False
         self._state = None
 
         self._pub_robot_state = rospy.Publisher('/%s/robot_state'%self._name, Float32MultiArray, queue_size=0)
@@ -295,3 +307,5 @@ class Robot(ABC):
         Publish robot state onto a ROS Topic
         '''
         pass
+
+from .Manipulators import Manipulator

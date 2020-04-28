@@ -8,9 +8,9 @@ from std_msgs.msg import Float32MultiArray, Float32
 from std_msgs.msg import String, Empty
 from geometry_msgs.msg import Pose
 from abc import abstractmethod
-from cairo_simulator.Simulator import ASSETS_PATH
-from cairo_simulator.Simulator import Simulator
-from cairo_simulator.Simulator import Robot
+from .Simulator import ASSETS_PATH
+from .Simulator import Simulator
+from .Simulator import Robot
 
 class Manipulator(Robot):
     def __init__(self, robot_name, urdf_file, x, y, z):   
@@ -518,9 +518,9 @@ class Sawyer(Manipulator):
         sim = Simulator.get_instance()
         sim.set_robot_trajectory(self._simulator_id, joint_positions, joint_velocities)
             
-    def check_if_at_position(self, pos, epsilon=0.001):
+    def check_if_at_position(self, pos, epsilon=0.1):
         '''
-        Returns True if the robot's joints are within 0.001 (epsilon) of pos, false otherwise
+        Returns True if the robot's joints are within (epsilon) of pos, false otherwise
         @param pos Vector of length 7, 8, or 9, corresponding to arm position, arm+gripper%, or arm+gripper position
         '''
         if len(pos) < 7 or len(pos) > 9: 
@@ -534,7 +534,11 @@ class Sawyer(Manipulator):
         elif len(pos) == 8:
             pos = pos[:7] + self.get_gripper_pct_finger_positions(pos[7])
 
-        return np.linalg.norm(np.array(pos) - np.array(cur_pos)) < epsilon
+        dist = np.linalg.norm(np.array(pos) - np.array(cur_pos))
+
+        #rospy.loginfo("Checking if Sawyer is at %s. (dist=%g) %s" % (str(pos), dist, str(dist <= epsilon)))
+        if dist <= epsilon: return True
+        return False
 
     def get_gripper_pct_finger_positions(self, pct_gripper_open):
         '''
