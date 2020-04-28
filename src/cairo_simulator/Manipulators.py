@@ -518,7 +518,7 @@ class Sawyer(Manipulator):
         sim = Simulator.get_instance()
         sim.set_robot_trajectory(self._simulator_id, joint_positions, joint_velocities)
             
-    def check_if_at_position(self, pos, epsilon=0.1):
+    def check_if_at_position(self, pos, epsilon=0.2):
         '''
         Returns True if the robot's joints are within (epsilon) of pos, false otherwise
         @param pos Vector of length 7, 8, or 9, corresponding to arm position, arm+gripper%, or arm+gripper position
