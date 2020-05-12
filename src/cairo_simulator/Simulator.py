@@ -2,16 +2,19 @@ import time
 import json
 import os
 import sys
+import copy
 from abc import ABC, abstractmethod
 import numpy as np
 import rospy
 from std_msgs.msg import Float32MultiArray
 from std_msgs.msg import String, Empty
+from geometry_msgs.msg import PoseStamped
 import pybullet as p
 import pybullet_data
 
-
 ASSETS_PATH = os.path.dirname(os.path.abspath(__file__)) + '/../../assets/' # Find ./cairo_simulator/assets/ from ./cairo_simulator/src/cairo_simulator/
+
+
 
 class Simulator:
     __instance = None    
@@ -19,26 +22,35 @@ class Simulator:
     @staticmethod
     def get_instance():
         if Simulator.__instance is None:
-            from cairo_simulator.Manipulators import Manipulator
             Simulator()
         return Simulator.__instance
-    def __init__(self):
+
+    def __init__(self, use_real_time=True):
         if Simulator.__instance is not None:
             raise Exception("You may only initialize -one- simulator per program! Use get_instance instead.")
         else:
             Simulator.__instance = self
 
         self.__init_bullet()
-        self.__init_vars()
+        self.__init_vars(use_real_time)
         self.__init_ros()
 
-    def __init_vars(self):
+    def __del__(self):
+        p.disconnect()
+
+    def __init_vars(self, use_real_time):
         self._estop = False # Global e-stop
         self._trajectory_queue = {} # Dict mapping robot ids to (joint_positions, joint_velocities) tuple
         self._trajectory_queue_timers = {} # Dict mapping robot ids to the time that their trajectory execution timeout clock started.
         self._robots = {} # Dict mapping robot ids to Robot objects
         self._objects = {} # Dict mapping object ids to SimObject objects
         self._motion_timeout = 10. # 10s timeout from robot motion
+        self._use_real_time = use_real_time
+        self._state_broadcast_rate = .1 # 10Hz Robot + Object state broadcast
+        self.__last_broadcast_time = 0 # Keep track of last time states were broadcast
+        self.__sim_time = 0 # Used if not using real-time simulation. Increments at time_step
+        self._sim_timestep = 1./240. # If not using real-time mode, amount of time to pass per step() call
+        self.set_real_time(use_real_time)
 
     def __init_bullet(self):
         # Simulation world setup
@@ -51,6 +63,32 @@ class Simulator:
         rospy.Subscriber("/sim/estop_set", Empty, self.estop_set_callback)
         rospy.Subscriber("/sim/estop_release", Empty, self.estop_release_callback)
 
+    def set_real_time(self, val):
+        if val is False:
+            p.setRealTimeSimulation(0)
+            self._use_real_time = False
+        elif val is True:
+            p.setRealTimeSimulation(1)
+            self._use_real_time = True
+        else:
+            rospy.logerr("Invalid realtime value given to Simulator.set_real_time: Expected True or False.")
+
+    def step(self):
+        if self._use_real_time is False:
+            p.stepSimulation()
+            self.__sim_time += self._sim_timestep
+        else:
+            self.__sim_time = time.time()
+
+        cur_time = self.__sim_time
+ 
+        if cur_time - self.__last_broadcast_time > self._state_broadcast_rate:
+            self.publish_robot_states()
+            self.publish_object_states()
+            self.__last_broadcast_time = cur_time
+        
+        self.process_trajectory_queues()
+
     def estop_set_callback(self, data):
         self._estop = True
         for id in g_trajectory_queue.keys():
@@ -62,38 +100,55 @@ class Simulator:
     def publish_robot_states(self):
         for id in self._robots.keys():
             self._robots[id].publish_state()
+    
+    def publish_object_states(self):
+        for id in self._objects.keys():
+            self._objects[id].publish_state()
 
     def process_trajectory_queues(self):
-        cur_time = time.time()
-
+        cur_time = self.__sim_time
         for id in self._trajectory_queue.keys():
             if self._trajectory_queue[id] is None: continue # Nothing on queue
 
-            # Check if robot is at the first pos vector off the robot's pos/vel tuple
+            if self._trajectory_queue_timers[id] is not None and cur_time - self._trajectory_queue_timers[id] > self._motion_timeout:
+                # Action timed out, abort trajectory
+                rospy.logwarn("Trajectory for robot %d timed out! Aborting remainder of trajectory." % id)
+                self.clear_trajectory_queue(id)
+                continue
+
+
+            # Check if robot is at the first position entry off the robot's pos/vel tuple
+            # to see if they reached their target waypoint and are ready for the next
+
+            # pos_vector and vel_vector layout: [ original_pos, target_pos, future pos, future pos, ...]
             pos_vector, vel_vector = self._trajectory_queue[id]
-            next_pos = pos_vector[0] # First entry of trajectory's position vector
-            assigned_time = self._trajectory_queue_timers[id] # Time last commanded
-            if assigned_time is None or self._robots[id].check_if_at_position(next_pos) is True:
+
+            # Check if trajectory is finished
+            if len(pos_vector) == 1: # Only have original_pos, therefore we reached the last position in the trajectory
+                self.clear_trajectory_queue(id)
+                continue
+
+            prev_pos = pos_vector[0] # Original position or last commanded position
+            next_pos = pos_vector[1] # First entry of trajectory's position vector
+            next_vel = vel_vector[1] # First entry of the trajectory's joint velocity vector
+
+
+            at_pos = self._robots[id].check_if_at_position(prev_pos)
+            if (self._trajectory_queue_timers[id] is None) or (at_pos is True):
                 # Robot is at this position, get the next position and velocity targets and remove from trajectory_queue
-
-                # Check if trajectory is finished
-                if len(pos_vector) == 1: # Reached the last position in the trajectory
-                    self.clear_trajectory_queue(id)
-                    continue
-
-                next_vel = vel_vector[0] # First entry of the trajectory's joint velocity vector
-                # Send command to the robot controller
-                self._robots[id]._executing_trajectory = True
+                self._trajectory_queue_timers[id] = cur_time
 
                 if isinstance(self._robots[id], Manipulator):
                     self._robots[id].move_to_joint_pos_with_vel(next_pos, next_vel)
+                    self._trajectory_queue[id][0] = self._trajectory_queue[id][0][1:] # Increment progress in the trajectory
+                    self._trajectory_queue[id][1] = self._trajectory_queue[id][1][1:] # Increment progress in the trajectory
                 else:
                     rospy.logerr("No mechanism for handling trajectory execution for Robot Type %s" % (str(type(self._robots[id]))))
+                    self.clear_trajectory_queue(id)
                     continue
 
                 # Update trajectory_queue_timer
-                self._trajectory_queue_timers[id] = cur_time
-            elif cur_time - assigned_time > self._motion_timeout:
+            elif cur_time - self._trajectory_queue_timers[id] > self._motion_timeout:
                 # Action timed out, abort trajectory
                 rospy.logwarn("Trajectory for robot %d timed out! Aborting remainder of trajectory." % id)
                 self.clear_trajectory_queue(id)
@@ -122,23 +177,42 @@ class Simulator:
         if id not in self._trajectory_queue.keys(): return
         self._trajectory_queue[id] = None
         self._trajectory_queue_timers[id] = None
-        self._robots[id]._executing_trajectory = False
 
     def set_robot_trajectory(self, id, joint_positions, joint_velocities):        
-        self._trajectory_queue[id] = (copy.copy(joint_positions), copy.copy(joint_velocities))
+        self._trajectory_queue[id] = [list(joint_positions), list(joint_velocities)]
         self._trajectory_queue_timers[id] = None
 
+    def load_scene_file(self, sdf_file, obj_name_prefix):
+        sim_id_array = p.loadSDF(sdf_file)
+        for i, id in enum(sim_id_array):
+            obj = SimObject(obj_name_prefix + str(i), id)
+
+
+
 class SimObject():
-    def __init__(self, object_name, model_file, position=(0,0,0), orientation=(0,0,0,1)):
+    def __init__(self, object_name, model_file_or_sim_id, position=(0,0,0), orientation=(0,0,0,1)):
         self._name = object_name
-        self._simulator_id = self._load_model_file_into_sim(model_file)
+
+        if isinstance(model_file_or_sim_id, int):
+            self._simulator_id = model_file_or_sim_id
+        else:
+            self._simulator_id = self._load_model_file_into_sim(model_file_or_sim_id)
+            self.move_to_pose(position, orientation)
+
         if self._simulator_id is None:
             rospy.logerr("Couldn't load object model from %s" % model_file)
             return None
 
         Simulator.get_instance().add_object(self)
 
-        self.move_to_position(position, orientation)
+        self._state_pub = rospy.Publisher("/%s/pose" % self._name, PoseStamped, queue_size=1)
+
+    def publish_state(self):
+        pose = PoseStamped()   
+        pos, ori = self.get_pose()
+        pose.pose.position.x, pose.pose.position.y, pose.pose.position.z = pos
+        pose.pose.orientation.x, pose.pose.orientation.y, pose.pose.orientation.z, pose.pose.orientation.w = ori
+        self._state_pub.publish(pose)
 
     def get_simulator_id(self):
         return self._simulator_id
@@ -152,14 +226,13 @@ class SimObject():
             if isinstance(sim_id, tuple): sim_id = sim_id[0]
         return sim_id
 
-
-    def get_position(self):
+    def get_pose(self):
         '''
         Returns position and orientation vector, e.g.,: ((x,y,z), (x,y,z,w))
         '''
         return p.getBasePositionAndOrientation(self._simulator_id)    
 
-    def move_to_position(self, position_vec=None, orientation_vec=None):
+    def move_to_pose(self, position_vec=None, orientation_vec=None):
         '''
         Sets an object's position and orientation in the simulation.
         @param position_vec (Optional) Desired [x,y,z] position of the object. Current position otherwise.
@@ -183,7 +256,7 @@ class Robot(ABC):
                 print("Joint %d: %s" % (i, str(p.getJointInfo(self._simulator_id,i))))
             pdb.set_trace()
     '''
-    def __init__(self, robot_name, urdf_file, x, y, z, urdf_flags=p.URDF_MERGE_FIXED_LINKS):   
+    def __init__(self, robot_name, urdf_file, x, y, z, urdf_flags):   
         """
         Initialize a Robot at coordinates (x,y,z) and add it to the simulator manager
 
@@ -191,7 +264,6 @@ class Robot(ABC):
         """ 
         super().__init__()
         self._name = robot_name
-        self._executing_trajectory = False
         self._state = None
 
         self._pub_robot_state = rospy.Publisher('/%s/robot_state'%self._name, Float32MultiArray, queue_size=0)
@@ -235,3 +307,5 @@ class Robot(ABC):
         Publish robot state onto a ROS Topic
         '''
         pass
+
+from .Manipulators import Manipulator
