@@ -12,6 +12,10 @@ from .Simulator import ASSETS_PATH
 from .Simulator import Simulator
 from .Simulator import Robot
 
+
+import pybullet as p
+
+
 class Manipulator(Robot):
     def __init__(self, robot_name, urdf_file, x, y, z):   
         """
@@ -569,13 +573,57 @@ class Jaco(Manipulator):
         self._pub_robot_state_full = rospy.Publisher('/%s/robot_state_full'%self._name, String, queue_size=0)
         #self._sub_head_pan = rospy.Subscriber('/%s/set_head_pan'%self._name, Float32, self.set_head_pan)
 
-        # Best to do this by name, for flexibility with respect to how the URDF is loaded and whether fixed joint links are merged.
-        self._arm_dof_names = ['right_j0', 'right_j1', 'right_j2', 'right_j3', 'right_j4', 'right_j5', 'right_j6']
-        self._gripper_dof_names = ['right_gripper_l_finger_joint', 'right_gripper_r_finger_joint']
-        self._extra_dof_names = ['head_pan']
+        self._init_local_vars()
+      
+    def _init_joint_names(self):
+        # Best to do this by name, for flexibility with respect to how 
+        # the URDF is loaded and whether fixed joint links are merged.
+        self._arm_dof_names = ['j2n7s300_joint_1', 'j2n7s300_joint_2', 
+                               'j2n7s300_joint_3', 'j2n7s300_joint_4', 
+                               'j2n7s300_joint_5', 'j2n7s300_joint_6', 
+                               'j2n7s300_joint_7']
+
+        self._gripper_dof_names = ['j2n7s300_joint_finger_1', 
+                                   'j2n7s300_joint_finger_2',
+                                   'j2n7s300_joint_finger_3']
     
+        self._arm_dof_indices = self._populate_dof_indices(self._arm_dof_names) 
+        self._gripper_dof_indices = \
+                            self._populate_dof_indices(self._gripper_dof_names)
+        self._end_effector_link_index = self._arm_dof_indices[-1]
+
+    def _init_joint_limits(self):
+        # Initialize joint limits
+        self._arm_joint_limits = [] # Seven elements, j0 through j6, containing a tuple with the (min,max) value
+        self._arm_joint_velocity_max = [] # Max velocity for each arm joint
+        self._arm_joint_default_velocity = [] # Default velocity for each arm joint
+
+        self._gripper_joint_limits = [] # Same as arm, but for left and right finger
+        self._gripper_joint_velocity_max = [] # Max velocity for each gripper joint
+        self._gripper_joint_default_velocity = [] # Default velocity for each gripper joint
+
+        self._extra_joint_limits = [] # Head pan DOF
+        self._extra_joint_velocity_max = [] # Head pan DOF
+        self._extra_joint_default_velocity = [] # Default velocity for moving the robot's joints
+
+        for i in self._arm_dof_indices:
+            joint_info = p.getJointInfo(self._simulator_id, i)
+            self._arm_joint_limits.append( (joint_info[8], joint_info[9]) )
+            self._arm_joint_velocity_max.append(joint_info[11])
+        for i in self._gripper_dof_indices:
+            joint_info = p.getJointInfo(self._simulator_id, i)
+            self._gripper_joint_limits.append( (joint_info[8], joint_info[9]) )
+            self._gripper_joint_velocity_max.append(joint_info[11])
+
+
+
+    def set_default_joint_velocity_pct(self, pct):
+        pass
+
+
     def publish_state(self):
         pass
+
 
     def move_to_joint_pos_callback(self, target_position_float32array):
         if self._executing_trajectory: rospy.logwarn("Current trajectory for %s not finished executing, but new joint position received!" % self._name)
@@ -587,12 +635,16 @@ class Jaco(Manipulator):
         Move arm to a target position
         @param target_position List of floats, indicating joint positions for the manipulator
         '''
+        pass
+
+
     def move_to_joint_pos_vel_callback(self, target_position_vel_float32array):
         if len(target_position_vel_float32array.data) != 18:
             rospy.logwarn("Invalid position and velocity configuration provided for Sawyer %s. Must have 18 floats for 9 position and 9 velocity targets." % self._name)
             return
         return self.move_to_joint_pos_with_vel(target_position_vel_float32array.data[:9], target_position_vel_float32array.data[9:])
     
+
     def move_to_joint_pos_with_vel(self, target_position, target_velocity):
         '''
         Move arm to a target position (interpolate) at a given velocity
@@ -609,11 +661,31 @@ class Jaco(Manipulator):
         pass
 
 
-    
     def execute_trajectory_callback(self, trajectory_json_string):
         if self._executing_trajectory: rospy.logwarn("Current trajectory for %s not finished executing, but new trajectory received!" % self._name)
         traj_data = json.loads(trajectory_json_string.data)
         self.execute_trajectory(traj_data)
 
     def execute_trajectory(self, trajectory_data):
+        '''
+        Execute a trajectory with the Sawyer arm given positions and timings. This function computes the velocities needed to make the timeline.
+        Ex: trajectory_data = [(1., [0,0,0,0,0,0,0]), (2.5, [1,0,0,0,0,0,0,0]), (4, [1,0,2.9,1.23,1.52,0,0,0])]
+            Sends robot to 3 waypoints over the course of 4 seconds
+        @param trajectory_data Vector of (time, joint configuration) tuples, indicating which joint positions the robot should achieve at which times. Set time=0 for each waypoint if you don't care about timing. Joint configuration vectors can be 7, 8, or 9 floats corresponding to the parameter for move_to_joint_pos (7: arm only, 8: arm + gripper %open, 9: arm + gripper finger positions)
+        '''
+        pass
+
+
+    def check_if_at_position(self, pos, epsilon=0.2):
+        '''
+        Returns True if the robot's joints are within (epsilon) of pos, false otherwise
+        @param pos Vector of length 7, 8, or 9, corresponding to arm position, arm+gripper%, or arm+gripper position
+        '''
+
+
+    def get_gripper_pct_finger_positions(self, pct_gripper_open):
+        '''
+        Returns the target position of each gripper finger given a percentage of how open the gripper should be
+        @param pct_gripper_open Value in range [0.,1.] describing how open the gripper should be
+        '''
         pass
