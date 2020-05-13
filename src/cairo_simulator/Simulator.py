@@ -192,20 +192,22 @@ class Simulator:
 class SimObject():
     def __init__(self, object_name, model_file_or_sim_id, position=(0,0,0), orientation=(0,0,0,1)):
         self._name = object_name
+        if Simulator.is_instantited():
+            if isinstance(model_file_or_sim_id, int):
+                self._simulator_id = model_file_or_sim_id
+            else:
+                self._simulator_id = self._load_model_file_into_sim(model_file_or_sim_id)
+                self.move_to_pose(position, orientation)
 
-        if isinstance(model_file_or_sim_id, int):
-            self._simulator_id = model_file_or_sim_id
+            if self._simulator_id is None:
+                rospy.logerr("Couldn't load object model from %s" % model_file)
+                return None
+
+            Simulator.get_instance().add_object(self)
+
+            self._state_pub = rospy.Publisher("/%s/pose" % self._name, PoseStamped, queue_size=1)
         else:
-            self._simulator_id = self._load_model_file_into_sim(model_file_or_sim_id)
-            self.move_to_pose(position, orientation)
-
-        if self._simulator_id is None:
-            rospy.logerr("Couldn't load object model from %s" % model_file)
-            return None
-
-        Simulator.get_instance().add_object(self)
-
-        self._state_pub = rospy.Publisher("/%s/pose" % self._name, PoseStamped, queue_size=1)
+            raise Expcetion("Simulator must be instantiated before creating a SimObject.")
 
     def publish_state(self):
         pose = PoseStamped()   
