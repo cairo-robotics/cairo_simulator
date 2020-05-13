@@ -15,7 +15,6 @@ import pybullet_data
 ASSETS_PATH = os.path.dirname(os.path.abspath(__file__)) + '/../../assets/' # Find ./cairo_simulator/assets/ from ./cairo_simulator/src/cairo_simulator/
 
 
-
 class Simulator:
     __instance = None    
 
@@ -145,7 +144,8 @@ class Simulator:
                 # Robot is at this position, get the next position and velocity targets and remove from trajectory_queue
                 self._trajectory_queue_timers[traj_id] = cur_time
 
-                if isinstance(self._robots[traj_id], Manipulator):
+                attr = getattr(self._robots[traj_id], 'move_to_joint_pos_with_vel', None)
+                if attr is not None:
                     self._robots[traj_id].move_to_joint_pos_with_vel(next_pos, next_vel)
                     self._trajectory_queue[traj_id][0] = self._trajectory_queue[traj_id][0][1:] # Increment progress in the trajectory
                     self._trajectory_queue[traj_id][1] = self._trajectory_queue[traj_id][1][1:] # Increment progress in the trajectory
