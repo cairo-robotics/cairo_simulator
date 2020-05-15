@@ -15,7 +15,6 @@ import pybullet_data
 ASSETS_PATH = os.path.dirname(os.path.abspath(__file__)) + '/../../assets/' # Find ./cairo_simulator/assets/ from ./cairo_simulator/src/cairo_simulator/
 
 
-
 class Simulator:
     __instance = None    
 
@@ -24,6 +23,13 @@ class Simulator:
         if Simulator.__instance is None:
             Simulator()
         return Simulator.__instance
+
+    @staticmethod
+    def is_instantiated():
+        if Simulator.__instance is not None:
+            return True
+        else:
+            return Simulator.__instance
 
     def __init__(self, use_real_time=True):
         if Simulator.__instance is not None:
@@ -91,29 +97,29 @@ class Simulator:
 
     def estop_set_callback(self, data):
         self._estop = True
-        for id in g_trajectory_queue.keys():
-            clear_trajectory_queue(id)
+        for traj_id in g_trajectory_queue.keys():
+            clear_trajectory_queue(traj_id)
 
     def estop_release_callback(self, data):
         self._estop = False
 
     def publish_robot_states(self):
-        for id in self._robots.keys():
-            self._robots[id].publish_state()
+        for robot_id in self._robots.keys():
+            self._robots[robot_id].publish_state()
     
     def publish_object_states(self):
-        for id in self._objects.keys():
-            self._objects[id].publish_state()
+        for object_id in self._objects.keys():
+            self._objects[object_id].publish_state()
 
     def process_trajectory_queues(self):
         cur_time = self.__sim_time
-        for id in self._trajectory_queue.keys():
-            if self._trajectory_queue[id] is None: continue # Nothing on queue
+        for traj_id in self._trajectory_queue.keys():
+            if self._trajectory_queue[traj_id] is None: continue # Nothing on queue
 
-            if self._trajectory_queue_timers[id] is not None and cur_time - self._trajectory_queue_timers[id] > self._motion_timeout:
+            if self._trajectory_queue_timers[traj_id] is not None and cur_time - self._trajectory_queue_timers[traj_id] > self._motion_timeout:
                 # Action timed out, abort trajectory
-                rospy.logwarn("Trajectory for robot %d timed out! Aborting remainder of trajectory." % id)
-                self.clear_trajectory_queue(id)
+                rospy.logwarn("Trajectory for robot %d timed out! Aborting remainder of trajectory." % traj_id)
+                self.clear_trajectory_queue(traj_id)
                 continue
 
 
@@ -121,11 +127,11 @@ class Simulator:
             # to see if they reached their target waypoint and are ready for the next
 
             # pos_vector and vel_vector layout: [ original_pos, target_pos, future pos, future pos, ...]
-            pos_vector, vel_vector = self._trajectory_queue[id]
+            pos_vector, vel_vector = self._trajectory_queue[traj_id]
 
             # Check if trajectory is finished
             if len(pos_vector) == 1: # Only have original_pos, therefore we reached the last position in the trajectory
-                self.clear_trajectory_queue(id)
+                self.clear_trajectory_queue(traj_id)
                 continue
 
             prev_pos = pos_vector[0] # Original position or last commanded position
@@ -133,30 +139,31 @@ class Simulator:
             next_vel = vel_vector[1] # First entry of the trajectory's joint velocity vector
 
 
-            at_pos = self._robots[id].check_if_at_position(prev_pos)
-            if (self._trajectory_queue_timers[id] is None) or (at_pos is True):
+            at_pos = self._robots[traj_id].check_if_at_position(prev_pos)
+            if (self._trajectory_queue_timers[traj_id] is None) or (at_pos is True):
                 # Robot is at this position, get the next position and velocity targets and remove from trajectory_queue
-                self._trajectory_queue_timers[id] = cur_time
+                self._trajectory_queue_timers[traj_id] = cur_time
 
-                if isinstance(self._robots[id], Manipulator):
-                    self._robots[id].move_to_joint_pos_with_vel(next_pos, next_vel)
-                    self._trajectory_queue[id][0] = self._trajectory_queue[id][0][1:] # Increment progress in the trajectory
-                    self._trajectory_queue[id][1] = self._trajectory_queue[id][1][1:] # Increment progress in the trajectory
+                attr = getattr(self._robots[traj_id], 'move_to_joint_pos_with_vel', None)
+                if attr is not None:
+                    self._robots[traj_id].move_to_joint_pos_with_vel(next_pos, next_vel)
+                    self._trajectory_queue[traj_id][0] = self._trajectory_queue[traj_id][0][1:] # Increment progress in the trajectory
+                    self._trajectory_queue[traj_id][1] = self._trajectory_queue[traj_id][1][1:] # Increment progress in the trajectory
                 else:
                     rospy.logerr("No mechanism for handling trajectory execution for Robot Type %s" % (str(type(self._robots[id]))))
-                    self.clear_trajectory_queue(id)
+                    self.clear_trajectory_queue(traj_id)
                     continue
 
                 # Update trajectory_queue_timer
-            elif cur_time - self._trajectory_queue_timers[id] > self._motion_timeout:
+            elif cur_time - self._trajectory_queue_timers[traj_id] > self._motion_timeout:
                 # Action timed out, abort trajectory
-                rospy.logwarn("Trajectory for robot %d timed out! Aborting remainder of trajectory." % id)
-                self.clear_trajectory_queue(id)
+                rospy.logwarn("Trajectory for robot %d timed out! Aborting remainder of trajectory." % traj_id)
+                self.clear_trajectory_queue(traj_id)
                 continue
 
     def add_object(self, simobj_obj):
-        id = simobj_obj.get_simulator_id()
-        self._objects[id] = simobj_obj
+        sim_id = simobj_obj.get_simulator_id()
+        self._objects[sim_id] = simobj_obj
     
     def remove_object(self, simobj_id):
         if simobj_id in self._objects:
@@ -165,47 +172,49 @@ class Simulator:
             rospy.logerr("Tried to delete object %d, which Simulator doesn't think exists" % simobj_id)
 
     def add_robot(self, robot_obj):        
-        id = robot_obj.get_simulator_id()
-        self._robots[id] = robot_obj
-        self.add_robot_to_trajectory_queue(id)
+        sim_id = robot_obj.get_simulator_id()
+        self._robots[sim_id] = robot_obj
+        self.add_robot_to_trajectory_queue(sim_id)
 
-    def add_robot_to_trajectory_queue(self, id):        
-        self._trajectory_queue[id] = None
-        self._trajectory_queue_timers[id] = None
+    def add_robot_to_trajectory_queue(self, robot_id):        
+        self._trajectory_queue[robot_id] = None
+        self._trajectory_queue_timers[robot_id] = None
 
-    def clear_trajectory_queue(self, id):
-        if id not in self._trajectory_queue.keys(): return
-        self._trajectory_queue[id] = None
-        self._trajectory_queue_timers[id] = None
+    def clear_trajectory_queue(self, id_):
+        if id_ not in self._trajectory_queue.keys(): return
+        self._trajectory_queue[id_] = None
+        self._trajectory_queue_timers[id_] = None
 
-    def set_robot_trajectory(self, id, joint_positions, joint_velocities):        
-        self._trajectory_queue[id] = [list(joint_positions), list(joint_velocities)]
-        self._trajectory_queue_timers[id] = None
+    def set_robot_trajectory(self, id_, joint_positions, joint_velocities):        
+        self._trajectory_queue[id_] = [list(joint_positions), list(joint_velocities)]
+        self._trajectory_queue_timers[id_] = None
 
     def load_scene_file(self, sdf_file, obj_name_prefix):
         sim_id_array = p.loadSDF(sdf_file)
-        for i, id in enum(sim_id_array):
-            obj = SimObject(obj_name_prefix + str(i), id)
+        for i, id_ in enum(sim_id_array):
+            obj = SimObject(obj_name_prefix + str(i), id_)
 
 
 
 class SimObject():
     def __init__(self, object_name, model_file_or_sim_id, position=(0,0,0), orientation=(0,0,0,1)):
         self._name = object_name
+        if Simulator.is_instantiated():
+            if isinstance(model_file_or_sim_id, int):
+                self._simulator_id = model_file_or_sim_id
+            else:
+                self._simulator_id = self._load_model_file_into_sim(model_file_or_sim_id)
+                self.move_to_pose(position, orientation)
 
-        if isinstance(model_file_or_sim_id, int):
-            self._simulator_id = model_file_or_sim_id
+            if self._simulator_id is None:
+                rospy.logerr("Couldn't load object model from %s" % model_file)
+                return None
+
+            Simulator.get_instance().add_object(self)
+
+            self._state_pub = rospy.Publisher("/%s/pose" % self._name, PoseStamped, queue_size=1)
         else:
-            self._simulator_id = self._load_model_file_into_sim(model_file_or_sim_id)
-            self.move_to_pose(position, orientation)
-
-        if self._simulator_id is None:
-            rospy.logerr("Couldn't load object model from %s" % model_file)
-            return None
-
-        Simulator.get_instance().add_object(self)
-
-        self._state_pub = rospy.Publisher("/%s/pose" % self._name, PoseStamped, queue_size=1)
+            raise Exception("Simulator must be instantiated before creating a SimObject.")
 
     def publish_state(self):
         pose = PoseStamped()   
