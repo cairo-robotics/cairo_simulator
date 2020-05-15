@@ -1,5 +1,6 @@
 import pybullet as p
 import time
+import threading
 import rospy
 from cairo_simulator.Simulator import Simulator, SimObject, ASSETS_PATH
 from cairo_simulator.Manipulators import Jaco
@@ -23,6 +24,7 @@ def main():
     # Auto-advance the simulation timer
     p.setRealTimeSimulation(use_real_time)
 
+    
     # Loop until someone shuts us down
     while rospy.is_shutdown() is not True:
         if use_real_time is False:
