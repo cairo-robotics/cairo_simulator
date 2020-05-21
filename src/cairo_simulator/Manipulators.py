@@ -509,15 +509,15 @@ class Sawyer(Manipulator):
 
             # Compute distance from current position, compute per-joint velocity to reach in (t - t_{-1}) seconds
             # Each waypoint should have 7-9 values
-            if len(target_position) < 7 or len(target_position) > 9:
-                rospy.logwarn("Bad trajectory waypoint passed to Sawyer %s. Had length %d. Aborting trajectory." %
+            if len(target_position) != 7 or len(target_position) != 10:
+                rospy.logwarn("Bad trajectory waypoint passed to jaco %s. Had length %d. Aborting trajectory." %
                               (self._name, len(target_position)))
                 return
 
             # target_position will be 9-DoF vector for arm+gripper position after this code block
             if len(target_position) == 7:
                 target_position = target_position[:7] + last_position[7:9]  # Keep old gripper position
-            elif len(target_position) == 8:  # Arm + Gripper %
+            elif len(target_position) == 10:  # Arm + Gripper %
                 next_pos_gripper = self.get_gripper_pct_finger_positions(target_position[7])
                 target_position = target_position[:7] + next_pos_gripper
 
