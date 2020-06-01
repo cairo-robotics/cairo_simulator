@@ -9,7 +9,7 @@
       <visual>
         <origin rpy="0 ${pi} ${pi}" xyz="0 0 0"/>
         <geometry>
-          <mesh filename="package://intera_tools_description/meshes/pneumatic_gripper/pneumatic_gripper_w_cup.DAE"/>
+          <mesh filename="../meshes/pneumatic_gripper/pneumatic_gripper_w_cup.DAE"/>
         </geometry>
       </visual>
       <collision>

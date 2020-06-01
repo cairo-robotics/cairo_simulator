@@ -30,12 +30,17 @@
         <color rgba=".2 .2 .2 1"/>
       </material>
     </visual>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.000000 0.000000 0.000000"/>
+      <mass value="0.0001"/>
+      <inertia ixx="1e-08" ixy="0" ixz="0" iyy="1e-08" iyz="0" izz="1e-08"/>
+    </inertial>
   </link>
   <link name="pedestal">
     <visual>
       <origin rpy="1.57079632679 0 -1.57079632679" xyz="0.26 0.345 -0.91488"/>
       <geometry>
-        <mesh filename="sawyer_description/meshes/sawyer_pv/pedestal.DAE"/>
+        <mesh filename="package://sawyer_description/meshes/sawyer_pv/pedestal.DAE"/>
       </geometry>
       <material name="darkgray"/>
     </visual>
@@ -101,7 +106,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="sawyer_description/meshes/sawyer_pv/base.DAE"/>
+        <mesh filename="package://sawyer_description/meshes/sawyer_pv/base.DAE"/>
       </geometry>
       <material name="sawyer_red"/>
     </visual>
@@ -121,7 +126,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="sawyer_description/meshes/sawyer_mp3/l0.DAE"/>
+        <mesh filename="package://sawyer_description/meshes/sawyer_mp3/l0.DAE"/>
       </geometry>
       <material name="sawyer_red"/>
     </visual>
@@ -138,7 +143,6 @@
     <child link="right_l0"/>
     <axis xyz="0 0 1"/>
     <limit effort="80.0" lower="-3.0503" upper="3.0503" velocity="1.74"/>
-    <dynamics damping="10.0" friction="5.0"/>
   </joint>
   <link name="head">
     <inertial>
@@ -149,7 +153,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="sawyer_description/meshes/sawyer_pv/head.DAE"/>
+        <mesh filename="package://sawyer_description/meshes/sawyer_pv/head.DAE"/>
       </geometry>
       <material name="sawyer_red"/>
     </visual>
@@ -166,9 +170,13 @@
     <child link="head"/>
     <axis xyz="0 0 1"/>
     <limit effort="8" lower="-5.0952" upper="0.9064" velocity="1.8"/>
-    <dynamics damping="1.0" friction="0.5"/>
   </joint>
   <link name="right_torso_itb">
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.000000 0.000000 0.000000"/>
+      <mass value="0.0001"/>
+      <inertia ixx="1e-08" ixy="0" ixz="0" iyy="1e-08" iyz="0" izz="1e-08"/>
+    </inertial>
   </link>
   <joint name="right_torso_itb" type="fixed">
     <origin rpy="0 -1.57079632679 0" xyz="-.055 0 .22"/>
@@ -185,7 +193,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="sawyer_description/meshes/sawyer_mp3/l1.DAE"/>
+        <mesh filename="package://sawyer_description/meshes/sawyer_mp3/l1.DAE"/>
       </geometry>
       <material name="sawyer_red"/>
     </visual>
@@ -202,7 +210,6 @@
     <child link="right_l1"/>
     <axis xyz="0 0 1"/>
     <limit effort="80.0" lower="-3.8095" upper="2.2736" velocity="1.328"/>
-    <dynamics damping="5.0" friction="2.0"/>
   </joint>
   <link name="right_l2">
     <inertial>
@@ -213,7 +220,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="sawyer_description/meshes/sawyer_pv/l2.DAE"/>
+        <mesh filename="package://sawyer_description/meshes/sawyer_pv/l2.DAE"/>
       </geometry>
       <material name="sawyer_red"/>
     </visual>
@@ -230,7 +237,6 @@
     <child link="right_l2"/>
     <axis xyz="0 0 1"/>
     <limit effort="40.0" lower="-3.0426" upper="3.0426" velocity="1.957"/>
-    <dynamics damping="5.0" friction="2.0"/>
   </joint>
   <link name="right_l3">
     <inertial>
@@ -241,7 +247,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="sawyer_description/meshes/sawyer_pv/l3.DAE"/>
+        <mesh filename="package://sawyer_description/meshes/sawyer_pv/l3.DAE"/>
       </geometry>
       <material name="sawyer_red"/>
     </visual>
@@ -258,7 +264,6 @@
     <child link="right_l3"/>
     <axis xyz="0 0 1"/>
     <limit effort="40.0" lower="-3.0439" upper="3.0439" velocity="1.957"/>
-    <dynamics damping="1.0" friction="0.5"/>
   </joint>
   <link name="right_l4">
     <inertial>
@@ -269,7 +274,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="sawyer_description/meshes/sawyer_pv/l4.DAE"/>
+        <mesh filename="package://sawyer_description/meshes/sawyer_pv/l4.DAE"/>
       </geometry>
       <material name="sawyer_red"/>
     </visual>
@@ -286,9 +291,13 @@
     <child link="right_l4"/>
     <axis xyz="0 0 1"/>
     <limit effort="9.0" lower="-2.9761" upper="2.9761" velocity="3.485"/>
-    <dynamics damping="2.0" friction="1.0"/>
   </joint>
   <link name="right_arm_itb">
+    <inertial>
+      <origin rpy="0 0 0" xyz="0.000000 0.000000 0.000000"/>
+      <mass value="0.0001"/>
+      <inertia ixx="1e-08" ixy="0" ixz="0" iyy="1e-08" iyz="0" izz="1e-08"/>
+    </inertial>
   </link>
   <joint name="right_arm_itb" type="fixed">
     <origin rpy="0 -1.57079632679 0" xyz="-.055 0 .075"/>
@@ -305,7 +314,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="sawyer_description/meshes/sawyer_pv/l5.DAE"/>
+        <mesh filename="package://sawyer_description/meshes/sawyer_pv/l5.DAE"/>
       </geometry>
       <material name="sawyer_red"/>
     </visual>
@@ -322,9 +331,13 @@
     <child link="right_l5"/>
     <axis xyz="0 0 1"/>
     <limit effort="9.0" lower="-2.9761" upper="2.9761" velocity="3.485"/>
-    <dynamics damping="1.0" friction="0.5"/>
   </joint>
   <link name="right_hand_camera"/>
+  <inertial>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" yzz="1"/>
+    <mass value="0.01"/>
+  </inertial>
   <joint name="right_hand_camera" type="fixed">
     <origin rpy="0 1.57079632679 0" xyz="0.039552 -0.033 0.0695"/>
     <parent link="right_l5"/>
@@ -347,7 +360,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="sawyer_description/meshes/sawyer_mp1/l6.DAE"/>
+        <mesh filename="package://sawyer_description/meshes/sawyer_mp1/l6.DAE"/>
       </geometry>
       <material name="sawyer_red"/>
     </visual>
@@ -363,8 +376,7 @@
     <parent link="right_l5"/>
     <child link="right_l6"/>
     <axis xyz="0 0 1"/>
-    <limit effort="9.0" lower="-3.14" upper="3.14" velocity="4.545"/>
-    <dynamics damping="1.0" friction="0.5"/>
+    <limit effort="9.0" lower="-4.7124" upper="4.7124" velocity="4.545"/>
   </joint>
   <link name="right_hand">
     <collision>
@@ -374,9 +386,9 @@
       </geometry>
     </collision>
     <inertial>
-      <origin rpy="0 0 0" xyz="0 0.1 0"/>
-      <mass value="0.01"/>
-      <inertia ixx="0.01" ixy="0.01" ixz="0.01" iyy="0.01" iyz="0.01" izz="0.01"/>
+      <origin rpy="0 0 0" xyz="1.0E-08 1.0E-08 1.0E-08"/>
+      <mass value="1.0E-08"/>
+      <inertia ixx="1.0E-08" ixy="1.0E-08" ixz="1.0E-08" iyy="1.0E-08" iyz="1.0E-08" izz="1.0E-08"/>
     </inertial>
   </link>
   <joint name="right_hand" type="fixed">
@@ -386,6 +398,11 @@
     <child link="right_hand"/>
   </joint>
   <link name="right_l1_2">
+    <inertial>
+      <origin rpy="0 0 0" xyz="1.0E-08 1.0E-08 1.0E-08"/>
+      <mass value="1.0E-08"/>
+      <inertia ixx="1.0E-08" ixy="1.0E-08" ixz="1.0E-08" iyy="1.0E-08" iyz="1.0E-08" izz="1.0E-08"/>
+    </inertial>
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0.035"/>
       <geometry>
@@ -400,6 +417,11 @@
     <axis xyz="0 0 1"/>
   </joint>
   <link name="right_l2_2">
+    <inertial>
+      <origin rpy="0 0 0" xyz="1.0E-08 1.0E-08 1.0E-08"/>
+      <mass value="1.0E-08"/>
+      <inertia ixx="1.0E-08" ixy="1.0E-08" ixz="1.0E-08" iyy="1.0E-08" iyz="1.0E-08" izz="1.0E-08"/>
+    </inertial>
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0.26"/>
       <geometry>
@@ -414,6 +436,11 @@
     <axis xyz="0 0 1"/>
   </joint>
   <link name="right_l4_2">
+    <inertial>
+      <origin rpy="0 0 0" xyz="1.0E-08 1.0E-08 1.0E-08"/>
+      <mass value="1.0E-08"/>
+      <inertia ixx="1.0E-08" ixy="1.0E-08" ixz="1.0E-08" iyy="1.0E-08" iyz="1.0E-08" izz="1.0E-08"/>
+    </inertial>
     <collision>
       <origin rpy="0 0 0" xyz="0 0.01 0.26"/>
       <geometry>
@@ -441,6 +468,11 @@
         <sphere radius="0.001"/>
       </geometry>
     </collision>
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <mass value="0.0001"/>
+      <inertia ixx="1e-08" ixy="0" ixz="0" iyy="1e-08" iyz="0" izz="1e-08"/>
+    </inertial>
   </link>
   <joint name="display_joint" type="fixed">
     <origin rpy="1.57079632679 0 1.57079632679" xyz="0.03 0.0 0.105"/>
@@ -454,253 +486,6 @@
     <child link="head_camera"/>
     <axis xyz="0 0 0"/>
   </joint>
-  <!-- ros_control plugin -->
-  <gazebo>
-    <plugin filename="libsawyer_gazebo_ros_control.so" name="sawyer_ros_control">
-      <robotNamespace>/robot</robotNamespace>
-      <robotSimType>sawyer_gazebo/SawyerRobotHWSim</robotSimType>
-      <controlPeriod>0.001</controlPeriod>
-      <eStopTopic>sim_estop</eStopTopic>
-    </plugin>
-  </gazebo>
-  <link name="world"/>
-  <joint name="fixed" type="fixed">
-    <parent link="world"/>
-    <child link="base"/>
-  </joint>
-  <gazebo reference="pedestal">
-    <material>Gazebo/FlatBlack</material>
-  </gazebo>
-  <gazebo reference="torso">
-    <self_collide>true</self_collide>
-  </gazebo>
-  <gazebo reference="head_pan">
-    <implicitSpringDamper>1</implicitSpringDamper>
-    <provideFeedback>true</provideFeedback>
-  </gazebo>
-  <gazebo reference="right_j0">
-    <implicitSpringDamper>1</implicitSpringDamper>
-    <provideFeedback>true</provideFeedback>
-  </gazebo>
-  <gazebo reference="right_j1">
-    <implicitSpringDamper>1</implicitSpringDamper>
-    <provideFeedback>true</provideFeedback>
-  </gazebo>
-  <gazebo reference="right_j2">
-    <implicitSpringDamper>1</implicitSpringDamper>
-    <provideFeedback>true</provideFeedback>
-  </gazebo>
-  <gazebo reference="right_j3">
-    <implicitSpringDamper>1</implicitSpringDamper>
-    <provideFeedback>true</provideFeedback>
-  </gazebo>
-  <gazebo reference="right_j4">
-    <implicitSpringDamper>1</implicitSpringDamper>
-    <provideFeedback>true</provideFeedback>
-  </gazebo>
-  <gazebo reference="right_j5">
-    <implicitSpringDamper>1</implicitSpringDamper>
-    <provideFeedback>true</provideFeedback>
-  </gazebo>
-  <gazebo reference="right_j6">
-    <implicitSpringDamper>1</implicitSpringDamper>
-    <provideFeedback>true</provideFeedback>
-  </gazebo>
-  <joint name="head_camera_optical_joint" type="fixed">
-    <origin rpy="-3.14159265359 -1.57079632679 -1.57079632679" xyz="0 0 0"/>
-    <parent link="head_camera"/>
-    <child link="head_camera_optical"/>
-  </joint>
-  <link name="head_camera_optical"/>
-  <gazebo reference="head_camera_optical">
-    <sensor name="head_camera" type="camera">
-      <update_rate>10</update_rate>
-      <camera name="head_camera">
-        <horizontal_fov>2.00787026</horizontal_fov>
-        <image>
-          <width>1280</width>
-          <height>800</height>
-          <format>R8G8B8</format>
-        </image>
-        <clip>
-          <near>0.1</near>
-          <far>50</far>
-        </clip>
-        <!-- Uncomment to add image Distortion -->
-        <!-- distortion>
-          <k1>0.6545419633392568</k1>
-          <k2>0.012904541485280972</k2>
-          <k3>-0.012279942338550547</k3>
-          <p1>-0.00036475699823703154</p1>
-          <p2>3.334461262764956e-05</p2>
-          <center>677.8808657338167 382.02964533321426</center>
-        </distortion -->
-      </camera>
-      <!-- Uncomment to visualize image inside Gazebo -->
-      <!-- visualize>true</visualize -->
-      <plugin filename="libgazebo_ros_camera.so" name="camera_controller">
-        <alwaysOn>true</alwaysOn>
-        <updateRate>10</updateRate>
-        <cameraName>head_camera</cameraName>
-        <imageTopicName>/io/internal_camera/head_camera/image_raw</imageTopicName>
-        <cameraInfoTopicName>/io/internal_camera/head_camera/camera_info</cameraInfoTopicName>
-        <frameName>head_camera</frameName>
-        <focalLength>407.391526</focalLength>
-        <!-- Uncomment to add image Distortion params to camera_info topic -->
-        <!-- distortionK1>0.6545419633392568</distortionK1>
-        <distortionK2>0.012904541485280972</distortionK2>
-        <distortionK3>-0.012279942338550547</distortionK3>
-        <distortionT1>-0.00036475699823703154</distortionT1>
-        <distortionT2>3.334461262764956e-05</distortionT2>
-        <Cx>677.8808657338167</Cx>
-        <Cy>382.02964533321426</Cy -->
-      </plugin>
-    </sensor>
-  </gazebo>
-  <joint name="right_hand_camera_optical_joint" type="fixed">
-    <origin rpy="-3.14159265359 -1.57079632679 -1.57079632679" xyz="0 0 0"/>
-    <parent link="right_hand_camera"/>
-    <child link="right_hand_camera_optical"/>
-  </joint>
-  <link name="right_hand_camera_optical"/>
-  <gazebo reference="right_hand_camera_optical">
-    <sensor name="right_hand_camera" type="camera">
-      <update_rate>10.0</update_rate>
-      <camera name="right_hand_camera">
-        <horizontal_fov>1.0992892</horizontal_fov>
-        <image>
-          <width>752</width>
-          <height>480</height>
-          <format>L8</format>
-        </image>
-        <clip>
-          <near>0.02</near>
-          <far>10</far>
-        </clip>
-        <!-- Uncomment to add image Distortion -->
-        <!-- distortion>
-          <k1>-0.442</k1>
-          <k2>0.273</k2>
-          <k3>-0.123</k3>
-          <p1>0.0</p1>
-          <p2>0.0</p2>
-          <center>365.734985 237.988998</center>
-        </distortion -->
-      </camera>
-      <!-- Uncomment to visualize image inside Gazebo -->
-      <!-- visualize>true</visualize -->
-      <plugin filename="libgazebo_ros_camera.so" name="camera_controller">
-        <alwaysOn>true</alwaysOn>
-        <updateRate>10.0</updateRate>
-        <cameraName>right_hand_camera</cameraName>
-        <imageTopicName>/io/internal_camera/right_hand_camera/image_raw</imageTopicName>
-        <cameraInfoTopicName>/io/internal_camera/right_hand_camera/camera_info</cameraInfoTopicName>
-        <frameName>right_hand_camera</frameName>
-        <focalLength>613.760435</focalLength>
-        <!-- Uncomment to add image Distortion params to camera_info topic -->
-        <!-- distortionK1>-0.442</distortionK1>
-        <distortionK2>0.273</distortionK2>
-        <distortionK3>-0.123</distortionK3>
-        <distortionT1>0.0</distortionT1>
-        <distortionT2>0.0</distortionT2>
-        <Cx>365.734985</Cx>
-        <Cy>237.988998</Cy -->
-      </plugin>
-    </sensor>
-  </gazebo>
-  <gazebo reference="screen">
-    <visual>
-      <plugin filename="libgazebo_ros_video.so" name="screen_video_controller">
-        <height>600</height>
-        <width>1024</width>
-        <topicName>/robot/head_display</topicName>
-        <robotNamespace>/robot</robotNamespace>
-      </plugin>
-    </visual>
-  </gazebo>
-  <!-- Transmissions -->
-  <!-- Right Arm -->
-  <transmission name="right_tran0">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="right_j0">
-      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="right_motor0">
-      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
-      <mechanicalReduction>1</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <transmission name="right_tran1">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="right_j1">
-      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="right_motor1">
-      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
-      <mechanicalReduction>1</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <transmission name="right_tran2">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="right_j2">
-      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="right_motor2">
-      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
-      <mechanicalReduction>1</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <transmission name="right_tran3">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="right_j3">
-      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="right_motor3">
-      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
-      <mechanicalReduction>1</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <transmission name="right_tran4">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="right_j4">
-      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="right_motor4">
-      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
-      <mechanicalReduction>1</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <transmission name="right_tran5">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="right_j5">
-      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="right_motor5">
-      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
-      <mechanicalReduction>1</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <transmission name="right_tran6">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="right_j6">
-      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="right_motor6">
-      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
-      <mechanicalReduction>1</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <!-- Head -->
-  <transmission name="head0">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="head_pan">
-      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="head_motor0">
-      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
-      <mechanicalReduction>1</mechanicalReduction>
-    </actuator>
-  </transmission>
   <!-- Base of whole end effector - (Connector Plate + Electric Gripper + Fingers + Tips) -->
   <link name="right_gripper_base">
     <inertial>
@@ -715,7 +500,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="sawyer_description/meshes/electric_gripper/electric_gripper_base.DAE"/>
+        <mesh filename="../meshes/electric_gripper/electric_gripper_base.DAE"/>
       </geometry>
     </visual>
     <collision>
@@ -748,7 +533,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="sawyer_description/meshes/connector_plate/connector_plate.STL"/>
+        <mesh filename="../meshes/connector_plate/connector_plate.STL"/>
       </geometry>
       <material name="black">
         <color rgba="0.05 0.05 0.05 1"/>
@@ -764,9 +549,6 @@
       </material>
     </collision>
   </link>
-  <gazebo reference="right_connector_plate_base">
-    <material>Gazebo/FlatBlack</material>
-  </gazebo>
   <link name="right_connector_plate_mount"/>
   <joint name="right_connector_plate_mount_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0 0 0.0176"/>
@@ -783,7 +565,7 @@
     <visual>
       <origin rpy="0 0 -3.14159265359" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="sawyer_description/meshes/electric_gripper/fingers/standard_narrow.DAE"/>
+        <mesh filename="../meshes/electric_gripper/fingers/standard_narrow.DAE"/>
       </geometry>
     </visual>
     <collision>
@@ -791,6 +573,7 @@
       <geometry>
         <box size="0.01 0.0135 0.075"/>
       </geometry>
+      <contact_coefficients mu="1"/>
     </collision>
     <collision>
       <origin rpy="0 0 -3.14159265359" xyz="-0.005 -0.003 0.0083"/>
@@ -804,18 +587,11 @@
       <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
     </inertial>
   </link>
-  <gazebo reference="right_gripper_l_finger">
-    <mu1>1000</mu1>
-    <mu2>1000</mu2>
-    <fdir1>0.0 0.0 1.0</fdir1>
-    <kp>1e5</kp>
-    <kd>1.0</kd>
-  </gazebo>
   <link name="right_gripper_l_finger_tip">
     <visual>
       <origin rpy="0 0 3.14159265359" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="sawyer_description/meshes/electric_gripper/fingers/basic_soft_tip.DAE"/>
+        <mesh filename="../meshes/electric_gripper/fingers/basic_soft_tip.DAE"/>
       </geometry>
     </visual>
     <collision>
@@ -839,7 +615,7 @@
     <visual>
       <origin rpy="0 0 -0.0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="sawyer_description/meshes/electric_gripper/fingers/standard_narrow.DAE"/>
+        <mesh filename="../meshes/electric_gripper/fingers/standard_narrow.DAE"/>
       </geometry>
     </visual>
     <collision>
@@ -847,6 +623,7 @@
       <geometry>
         <box size="0.01 0.0135 0.075"/>
       </geometry>
+      <contact_coefficients mu="1"/>
     </collision>
     <collision>
       <origin rpy="0 0 -0.0" xyz="0.005 0.003 0.0083"/>
@@ -860,18 +637,11 @@
       <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
     </inertial>
   </link>
-  <gazebo reference="right_gripper_r_finger">
-    <mu1>1000</mu1>
-    <mu2>1000</mu2>
-    <fdir1>0.0 0.0 1.0</fdir1>
-    <kp>1e5</kp>
-    <kd>1.0</kd>
-  </gazebo>
   <link name="right_gripper_r_finger_tip">
     <visual>
       <origin rpy="0 0 0.0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="sawyer_description/meshes/electric_gripper/fingers/basic_soft_tip.DAE"/>
+        <mesh filename="../meshes/electric_gripper/fingers/basic_soft_tip.DAE"/>
       </geometry>
     </visual>
     <collision>
@@ -926,31 +696,5 @@
     <mimic joint="right_gripper_l_finger_joint" multiplier="-1.0"/>
     <dynamics damping="100.0" friction="500.0"/>
   </joint>
-  <transmission name="gripper_right1">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="right_gripper_r_finger_joint">
-      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="gripper_right1_motor1">
-      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
-      <mechanicalReduction>1</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <transmission name="gripper_right2">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="right_gripper_l_finger_joint">
-      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
-    </joint>
-    <actuator name="gripper_right1_motor2">
-      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
-      <mechanicalReduction>1</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <gazebo reference="right_gripper_r_finger_joint">
-    <implicitSpringDamper>1</implicitSpringDamper>
-  </gazebo>
-  <gazebo reference="right_gripper_l_finger_joint">
-    <implicitSpringDamper>1</implicitSpringDamper>
-  </gazebo>
 </robot>
 
