@@ -9,7 +9,7 @@ from abc import abstractmethod
 from .Simulator import ASSETS_PATH
 from .Simulator import Simulator
 from .Simulator import Robot
-
+from cairo_simulator import Utils
 
 class Manipulator(Robot):
     def __init__(self, robot_name, urdf_file, x, y, z):
@@ -86,7 +86,7 @@ class Manipulator(Robot):
     @abstractmethod
     def get_current_joint_states(self):
         '''
-        Returns a vector of the robot's joint positions
+        Returns a vector of the robot's joint positions.
         '''
         pass
 
@@ -173,24 +173,21 @@ class Manipulator(Robot):
         ik_solution = None
 
         if target_in_local_coords is True:
-            cur_pos = self.get_current_joint_states()[:len(self._arm_dof_indices)]
-            if target_orientation is None:
-                ik_solution = p.calculateInverseKinematics(
-                    self._simulator_id, self._end_effector_link_index, target_position, currentPosition=cur_pos, maxNumIterations=120)
-            else:
-                if len(target_orientation) == 3:
-                    target_orientation = p.getQuaternionFromEuler(target_orientation)
-                ik_solution = p.calculateInverseKinematics(self._simulator_id, self._end_effector_link_index,
-                                                           target_position, targetOrientation=target_orientation, currentPosition=cur_pos, maxNumIterations=120)
+            # Convert position from robot-centric coordinate space to world coordinates
+            robot_world_pose = p.getBasePositionAndOrientation(self._simulator_id)
+            robot_world_position, robot_world_ori_euler = robot_world_pose[:3], p.getEulerFromQuaternion(robot_world_pose[3:])            
+            transform_from_robot_local_coord_to_world_frame = Utils.compute_3d_homogeneous_transform(robot_world_pose[0], robot_world_pose[1], robot_world_pose[2], robot_world_ori_euler[0], robot_world_ori_euler[1], robot_world_ori_euler[2])
+            target_point = np.array([*target_position, 1])
+            target_position = np.matmul(transform_from_robot_local_coord_to_world_frame, target_point.T)[:3]
+
+        if target_orientation is None:
+            ik_solution = p.calculateInverseKinematics(
+                self._simulator_id, self._end_effector_link_index, target_position, maxNumIterations=120)
         else:
-            if target_orientation is None:
-                ik_solution = p.calculateInverseKinematics(
-                    self._simulator_id, self._end_effector_link_index, target_position, maxNumIterations=120)
-            else:
-                if len(target_orientation) == 3:
-                    target_orientation = p.getQuaternionFromEuler(target_orientation)
-                ik_solution = p.calculateInverseKinematics(
-                    self._simulator_id, self._end_effector_link_index, target_position, targetOrientation=target_orientation, maxNumIterations=120)
+            if len(target_orientation) == 3:
+                target_orientation = p.getQuaternionFromEuler(target_orientation)
+            ik_solution = p.calculateInverseKinematics(
+                self._simulator_id, self._end_effector_link_index, target_position, targetOrientation=target_orientation, maxNumIterations=120)
 
         # Return a configuration of only the arm's joints.
         arm_config = [0] * len(self._arm_dof_indices)
