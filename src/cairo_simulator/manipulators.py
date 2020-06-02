@@ -1,3 +1,6 @@
+"""
+Classes to represent robot Manpulators in PyBullet simulations.
+"""
 import copy
 import json
 import numpy as np
@@ -6,15 +9,27 @@ import pybullet as p
 from std_msgs.msg import Float32MultiArray, Float32
 from std_msgs.msg import String
 from abc import abstractmethod
-from .Simulator import ASSETS_PATH
-from .Simulator import Simulator
-from .Simulator import Robot
-from cairo_simulator import Utils
+from cairo_simulator.simulator import Simulator
+from cairo_simulator.simulator import Robot
+
+from cairo_simulator.sim_const import ASSETS_PATH
 
 class Manipulator(Robot):
+
+    """
+     Base class for Robot Manipulators with linked/articulated chains.
+    """
+    
     def __init__(self, robot_name, urdf_file, x, y, z):
         """
         Initialize a Robot at coordinates (x,y,z) and add it to the simulator manager
+        
+        Args:
+            robot_name (str): Name of the robot
+            urdf_file (file object): File object of the desired URDF file
+            x (int): Central x-coordinate
+            y (int): Central y-coordinate
+            z (int): Central z-coordinate
         """
         super().__init__(robot_name, urdf_file, x, y, z, 0) # p.URDF_MERGE_FIXED_LINKS)
 
@@ -71,16 +86,20 @@ class Manipulator(Robot):
     def move_to_joint_pos(self, target_position):
         '''
         Move arm to a target position
-        @param target_position List of floats, indicating joint positions for the manipulator
+        
+        Args:
+            target_position (list): List of floats, indicating joint positions for the manipulator
         '''
         pass
 
     @abstractmethod
     def move_to_joint_pos_with_vel(self, target_position, target_velocity):
         '''
-        Move arm to a target position (interpolate) at a given velocity
-        @param target_position List of floats, indicating joint positions for the manipulator
-        @param target_velocities: List of floats, indicating the speed that each joint should move to reach its position.
+        Abtract method to move arm to a target position (interpolate) at a given velocity
+        
+        Args:
+            target_position (): List of floats, indicating joint positions for the manipulator
+            target_velocity (list): List of floats, indicating the speed that each joint should move to reach its position.
         '''
         pass
 
@@ -111,9 +130,13 @@ class Manipulator(Robot):
         '''
         Returns the pose (point,quaternion) of the robot's end-effector given the provided joint_configuration
         in both world coords and local inertial frame coords.
-        @param joint_configuration Vector of motor positions
-        @param terminal_joint_index Joint/Link index whose position is desired
-        @return [(world_pos, world_ori), (local_pos, local_ori)]
+        
+        Args:
+            joint_configuration (list): Vector of motor positions
+            terminal_joint_index (None, optional): Joint/Link index whose position is desired
+        
+        Returns:
+            List: [(world_pos, world_ori), (local_pos, local_ori)]
         '''
 
         if terminal_joint_index is None:
@@ -145,6 +168,12 @@ class Manipulator(Robot):
     def get_joint_pose_in_world_frame(self, joint_index=None):
         '''
         Returns the pose (point,quaternion) of the robot's joint at joint_index in the world frame. Defaults to end effector.
+        
+        Args:
+            joint_index (None, optional): Index of the joint for which to get the pose.
+        
+        Returns:
+            list, list: world_pos, world_quaternion
         '''
         if joint_index is None:
             joint_index = self._end_effector_link_index
@@ -160,11 +189,18 @@ class Manipulator(Robot):
         '''
         Returns a robot configuration (list of joint positions) that gets the robot's end_effector_link 
         as close as possible to target_position at target_orientation in world coordinates.
+        
         If target_in_local_coords is true, then target_position is assumed to be from the robot's inertial frame.
         Wraps PyBullet's calculateInverseKinematics function.
-
-        @param target_position List with target [x,y,z] coordinate.
-        @param target_orientation (Optional) List with target orientation either as Euler angles [r,p,y] or a quaternion [x,y,z,w].
+        
+        
+        Args:
+            target_position (list): List with target [x,y,z] coordinate.
+            target_orientation (list/None, optional): List with target orientation either as Euler angles [r,p,y] or a quaternion [x,y,z,w].
+            target_in_local_coords (bool, optional): Boolean flag to indicate whether to use robot's intertial frame.
+        
+        Returns:
+            list: List of joint configurations.
         '''
         if self._end_effector_link_index == -1:
             rospy.logerr(
@@ -203,7 +239,9 @@ class Manipulator(Robot):
         This function computes the velocities needed to make the timeline.        
         Ex: trajectory_data = [(1., [0,0,0,0,0,0,0]), (2.5, [1,0,0,0,0,0,0]), (4, [1,0,2.9,1.23,1.52,0,0])]
             Sends robot to 3 waypoints over the course of 4 seconds
-        @param trajectory_data Vector of (time, joint configuration) tuples, indicating which joint positions the robot should achieve at which times. Set time=0 for each waypoint if you don't care about timing. Joint configuration vector contents should correspond to the parameters that work for for move_to_joint_pos
+        
+        Args:
+            trajectory_data (list): Vector of (time, joint configuration) tuples, indicating which joint positions the robot should achieve at which times. Set time=0 for each waypoint if you don't care about timing. Joint configuration vector contents should correspond to the parameters that work for for move_to_joint_pos
         '''
         joint_count = (len(self._arm_dof_indices) + len(self._gripper_dof_indices))
 
@@ -251,9 +289,14 @@ class Manipulator(Robot):
 
     def check_if_at_position(self, pos, epsilon=0.001):
         '''
-        Returns True if the robot's joints are within epsilon of pos, false otherwise
-        @param pos Vector of joint positions
-        @param epsilon Distance threshold for 'at position'. Larger is more permissive.
+        Returns True if the robot's joints are within epsilon of pos, false otherwisen 
+        
+        Args:
+            pos (list): Vector of joint positions
+            epsilon (float, optional): Distance threshold for 'at position'. Larger is more permissive.
+        
+        Returns:
+            bool: Whether or not if at position within epsilon.
         '''
 
         joint_count = (len(self._arm_dof_indices) + len(self._gripper_dof_indices))
@@ -268,9 +311,21 @@ class Manipulator(Robot):
 
 
 class Sawyer(Manipulator):
+
+    """
+    Concrete Manipulator representing a Sawyer Robot in Simulation.
+    """
+    
     def __init__(self, robot_name, x=0, y=0, z=0.8, publish_full_state=False):
-        """
+         """
         Initialize a Sawyer Robot at coordinates (x,y,z) and add it to the simulator manager
+        
+        Args:
+            robot_name (TYPE): Description
+            x (int, optional): Description
+            y (int, optional): Description
+            z (float, optional): Description
+            publish_full_state (bool, optional): Description
         """
         super().__init__(robot_name, ASSETS_PATH + 'sawyer_description/urdf/sawyer_static.urdf', x, y, z)
 
@@ -282,6 +337,9 @@ class Sawyer(Manipulator):
         self._init_local_vars()
 
     def _init_joint_names(self):
+        """
+        Initialize joint names i.e.  Sawyer's"right_j0"
+        """
         self._arm_dof_names = ['right_j0', 'right_j1', 'right_j2', 'right_j3', 'right_j4', 'right_j5', 'right_j6']
         self._gripper_dof_names = ['right_gripper_l_finger_joint', 'right_gripper_r_finger_joint']
         self._extra_dof_names = ['head_pan']
@@ -305,7 +363,9 @@ class Sawyer(Manipulator):
         self._end_effector_link_index = self._arm_dof_indices[-1]
 
     def _init_joint_limits(self):
-        # Initialize joint limits
+        """
+        Initialize join limits.
+        """
         self._arm_joint_limits = []  # Seven elements, j0 through j6, containing a tuple with the (min,max) value
         self._arm_joint_velocity_max = []  # Max velocity for each arm joint
         self._arm_joint_default_velocity = []  # Default velocity for each arm joint
@@ -335,6 +395,9 @@ class Sawyer(Manipulator):
     def set_default_joint_velocity_pct(self, pct):
         '''
         Sets the default movement speed for each joint as a percentage of its maximum velocity.
+        
+        Args:
+            pct (float): The percentage of max velocity.
         '''
         pct = max(min(1., pct), 0.)
 
@@ -351,12 +414,24 @@ class Sawyer(Manipulator):
             self._extra_joint_default_velocity.append(max_vel * pct)
 
     def set_head_pan(self, val):
+        """Sets head pan position.
+
+        TODO: Currently setup to be ROS callback but should be separated into two separate function calls.
+        
+        Args:
+            val (TYPE): Description
+        """
         target_position = max(self._extra_joint_limits[0][0], min(val.data, self._extra_joint_limits[0][1]))
         # TODO: Update to use setJointMotorControl with maxVelocity
         p.setJointMotorControlArray(self._simulator_id, self._extra_dof_indices,
                                     p.POSITION_CONTROL, targetPositions=target_position)
 
     def publish_state(self):
+        """
+        Publish robot state if using ROS. 
+
+        This will populate a state vector and publish the the robot state topic initalized during instantiation.
+        """
         base_pose = p.getBasePositionAndOrientation(self._simulator_id)
         arm_configuration = []
         gripper_configuration = []
@@ -394,6 +469,13 @@ class Sawyer(Manipulator):
         self._pub_robot_state.publish(state_vector)
 
     def move_to_joint_pos_callback(self, target_position_float32array):
+        """
+        Moves to target joint position, will wait for current execution to finish.
+        
+        Args:
+            target_position_float32array (list): List for float value sfor position.
+        
+        """
         if self._executing_trajectory:
             rospy.logwarn("Current trajectory for %s not finished executing, but new joint position received!" % self._name)
         return self.move_to_joint_pos(target_position_float32array.data)
@@ -402,6 +484,9 @@ class Sawyer(Manipulator):
         '''
         Move Sawyer arm to a target position (interpolate)
         @param target_position: List of 7, 8, or 9 floats, indicating either 7: joint positions for Sawyer's 7 DoF arm, 8: joint positions for the 7 DoF arm and a percentage indicating how open the gripper should be, or 9: joint positions for the 7 DoF arm and positions for the 2 DoF gripper's finger positions
+        
+        Args:
+            target_position (TYPE): The target description the length of which is depdendent on whether gripper open/close control is desired.
         '''
         list_tgt_position = list(target_position)
         if len(target_position) == 7:
@@ -418,9 +503,17 @@ class Sawyer(Manipulator):
         else:
             rospy.logwarn(
                 "Invalid joint configuration provided for Sawyer %s. Needs to be 7 floats (arm) or 9 floats (arm+gripper)" % self._name)
-            return
 
     def move_to_joint_pos_vel_callback(self, target_position_vel_float32array):
+        """
+        Moves robot to joint position with given joint velocities.
+        
+        Args:
+            target_position_vel_float32array (list): 9 positional and 9 velocity float values
+        
+        Returns:
+            TYPE: Description
+        """
         if len(target_position_vel_float32array.data) != 18:
             rospy.logwarn(
                 "Invalid position and velocity configuration provided for Sawyer %s. Must have 18 floats for 9 position and 9 velocity targets." % self._name)
@@ -432,6 +525,11 @@ class Sawyer(Manipulator):
         Move Sawyer arm to a target position (interpolate) at a given velocity
         @param target_position: Vector of 9 floats, indicating joint positions for the 7 DoF arm and positions for the 2 DoF gripper's finger positions
         @param target_velocities: Vector of 9 floats, indicating the speed that each joint should move to reach its position.
+        
+        Args:
+            desired_position (list): Desired position/joint positions
+            desired_velocity (list): Desired joint velocities.
+        
         '''
 
         target_position = list(desired_position)
@@ -443,11 +541,11 @@ class Sawyer(Manipulator):
                 len(target_position), len(target_velocity)))
             return
 
-        if len(target_position) != 7 and len(target_position) != 9:
+        elif len(target_position) != 7 and len(target_position) != 9:
             rospy.logwarn("Invalid joint configuration/velocities provided for Sawyer %s. Function requires lists to be of length 1-7 floats (arm DoF only) or 9 floats (7 arm + 2 gripper DoF)" % self._name)
-            return
+            
 
-        if len(target_position) == 7:
+        elif len(target_position) == 7:
             gripper_pos = p.getJointStates(self._simulator_id, self._gripper_dof_indices)
             for entry in gripper_pos:
                 target_position.append(entry[0])
@@ -473,6 +571,12 @@ class Sawyer(Manipulator):
                                     target_position[i], target_velocity[i], maxVelocity=target_velocity[i])
 
     def get_current_joint_states(self):
+        """
+        Returns the current joint states.
+        
+        Returns:
+            list: List of joint angles / configuration.
+        """
         position = []
         joint_states = p.getJointStates(self._simulator_id, self._arm_dof_indices + self._gripper_dof_indices)
         for entry in joint_states:
@@ -480,6 +584,12 @@ class Sawyer(Manipulator):
         return position
 
     def execute_trajectory_callback(self, trajectory_json_string):
+        """
+        Executed the given trajectory encoded as in a predefined JSON format.
+        
+        Args:
+            trajectory_json_string (str): JSON formatted string.
+        """
         if self._executing_trajectory:
             rospy.logwarn("Current trajectory for %s not finished executing, but new trajectory received!" % self._name)
         traj_data = json.loads(trajectory_json_string.data)
@@ -491,6 +601,9 @@ class Sawyer(Manipulator):
         Ex: trajectory_data = [(1., [0,0,0,0,0,0,0]), (2.5, [1,0,0,0,0,0,0,0]), (4, [1,0,2.9,1.23,1.52,0,0,0])]
             Sends robot to 3 waypoints over the course of 4 seconds
         @param trajectory_data Vector of (time, joint configuration) tuples, indicating which joint positions the robot should achieve at which times. Set time=0 for each waypoint if you don't care about timing. Joint configuration vectors can be 7, 8, or 9 floats corresponding to the parameter for move_to_joint_pos (7: arm only, 8: arm + gripper %open, 9: arm + gripper finger positions)
+        
+        Args:
+            trajectory_data (list): List of tuples (time, configuration list)
         '''
 
         joint_positions = []
@@ -546,6 +659,13 @@ class Sawyer(Manipulator):
         '''
         Returns True if the robot's joints are within (epsilon) of pos, false otherwise
         @param pos Vector of length 7, 8, or 9, corresponding to arm position, arm+gripper%, or arm+gripper position
+        
+        Args:
+            pos (TYPE): Vector of length 7, 8, or 9, corresponding to arm position, arm+gripper%, or arm+gripper position
+            epsilon (float, optional): Within bounds
+        
+        Returns:
+            TYPE: Description
         '''
         if len(pos) < 7 or len(pos) > 9:
             rospy.logwarn("Invalid position given to check_if_at_position. Must be length 7, 8, or 9 for Sawyer.")
@@ -568,7 +688,13 @@ class Sawyer(Manipulator):
     def get_gripper_pct_finger_positions(self, pct_gripper_open):
         '''
         Returns the target position of each gripper finger given a percentage of how open the gripper should be
-        @param pct_gripper_open Value in range [0.,1.] describing how open the gripper should be
+        
+        Args:
+            pct_gripper_open (float): pct_gripper_open Value in range [0.,1.] describing how open the gripper should be
+
+        
+        Returns:
+            TYPE: Description
         '''
         pct_gripper_open = max(0., min(1., pct_gripper_open))
         max_displacement = 0
