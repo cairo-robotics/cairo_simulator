@@ -3,7 +3,7 @@ import time
 import rospy
 from cairo_simulator.simulator import Simulator, SimObject
 from cairo_simulator.manipulators import Sawyer
-from cairo_simulator.sim_const import ASSETS_PATH
+from cairo_simulator.utils import ASSETS_PATH
 
 def main():
     rospy.init_node("CAIRO_Sawyer_Simulator")

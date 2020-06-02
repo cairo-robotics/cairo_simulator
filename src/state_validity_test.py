@@ -3,7 +3,7 @@ import rospy
 from cairo_simulator.simulator import Simulator, SimObject
 from cairo_simulator.manipulators import Sawyer
 from planning.collision import self_collision_test, DisabledCollisionsContext
-from cairo_simulator.sim_const import ASSETS_PATH
+from cairo_simulator.utils import ASSETS_PATH
 from cairo_motion_planning.samplers import UniformSampler
 from cairo_motion_planning.state_space import SawyerConfigurationSpace
 from cairo_motion_planning.state_validity import StateValidyChecker
