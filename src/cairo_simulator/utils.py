@@ -1,4 +1,9 @@
+import os
+
 import numpy as np
+
+ASSETS_PATH = os.path.dirname(os.path.abspath(__file__)) + '/../../assets/' # Find ./cairo_simulator/assets/ from ./cairo_simulator/src/cairo_simulator/
+
 
 def compute_3d_homogeneous_transform(x, y, z, alpha, beta, gamma):
     '''
