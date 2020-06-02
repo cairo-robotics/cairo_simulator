@@ -2,8 +2,10 @@ import pybullet as p
 import time
 import copy
 import rospy
-from cairo_simulator.Simulator import Simulator, SimObject, ASSETS_PATH
-from cairo_simulator.Manipulators import Sawyer
+from cairo_simulator.simulator import Simulator, SimObject
+from cairo_simulator.manipulators import Sawyer
+from cairo_simulator.sim_const import ASSETS_PATH
+
 
 def main():
     rospy.init_node("CAIRO_Sawyer_Simulator")

@@ -1,8 +1,9 @@
 import pybullet as p
 import time
 import rospy
-from cairo_simulator.Simulator import Simulator, SimObject, ASSETS_PATH
-from cairo_simulator.Manipulators import Sawyer
+from cairo_simulator.simulator import Simulator, SimObject
+from cairo_simulator.manipulators import Sawyer
+from cairo_simulator.sim_const import ASSETS_PATH
 
 def main():
     rospy.init_node("CAIRO_Sawyer_Simulator")
@@ -12,6 +13,7 @@ def main():
 
     # Add a table and a Sawyer robot
     table = SimObject("Table", ASSETS_PATH + 'table.sdf', (0.9, 0, 0), (0, 0, 1.5708)) # Table rotated 90deg along z-axis
+    print(p.getNumJoints(table.get_simulator_id()))
     sawyer_robot = Sawyer("sawyer0", 0, 0, 0.8)
 
     sim_obj = SimObject('cube0', 'cube_small.urdf', (0.75, 0, .55))
