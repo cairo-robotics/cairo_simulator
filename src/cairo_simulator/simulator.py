@@ -1,18 +1,13 @@
 import time
-import json
-import os
-import sys
-import copy
 from abc import ABC, abstractmethod
-import numpy as np
+
 import rospy
 from std_msgs.msg import Float32MultiArray
-from std_msgs.msg import String, Empty
+from std_msgs.msg import Empty
 from geometry_msgs.msg import PoseStamped
+
 import pybullet as p
 import pybullet_data
-
-ASSETS_PATH = os.path.dirname(os.path.abspath(__file__)) + '/../../assets/' # Find ./cairo_simulator/assets/ from ./cairo_simulator/src/cairo_simulator/
 
 
 class Simulator:
@@ -29,15 +24,15 @@ class Simulator:
         if Simulator.__instance is not None:
             return True
         else:
-            return Simulator.__instance
+            return False
 
-    def __init__(self, use_real_time=True):
+    def __init__(self, use_real_time=True, gui=True):
         if Simulator.__instance is not None:
             raise Exception("You may only initialize -one- simulator per program! Use get_instance instead.")
         else:
             Simulator.__instance = self
 
-        self.__init_bullet()
+        self.__init_bullet(gui=gui)
         self.__init_vars(use_real_time)
         self.__init_ros()
 
@@ -58,9 +53,12 @@ class Simulator:
         self._sim_timestep = 1./240. # If not using real-time mode, amount of time to pass per step() call
         self.set_real_time(use_real_time)
 
-    def __init_bullet(self):
+    def __init_bullet(self, gui=True):
         # Simulation world setup
-        self._physics_client = p.connect(p.GUI)
+        if gui:
+            self._physics_client = p.connect(p.GUI)
+        else:
+            self._physics_client = p.connect(p.DIRECT)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         p.setGravity(0,0,-9.81)
         id_plane = p.loadURDF("plane.urdf")
@@ -97,8 +95,8 @@ class Simulator:
 
     def estop_set_callback(self, data):
         self._estop = True
-        for traj_id in g_trajectory_queue.keys():
-            clear_trajectory_queue(traj_id)
+        for traj_id in self._trajectory_queue.keys():
+            self.clear_trajectory_queue(traj_id)
 
     def estop_release_callback(self, data):
         self._estop = False
@@ -191,7 +189,7 @@ class Simulator:
 
     def load_scene_file(self, sdf_file, obj_name_prefix):
         sim_id_array = p.loadSDF(sdf_file)
-        for i, id_ in enum(sim_id_array):
+        for i, id_ in enumerate(sim_id_array):
             obj = SimObject(obj_name_prefix + str(i), id_)
 
 
@@ -207,7 +205,7 @@ class SimObject():
                 self.move_to_pose(position, orientation)
 
             if self._simulator_id is None:
-                rospy.logerr("Couldn't load object model from %s" % model_file)
+                rospy.logerr("Couldn't load object model from %s" % self.model_file_or_sim_id)
                 return None
 
             Simulator.get_instance().add_object(self)
@@ -316,5 +314,3 @@ class Robot(ABC):
         Publish robot state onto a ROS Topic
         '''
         pass
-
-from .Manipulators import Manipulator
