@@ -52,7 +52,7 @@
     </collision>
     <inertial>
       <origin rpy="0 0 0" xyz="0 0 -0.5"/>
-      <mass value="60.86397744"/>
+      <mass value="1160.86397744"/>
       <inertia ixx="5.0635929" ixy="0.00103417" ixz="0.80199628" iyy="6.08689388" iyz="0.00105311" izz="4.96191932"/>
     </inertial>
   </link>
@@ -333,11 +333,6 @@
     <limit effort="9.0" lower="-2.9761" upper="2.9761" velocity="3.485"/>
   </joint>
   <link name="right_hand_camera"/>
-  <inertial>
-    <origin rpy="0 0 0" xyz="0 0 0"/>
-    <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" yzz="1"/>
-    <mass value="0.01"/>
-  </inertial>
   <joint name="right_hand_camera" type="fixed">
     <origin rpy="0 1.57079632679 0" xyz="0.039552 -0.033 0.0695"/>
     <parent link="right_l5"/>

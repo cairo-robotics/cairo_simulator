@@ -16,7 +16,7 @@ class Manipulator(Robot):
         """
         Initialize a Robot at coordinates (x,y,z) and add it to the simulator manager
         """
-        super().__init__(robot_name, urdf_file, x, y, z, p.URDF_MERGE_FIXED_LINKS)
+        super().__init__(robot_name, urdf_file, x, y, z, 0) # p.URDF_MERGE_FIXED_LINKS)
 
         self._sub_position_update = rospy.Subscriber(
             '/%s/move_to_joint_pos' % self._name, Float32MultiArray, self.move_to_joint_pos_callback)
@@ -37,6 +37,7 @@ class Manipulator(Robot):
         self._arm_joint_limits = []
         self._arm_joint_velocity_max = []  # Max velocity for each arm joint
         self._arm_joint_default_velocity = []  # Default velocity for moving the robot's joints
+        self._arm_ik_indices = [] # List of indices of arm DoF within list of all non-fixed joints
 
         self._gripper_joint_limits = []
         self._gripper_joint_velocity_max = []  # Max velocity for each gripper joint
@@ -190,8 +191,8 @@ class Manipulator(Robot):
                 self._simulator_id, self._end_effector_link_index, target_position, targetOrientation=target_orientation, maxNumIterations=120)
 
         # Return a configuration of only the arm's joints.
-        arm_config = [0] * len(self._arm_dof_indices)
-        for i, idx in enumerate(self._arm_dof_indices):
+        arm_config = [0] * len(self._arm_ik_indices)
+        for i, idx in enumerate(self._arm_ik_indices):
             arm_config[i] = ik_solution[idx]
 
         return arm_config
@@ -289,6 +290,17 @@ class Sawyer(Manipulator):
         self._arm_dof_indices = self._populate_dof_indices(self._arm_dof_names)
         self._gripper_dof_indices = self._populate_dof_indices(self._gripper_dof_names)  # Left finger, Right finger
         self._extra_dof_indices = self._populate_dof_indices(self._extra_dof_names)
+        
+        # Find index of each arm DoF when only counting non-fixed joints for IK calls
+        self._arm_ik_indices = []
+        actuated_joints = []
+        for i in range(p.getNumJoints(self._simulator_id)):
+            j_info = p.getJointInfo(self._simulator_id, i)
+            if j_info[2] != p.JOINT_FIXED: actuated_joints.append(j_info[1].decode('UTF-8'))
+        
+        for joint_name in self._arm_dof_names:
+            self._arm_ik_indices.append(actuated_joints.index(joint_name))
+                
 
         self._end_effector_link_index = self._arm_dof_indices[-1]
 
