@@ -11,19 +11,18 @@ from std_msgs.msg import String
 from abc import abstractmethod
 from cairo_simulator.simulator import Simulator
 from cairo_simulator.simulator import Robot
-
-from cairo_simulator.sim_const import ASSETS_PATH
+from cairo_simulator.utils import ASSETS_PATH, compute_3d_homogeneous_transform
 
 class Manipulator(Robot):
 
     """
      Base class for Robot Manipulators with linked/articulated chains.
     """
-    
+
     def __init__(self, robot_name, urdf_file, x, y, z):
         """
         Initialize a Robot at coordinates (x,y,z) and add it to the simulator manager
-        
+
         Args:
             robot_name (str): Name of the robot
             urdf_file (file object): File object of the desired URDF file
@@ -211,18 +210,23 @@ class Manipulator(Robot):
 
         if target_in_local_coords is True:
             # Convert position from robot-centric coordinate space to world coordinates
-            robot_world_pose = p.getBasePositionAndOrientation(self._simulator_id)
-            robot_world_position, robot_world_ori_euler = robot_world_pose[:3], p.getEulerFromQuaternion(robot_world_pose[3:])            
-            transform_from_robot_local_coord_to_world_frame = Utils.compute_3d_homogeneous_transform(robot_world_pose[0], robot_world_pose[1], robot_world_pose[2], robot_world_ori_euler[0], robot_world_ori_euler[1], robot_world_ori_euler[2])
+            robot_world_pose = p.getBasePositionAndOrientation(
+                self._simulator_id)
+            robot_world_position, robot_world_ori_euler = robot_world_pose[:3], p.getEulerFromQuaternion(
+                robot_world_pose[3:])
+            transform_from_robot_local_coord_to_world_frame = compute_3d_homogeneous_transform(
+                robot_world_pose[0], robot_world_pose[1], robot_world_pose[2], robot_world_ori_euler[0], robot_world_ori_euler[1], robot_world_ori_euler[2])
             target_point = np.array([*target_position, 1])
-            target_position = np.matmul(transform_from_robot_local_coord_to_world_frame, target_point.T)[:3]
+            target_position = np.matmul(
+                transform_from_robot_local_coord_to_world_frame, target_point.T)[:3]
 
         if target_orientation is None:
             ik_solution = p.calculateInverseKinematics(
                 self._simulator_id, self._end_effector_link_index, target_position, maxNumIterations=120)
         else:
             if len(target_orientation) == 3:
-                target_orientation = p.getQuaternionFromEuler(target_orientation)
+                target_orientation = p.getQuaternionFromEuler(
+                    target_orientation)
             ik_solution = p.calculateInverseKinematics(
                 self._simulator_id, self._end_effector_link_index, target_position, targetOrientation=target_orientation, maxNumIterations=120)
 
