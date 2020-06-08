@@ -1,9 +1,16 @@
 import os
+from collections import namedtuple
 
 import numpy as np
 
 ASSETS_PATH = os.path.dirname(os.path.abspath(__file__)) + '/../../assets/' # Find ./cairo_simulator/assets/ from ./cairo_simulator/src/cairo_simulator/
 
+
+JointInfo = namedtuple('JointInfo', ['idx', 'name', 'type',
+                                     'qidx', 'uidx', 'flags',
+                                     'damping', 'friction', 'lower_limit', 'upper_limit',
+                                     'max_force', 'max_velocity', 'link_name', 'joint_axis',
+                                     'parent_position', 'parent_orientation', 'parent_idx'])
 
 def compute_3d_homogeneous_transform(x, y, z, alpha, beta, gamma):
     '''
