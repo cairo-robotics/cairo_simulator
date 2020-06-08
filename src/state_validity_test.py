@@ -20,9 +20,9 @@ def main():
 
     # Add a table and a Sawyer robot
     table = SimObject("Table", ASSETS_PATH + 'table.sdf', (0.9, 0, 0), (0, 0, 1.5708)) # Table rotated 90deg along z-axis
-    sawyer_robot = Sawyer("sawyer0", 0, 0, 0.8)
+    sawyer_robot = Sawyer("sawyer0", 0, 0, 0.9)
 
-    self_collision_fn = partial(self_collision_test, robot=sawyer_robot, excluded_pairs=[(5, 33), (6, 33)])
+    self_collision_fn = partial(self_collision_test, robot=sawyer_robot, excluded_pairs=[(4, 30), (5, 30)])
 
     svc = StateValidyChecker(self_collision_fn)
     scs = SawyerConfigurationSpace()
@@ -39,6 +39,13 @@ def main():
                 valid_samples.append(sample)
         print("The time difference is :", timeit.default_timer() - starttime)
         print("{} valid of {}".format(len(valid_samples), n_samples))
+    # print("Sampling start time is :",starttime)
+    # for i in range(0, n_samples):
+    #     sample = sampler.sample()
+    #     if svc.validate(sample):
+    #         valid_samples.append(sample)
+    # print("The time difference is :", timeit.default_timer() - starttime)
+    # print("{} valid of {}".format(len(valid_samples), n_samples))
 
     # Loop until someone shuts us down
     # while rospy.is_shutdown() is not True:
