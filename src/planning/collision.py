@@ -1,4 +1,6 @@
-"""Summary
+"""
+Classes and methods to support collision functionality withing PyBullet, and to inject into 
+interfaces for motion planning.
 """
 import pybullet as p
 
@@ -7,39 +9,32 @@ from cairo_simulator.link import get_link_pairs
 
 class DisabledCollisionsContext(): 
 
-    """Summary
+    """
+    Python Context Manager that disables collisions. Includes all self collisions, and collisions between SimObjects and Robots.
     
     Attributes:
-        simulator (TYPE): Description
+        simulator (simulator.Simulator): The Simulator singleton instance.
     """
     
     def __init__(self, simulator): 
-        """Summary
+        """
         
         Args:
-            simulator (TYPE): Description
+        simulator (simulator.Simulator): The Simulator singleton instance.        
         """
         self.simulator = simulator
           
     def __enter__(self): 
-        """Summary
-        """
         self._disable_robot_collisions()
         self._disable_simobj_collisions()
       
     def __exit__(self, exc_type, exc_value, exc_traceback): 
-        """Summary
-        
-        Args:
-            exc_type (TYPE): Description
-            exc_value (TYPE): Description
-            exc_traceback (TYPE): Description
-        """
         self._enable_robot_collisions()
         self._enable_simobj_collisions()
 
     def _disable_robot_collisions(self):
-        """Summary
+        """
+        Disables all self collisions for all robots.
         """
         for robot in self.simulator._robots.keys():
             links = [idx for idx in range(-1, p.getNumJoints(robot))]
@@ -47,13 +42,15 @@ class DisabledCollisionsContext():
                 p.setCollisionFilterGroupMask(robot, link, 0, 0)
 
     def _disable_simobj_collisions(self):
-        """Summary
+        """
+        Disables all collisions between simobjects and robots.
         """
         for sim_obj in self.simulator._objects.keys():
             p.setCollisionFilterGroupMask(sim_obj, 0, 0, 0)
 
     def _enable_robot_collisions(self):
-        """Summary
+        """
+        Enables all self collisions for all robots.
         """
         for robot in self.simulator._robots.keys():
             links = [idx for idx in range(-1, p.getNumJoints(robot))]
@@ -61,7 +58,8 @@ class DisabledCollisionsContext():
                 p.setCollisionFilterGroupMask(robot, link, 0, 1)
 
     def _enable_simobj_collisions(self):
-        """Summary
+        """
+        Enables all collisions between simobjects and robots.
         """
         for sim_obj in self.simulator._objects.keys():
             p.setCollisionFilterGroupMask(sim_obj, 0, 0, 1)
@@ -69,17 +67,19 @@ class DisabledCollisionsContext():
 
 
 def link_collision(body1, link1, body2, link2, max_distance=0):
-    """Summary
+    """
+    Test for the collision between link1 of body1 and link2 of body2. This method relies on p.GetClosestPoints.
+    Using a max_distinace of 0 will test for exact collision given overlap of bounding boxes.
     
     Args:
-        body1 (TYPE): Description
-        link1 (TYPE): Description
-        body2 (TYPE): Description
-        link2 (TYPE): Description
-        max_distance (int, optional): Description
+        body1 (int): PyBullet body ID.
+        link1 (int): Link/joint index.
+        body2 (int): PyBullet body ID.
+        link2 (int): Link/joint index.
+        max_distance (int, optional): Range within which to test for collision.
     
     Returns:
-        TYPE: Description
+        bool: True if in collision, else False.
     """
     return len(p.getClosestPoints(bodyA=body1, bodyB=body2, distance=max_distance,
                               linkIndexA=link1, linkIndexB=link2,
@@ -87,15 +87,20 @@ def link_collision(body1, link1, body2, link2, max_distance=0):
 
 
 def self_collision_test(joint_configuration, robot, excluded_pairs):
-    """Summary
+    """
+    Tests whether a give joint configuration will result in self collision. 
+
+    It stores the current joint state, then sets the robot state to the test configuration. 
+    Every link pair of the robot is check for collision. If every link pair is collision free,
+    the function returns true, else if there is a single collision, the function returns false.
     
     Args:
-        joint_configuration (TYPE): Description
-        robot (TYPE): Description
-        excluded_pairs (TYPE): Description
+        joint_configuration (list): The joint configuration to test for self-collision
+        robot (int): PyBullet body ID.
+        excluded_pairs (list): LIst of tuples of link pairs to ignore during self-collision check.
     
     Returns:
-        TYPE: Description
+        bool: True if no self-collision, else False.
     """
     robot_id = robot.get_simulator_id()
     check_link_pairs = get_link_pairs(robot_id, excluded_pairs=excluded_pairs)

@@ -16,7 +16,7 @@ from cairo_simulator.utils import ASSETS_PATH, compute_3d_homogeneous_transform
 class Manipulator(Robot):
 
     """
-     Base class for Robot Manipulators with linked/articulated chains.
+    Base class for Robot Manipulators with linked/articulated chains.
     """
 
     def __init__(self, robot_name, urdf_file, x, y, z):
@@ -30,7 +30,7 @@ class Manipulator(Robot):
             y (int): Central y-coordinate
             z (int): Central z-coordinate
         """
-        super().__init__(robot_name, urdf_file, x, y, z, 0)  # p.URDF_MERGE_FIXED_LINKS)
+        super().__init__(robot_name, urdf_file, x, y, z, 0)  # p.URDF_MERGE_FIXED_LINKS currently enables self collisions on Sawyer
 
         self._sub_position_update = rospy.Subscriber(
             '/%s/move_to_joint_pos' % self._name, Float32MultiArray, self.move_to_joint_pos_callback)
@@ -678,11 +678,11 @@ class Sawyer(Manipulator):
         @param pos Vector of length 7, 8, or 9, corresponding to arm position, arm+gripper%, or arm+gripper position
         
         Args:
-            pos (TYPE): Vector of length 7, 8, or 9, corresponding to arm position, arm+gripper%, or arm+gripper position
+            pos (list): Vector of length 7, 8, or 9, corresponding to arm position, arm+gripper%, or arm+gripper position
             epsilon (float, optional): Within bounds
         
         Returns:
-            TYPE: Description
+            bool: True if within epsilon ball, else False.
         '''
         if len(pos) < 7 or len(pos) > 9:
             rospy.logwarn("Invalid position given to check_if_at_position. Must be length 7, 8, or 9 for Sawyer.")
@@ -708,10 +708,9 @@ class Sawyer(Manipulator):
         
         Args:
             pct_gripper_open (float): pct_gripper_open Value in range [0.,1.] describing how open the gripper should be
-
         
         Returns:
-            TYPE: Description
+            float, float: The left and right position.
         '''
         pct_gripper_open = max(0., min(1., pct_gripper_open))
         max_displacement = 0
