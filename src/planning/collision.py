@@ -2,7 +2,7 @@
 """
 import pybullet as p
 
-from planning.link import get_link_pairs
+from cairo_simulator.link import get_link_pairs
 
 
 class DisabledCollisionsContext(): 
