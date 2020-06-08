@@ -471,6 +471,25 @@ class Sawyer(Manipulator):
         for i, j_idx in enumerate(joints_list):
             p.setJointMotorControl2(self._simulator_id, j_idx, p.POSITION_CONTROL,
                                     target_position[i], target_velocity[i], maxVelocity=target_velocity[i])
+    
+    def move_with_joint_vel(self, desired_vel):
+        """
+        Move sawyer joints with desired velocity.
+        NOTE does not check against max vel and only uses main 7DOF arm
+        """
+        
+        target_velocity = list(desired_vel)
+        joints_list = self._arm_dof_indices
+        
+        if len(joints_list) is not len(desired_vel):
+            rospy.logwarn("wrong size torque list")
+            return
+
+        for i, j_idx in enumerate(joints_list):
+             p.setJointMotorControl2(self._simulator_id, 
+                                    j_idx, 
+                                    p.VELOCITY_CONTROL,
+                                    targetVelocity=target_velocity[i])
 
     def get_current_joint_states(self):
         position = []
