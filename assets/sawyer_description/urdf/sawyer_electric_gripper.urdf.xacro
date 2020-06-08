@@ -8,7 +8,7 @@
     <xacro:property name="gazebo_tag" value="false" scope="local"/>
   </xacro:unless>
 
-  <xacro:include filename="$(find intera_tools_description)/urdf/electric_gripper/rethink_electric_gripper.xacro" />
+  <xacro:include filename="electric_gripper/rethink_electric_gripper.xacro" />
   <xacro:rethink_electric_gripper side="right"
                                   gazebo="${gazebo_tag}"
                                   use_connector_plate="true"

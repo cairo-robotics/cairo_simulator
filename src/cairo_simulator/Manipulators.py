@@ -9,14 +9,14 @@ from abc import abstractmethod
 from .Simulator import ASSETS_PATH
 from .Simulator import Simulator
 from .Simulator import Robot
-
+from cairo_simulator import Utils
 
 class Manipulator(Robot):
     def __init__(self, robot_name, urdf_file, x, y, z):
         """
         Initialize a Robot at coordinates (x,y,z) and add it to the simulator manager
         """
-        super().__init__(robot_name, urdf_file, x, y, z, p.URDF_MERGE_FIXED_LINKS)
+        super().__init__(robot_name, urdf_file, x, y, z, 0) # p.URDF_MERGE_FIXED_LINKS)
 
         self._sub_position_update = rospy.Subscriber(
             '/%s/move_to_joint_pos' % self._name, Float32MultiArray, self.move_to_joint_pos_callback)
@@ -37,6 +37,7 @@ class Manipulator(Robot):
         self._arm_joint_limits = []
         self._arm_joint_velocity_max = []  # Max velocity for each arm joint
         self._arm_joint_default_velocity = []  # Default velocity for moving the robot's joints
+        self._arm_ik_indices = [] # List of indices of arm DoF within list of all non-fixed joints
 
         self._gripper_joint_limits = []
         self._gripper_joint_velocity_max = []  # Max velocity for each gripper joint
@@ -86,7 +87,7 @@ class Manipulator(Robot):
     @abstractmethod
     def get_current_joint_states(self):
         '''
-        Returns a vector of the robot's joint positions
+        Returns a vector of the robot's joint positions.
         '''
         pass
 
@@ -173,28 +174,25 @@ class Manipulator(Robot):
         ik_solution = None
 
         if target_in_local_coords is True:
-            cur_pos = self.get_current_joint_states()[:len(self._arm_dof_indices)]
-            if target_orientation is None:
-                ik_solution = p.calculateInverseKinematics(
-                    self._simulator_id, self._end_effector_link_index, target_position, currentPosition=cur_pos, maxNumIterations=120)
-            else:
-                if len(target_orientation) == 3:
-                    target_orientation = p.getQuaternionFromEuler(target_orientation)
-                ik_solution = p.calculateInverseKinematics(self._simulator_id, self._end_effector_link_index,
-                                                           target_position, targetOrientation=target_orientation, currentPosition=cur_pos, maxNumIterations=120)
+            # Convert position from robot-centric coordinate space to world coordinates
+            robot_world_pose = p.getBasePositionAndOrientation(self._simulator_id)
+            robot_world_position, robot_world_ori_euler = robot_world_pose[:3], p.getEulerFromQuaternion(robot_world_pose[3:])            
+            transform_from_robot_local_coord_to_world_frame = Utils.compute_3d_homogeneous_transform(robot_world_pose[0], robot_world_pose[1], robot_world_pose[2], robot_world_ori_euler[0], robot_world_ori_euler[1], robot_world_ori_euler[2])
+            target_point = np.array([*target_position, 1])
+            target_position = np.matmul(transform_from_robot_local_coord_to_world_frame, target_point.T)[:3]
+
+        if target_orientation is None:
+            ik_solution = p.calculateInverseKinematics(
+                self._simulator_id, self._end_effector_link_index, target_position, maxNumIterations=120)
         else:
-            if target_orientation is None:
-                ik_solution = p.calculateInverseKinematics(
-                    self._simulator_id, self._end_effector_link_index, target_position, maxNumIterations=120)
-            else:
-                if len(target_orientation) == 3:
-                    target_orientation = p.getQuaternionFromEuler(target_orientation)
-                ik_solution = p.calculateInverseKinematics(
-                    self._simulator_id, self._end_effector_link_index, target_position, targetOrientation=target_orientation, maxNumIterations=120)
+            if len(target_orientation) == 3:
+                target_orientation = p.getQuaternionFromEuler(target_orientation)
+            ik_solution = p.calculateInverseKinematics(
+                self._simulator_id, self._end_effector_link_index, target_position, targetOrientation=target_orientation, maxNumIterations=120)
 
         # Return a configuration of only the arm's joints.
-        arm_config = [0] * len(self._arm_dof_indices)
-        for i, idx in enumerate(self._arm_dof_indices):
+        arm_config = [0] * len(self._arm_ik_indices)
+        for i, idx in enumerate(self._arm_ik_indices):
             arm_config[i] = ik_solution[idx]
 
         return arm_config
@@ -292,6 +290,17 @@ class Sawyer(Manipulator):
         self._arm_dof_indices = self._populate_dof_indices(self._arm_dof_names)
         self._gripper_dof_indices = self._populate_dof_indices(self._gripper_dof_names)  # Left finger, Right finger
         self._extra_dof_indices = self._populate_dof_indices(self._extra_dof_names)
+        
+        # Find index of each arm DoF when only counting non-fixed joints for IK calls
+        self._arm_ik_indices = []
+        actuated_joints = []
+        for i in range(p.getNumJoints(self._simulator_id)):
+            j_info = p.getJointInfo(self._simulator_id, i)
+            if j_info[2] != p.JOINT_FIXED: actuated_joints.append(j_info[1].decode('UTF-8'))
+        
+        for joint_name in self._arm_dof_names:
+            self._arm_ik_indices.append(actuated_joints.index(joint_name))
+                
 
         self._end_effector_link_index = self._arm_dof_indices[-1]
 

@@ -18,7 +18,7 @@
       <visual>
         <origin rpy="0 0 0" xyz="0 0 0"/>
         <geometry>
-          <mesh filename="package://intera_tools_description/meshes/electric_gripper/electric_gripper_base.DAE"/>
+	<mesh filename="../meshes/electric_gripper/electric_gripper_base.DAE"/>
         </geometry>
       </visual>
       <collision>
@@ -49,7 +49,7 @@
        <child  link="${side}_connector_plate_base" />
      </joint>
      <!-- Connector Plate Link -->
-     <xacro:include filename="$(find intera_tools_description)/urdf/connector_plate/connector_plate.xacro" />
+     <xacro:include filename="connector_plate/connector_plate.xacro" />
      <xacro:rethink_connector_plate side="${side}" gazebo="${gazebo}"/>
      <xacro:property name="electric_gripper_parent_link" value="${side}_connector_plate_mount" scope="local"/>
      <xacro:property name="connector_plate_length" value="${rethink_connector_plate_length}" scope="local"/>
@@ -64,12 +64,12 @@
 
     <!-- Left finger link -->
     <xacro:property name="finger_length" value="0.0" scope="global"/>
-    <xacro:include filename="$(find intera_tools_description)/urdf/electric_gripper/fingers/${l_finger}.xacro" />
+    <xacro:include filename="electric_gripper/fingers/${l_finger}.xacro" />
     <xacro:finger_xacro gripper_side="${gripper_side}" finger_side="l" reflect="1" finger_tip="${l_finger_tip}" finger_grasp="${l_finger_grasp}" gazebo="${gazebo}"/>
     <xacro:property name="tip_finger_length" value="${finger_length}" scope="local"/>
 
     <!-- Right finger link -->
-    <xacro:include filename="$(find intera_tools_description)/urdf/electric_gripper/fingers/${r_finger}.xacro" />
+    <xacro:include filename="electric_gripper/fingers/${r_finger}.xacro" />
     <xacro:finger_xacro gripper_side="${gripper_side}" finger_side="r" reflect="-1" finger_tip="${r_finger_tip}" finger_grasp="${r_finger_grasp}" gazebo="${gazebo}"/>
     <xacro:if value="${finger_length > tip_finger_length}">
         <xacro:property name="tip_finger_length" value="${finger_length}" scope="local"/>
