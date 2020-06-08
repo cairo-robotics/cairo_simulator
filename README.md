@@ -14,7 +14,7 @@ pip3 install --user rospkg catkin_pkg
 git clone https://github.com/cairo-robotics/cairo_motion_planning.git
 pip3 install --user path-to-cairo_motion_planning-reop
 ```
-Use the --editable flag if working on 
+Use the --editable flag if developing cairo-motion-planning and want to see changes reflecting the cairo-simulator.
 
 ### Install the PyBullet physics engine: 
 `pip3 install pybullet`
