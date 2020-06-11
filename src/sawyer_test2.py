@@ -1,17 +1,26 @@
-import pybullet as p
+import sys
+import os
 import time
 import copy
-import rospy
+
+if os.environ.get('ROS_DISTRO'):
+    import rospy
+import pybullet as p
+
 from cairo_simulator.simulator import Simulator, SimObject
 from cairo_simulator.manipulators import Sawyer
 from cairo_simulator.utils import ASSETS_PATH
-
+from cairo_simulator.log import Logger
 
 def main():
-    rospy.init_node("CAIRO_Sawyer_Simulator")
-    use_real_time = True
-
-    sim = Simulator() # Initialize the Simulator
+    if os.environ.get('ROS_DISTRO'):
+        rospy.init_node("CAIRO_Sawyer_Simulator")
+        use_ros = True
+    else:
+        use_ros = False
+    use_real_time = False
+    logger = Logger()
+    sim = Simulator(logger=logger, use_ros=use_ros, use_real_time=use_real_time) # Initialize the Simulator
     ground_plane = SimObject("Ground", "plane.urdf", [0,0,0])
 
     # Add a table and a Sawyer robot
@@ -44,8 +53,13 @@ def main():
 
 
     # Loop until someone shuts us down
-    while rospy.is_shutdown() is not True:
-        sim.step()
+    try:
+        while True:
+            sim.step()
+    except KeyboardInterrupt:
+        p.disconnect()
+        sys.exit(0)
+   
 
 
 if __name__ == "__main__":
