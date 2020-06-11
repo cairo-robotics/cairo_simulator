@@ -12,11 +12,16 @@ from .Simulator import Robot
 from cairo_simulator import Utils
 
 class Manipulator(Robot):
-    def __init__(self, robot_name, urdf_file, x, y, z):
+    def __init__(self, robot_name, urdf_file, position, orientation=[0,0,0,1], fixed_base=0, urdf_flags=0):
         """
-        Initialize a Robot at coordinates (x,y,z) and add it to the simulator manager
+        Initialize a Robot at coordinates position=(x,y,z) and add it to the simulator manager
+        @param robot_name Internal identifier for this robot, used for ROS namespacing and debugging info
+        @param urdf_file Path to URDF file
+        @param position [x,y,z] position of the robot in the world
+        @param orientation Quaternion [x,y,z,w] for the robot's start position. Default to upright.
+        @param fixed_base Indicates if the base should be static in the world (0=False, 1=True)
         """
-        super().__init__(robot_name, urdf_file, x, y, z, 0) # p.URDF_MERGE_FIXED_LINKS)
+        super().__init__(robot_name, urdf_file, position, orientation=orientation, fixed_base=fixed_base, urdf_flags=urdf_flags) # p.URDF_MERGE_FIXED_LINKS)
 
         self._sub_position_update = rospy.Subscriber(
             '/%s/move_to_joint_pos' % self._name, Float32MultiArray, self.move_to_joint_pos_callback)
@@ -268,11 +273,11 @@ class Manipulator(Robot):
 
 
 class Sawyer(Manipulator):
-    def __init__(self, robot_name, x=0, y=0, z=0.8, publish_full_state=False):
+    def __init__(self, robot_name, position, orientation=[0,0,0,1], fixed_base=0, publish_full_state=False):
         """
         Initialize a Sawyer Robot at coordinates (x,y,z) and add it to the simulator manager
         """
-        super().__init__(robot_name, ASSETS_PATH + 'sawyer_description/urdf/sawyer_static.urdf', x, y, z)
+        super().__init__(robot_name, ASSETS_PATH + 'sawyer_description/urdf/sawyer_static.urdf', position, orientation, fixed_base)
 
         # Should the full robot state be published each cycle (pos/vel/force), or just joint positions
         self._publish_full_state = publish_full_state
@@ -292,6 +297,7 @@ class Sawyer(Manipulator):
         self._extra_dof_indices = self._populate_dof_indices(self._extra_dof_names)
         
         # Find index of each arm DoF when only counting non-fixed joints for IK calls
+        # Detail: IK solver returns a vector including positions for all non-fixed joints, we need to track which ones are part of the arm.
         self._arm_ik_indices = []
         actuated_joints = []
         for i in range(p.getNumJoints(self._simulator_id)):
@@ -350,11 +356,18 @@ class Sawyer(Manipulator):
         for max_vel in self._extra_joint_velocity_max:
             self._extra_joint_default_velocity.append(max_vel * pct)
 
-    def set_head_pan(self, val):
-        target_position = max(self._extra_joint_limits[0][0], min(val.data, self._extra_joint_limits[0][1]))
-        # TODO: Update to use setJointMotorControl with maxVelocity
-        p.setJointMotorControlArray(self._simulator_id, self._extra_dof_indices,
-                                    p.POSITION_CONTROL, targetPositions=target_position)
+    def set_head_pan(self, target_position, target_velocity=None):
+        '''
+        Sets the Sawyer's tablet head to a given position at a given speed.
+        @param target_position Target head position
+        @param target_velocity Desired motor velocity, Use None for default speed.
+        '''
+        target_position = max(self._extra_joint_limits[0][0], min(val, self._extra_joint_limits[0][1]))
+        if target_velocity is None:
+            target_velocity = self._extra_joint_default_velocity[0]
+        p.setJointMotorControl2(self._simulator_id, self._extra_dof_indices[0], p.POSITION_CONTROL,
+                        target_position, target_velocity, maxVelocity=target_velocity)
+
 
     def publish_state(self):
         base_pose = p.getBasePositionAndOrientation(self._simulator_id)

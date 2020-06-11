@@ -63,7 +63,6 @@ class Simulator:
         self._physics_client = p.connect(p.GUI)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         p.setGravity(0,0,-9.81)
-        id_plane = p.loadURDF("plane.urdf")
 
     def __init_ros(self):
         rospy.Subscriber("/sim/estop_set", Empty, self.estop_set_callback)
@@ -197,13 +196,13 @@ class Simulator:
 
 
 class SimObject():
-    def __init__(self, object_name, model_file_or_sim_id, position=(0,0,0), orientation=(0,0,0,1)):
+    def __init__(self, object_name, model_file_or_sim_id, position=(0,0,0), orientation=(0,0,0,1), fixed_base=0):
         self._name = object_name
         if Simulator.is_instantiated():
             if isinstance(model_file_or_sim_id, int):
                 self._simulator_id = model_file_or_sim_id
             else:
-                self._simulator_id = self._load_model_file_into_sim(model_file_or_sim_id)
+                self._simulator_id = self._load_model_file_into_sim(model_file_or_sim_id, fixed_base)
                 self.move_to_pose(position, orientation)
 
             if self._simulator_id is None:
@@ -226,13 +225,16 @@ class SimObject():
     def get_simulator_id(self):
         return self._simulator_id
 
-    def _load_model_file_into_sim(self, filepath):
+    def _load_model_file_into_sim(self, filepath, fixed_base=0):
         sim_id = None
         if filepath[-5:] == '.urdf':
-            sim_id = p.loadURDF(filepath, flags=p.URDF_MERGE_FIXED_LINKS)
+            sim_id = p.loadURDF(filepath, useFixedBase=fixed_base, flags=p.URDF_MERGE_FIXED_LINKS)
         elif filepath[-4:] == '.sdf':
             sim_id = p.loadSDF(filepath)
-            if isinstance(sim_id, tuple): sim_id = sim_id[0]
+            if isinstance(sim_id, tuple): 
+                for idx, sdf_object_id in enumerate(sim_id[1:]):
+                    loaded_object = SimObject("%s_%d"%(self._name, idx), sdf_object_id)
+                sim_id = sim_id[0]
         return sim_id
 
     def get_pose(self):
@@ -265,9 +267,9 @@ class Robot(ABC):
                 print("Joint %d: %s" % (i, str(p.getJointInfo(self._simulator_id,i))))
             pdb.set_trace()
     '''
-    def __init__(self, robot_name, urdf_file, x, y, z, urdf_flags):   
+    def __init__(self, robot_name, urdf_file, position, orientation=[0,0,0,1], fixed_base=0, urdf_flags=0):   
         """
-        Initialize a Robot at coordinates (x,y,z) and add it to the simulator manager
+        Initialize a Robot at pose=(position, orientation) and add it to the simulator manager.
 
         Warning: Including p.URDF_USE_SELF_COLLISION is buggy right now due to URDF issues and is not recommended
         """ 
@@ -276,7 +278,7 @@ class Robot(ABC):
         self._state = None
 
         self._pub_robot_state = rospy.Publisher('/%s/robot_state'%self._name, Float32MultiArray, queue_size=0)
-        self._simulator_id = p.loadURDF(urdf_file, [x,y,z], flags=urdf_flags)
+        self._simulator_id = p.loadURDF(urdf_file, basePosition=position, baseOrientation=orientation, useFixedBase=fixed_base, flags=urdf_flags)
 
         # Register with Simulator manager
         sim = Simulator.get_instance()
@@ -305,7 +307,13 @@ class Robot(ABC):
         
         return dof_index_list
             
-
+    def set_world_pose(self, position, orientation):
+        '''
+        Set the world pose and orientation of the robot
+        @param position World position in the form [x,y,z]
+        @param orientation Quaternion in the form [x,y,z,w]
+        '''
+        p.resetBasePositionAndOrientation(self._simulator_id, position, orientation)
 
     def get_simulator_id(self):
         return self._simulator_id
