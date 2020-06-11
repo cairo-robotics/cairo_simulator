@@ -64,7 +64,24 @@ class Simulator:
         else:
             return False
 
-    def __init__(self, use_real_time=True, gui=True):
+    @staticmethod
+    def using_ros():
+        """
+        Checks if Simulator environment will use ROS integrations.
+
+        Returns:
+            bool: True, if using ROS, else False.
+        """
+        if Simulator.__instance.use_ros:
+            return True
+        else:
+            return False
+
+    @staticmethod
+    def get_logger():
+        return Simulator.__instance.logger
+
+    def __init__(self, logger=None, use_real_time=True, use_gui=True, use_ros=False):
         """
         Args:
             use_real_time (bool, optional): Whether or not to use real_time for simulation steps.
