@@ -3,15 +3,21 @@ Classes to represent robot Manpulators in PyBullet simulations.
 """
 import copy
 import json
-import numpy as np
-import rospy
-import pybullet as p
-from std_msgs.msg import Float32MultiArray, Float32
-from std_msgs.msg import String
+import os
 from abc import abstractmethod
-from cairo_simulator.simulator import Simulator
-from cairo_simulator.simulator import Robot
+
+if os.environ.get('ROS_DISTRO'):
+    import rospy
+    from std_msgs.msg import Float32MultiArray, Float32
+    from std_msgs.msg import String
+import numpy as np
+import pybullet as p
+
+
+from cairo_simulator.simulator import Simulator, Robot, ros_method
 from cairo_simulator.utils import ASSETS_PATH, compute_3d_homogeneous_transform
+
+
 
 class Manipulator(Robot):
 

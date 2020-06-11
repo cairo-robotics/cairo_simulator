@@ -1,17 +1,21 @@
 """
 Core classes / abstract classes that interface with PyBullet.
 """
+import os
+import sys
 import time
 from abc import ABC, abstractmethod
 
-import rospy
-from std_msgs.msg import Float32MultiArray
-from std_msgs.msg import Empty
-from geometry_msgs.msg import PoseStamped
+if os.environ.get('ROS_DISTRO'):
+    import rospy
+    from std_msgs.msg import Float32MultiArray
+    from std_msgs.msg import Empty
+    from geometry_msgs.msg import PoseStamped
 
 import pybullet as p
 import pybullet_data
 
+from cairo_simulator.log import Logger
 
 class Simulator:
 
