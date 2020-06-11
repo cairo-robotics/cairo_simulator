@@ -39,13 +39,14 @@ class Manipulator(Robot):
         """
         super().__init__(robot_name, urdf_file, position, orientation=orientation, fixed_base=fixed_base, urdf_flags=urdf_flags) # p.URDF_MERGE_FIXED_LINKS)
 
-        self._sub_position_update = rospy.Subscriber(
-            '/%s/move_to_joint_pos' % self._name, Float32MultiArray, self.move_to_joint_pos_callback)
-        self._sub_position_vel_update = rospy.Subscriber(
-            '/%s/move_to_joint_pos_vel' % self._name, Float32MultiArray, self.move_to_joint_pos_vel_callback)
-        self._sub_execute_trajectory = rospy.Subscriber(
-            '/%s/execute_trajectory' % self._name, String, self.execute_trajectory_callback)
-
+        if Simulator.using_ros():
+            self._sub_position_update = rospy.Subscriber(
+                '/%s/move_to_joint_pos' % self._name, Float32MultiArray, self.move_to_joint_pos_callback)
+            self._sub_position_vel_update = rospy.Subscriber(
+                '/%s/move_to_joint_pos_vel' % self._name, Float32MultiArray, self.move_to_joint_pos_vel_callback)
+            self._sub_execute_trajectory = rospy.Subscriber(
+                '/%s/execute_trajectory' % self._name, String, self.execute_trajectory_callback)
+        
         # self._ik_service = rospy.Service('/%s/ik_service', Pose, self.ik_service)
 
         self._end_effector_link_index = -1  # Must be set by instantiating class
@@ -287,7 +288,7 @@ class Manipulator(Robot):
             # Compute distance from current position, compute per-joint velocity to reach in (t - t_{-1}) seconds
             # Each waypoint should have joint_count values
             if len(target_position) != joint_count:
-                rospy.logwarn("Bad trajectory waypoint passed to Manipulator %s. Had length %d. Aborting trajectory." % (
+                self.logger.warn("Bad trajectory waypoint passed to Manipulator %s. Had length %d. Aborting trajectory." % (
                     self._name, len(target_position)))
                 return
 
@@ -326,7 +327,7 @@ class Manipulator(Robot):
                        len(self._gripper_dof_indices))
 
         if len(pos) != joint_count:
-            rospy.logwarn("Invalid position given to check_if_at_position.")
+            self.logger.warn("Invalid position given to check_if_at_position.")
             return False
 
         cur_pos = self.get_current_joint_states()
@@ -355,10 +356,11 @@ class Sawyer(Manipulator):
         """
         super().__init__(robot_name, ASSETS_PATH + 'sawyer_description/urdf/sawyer_static.urdf', position, orientation, fixed_base)
 
-        # Should the full robot state be published each cycle (pos/vel/force), or just joint positions
-        self._publish_full_state = publish_full_state
-        self._pub_robot_state_full = rospy.Publisher('/%s/robot_state_full' % self._name, String, queue_size=0)
-        self._sub_head_pan = rospy.Subscriber('/%s/set_head_pan' % self._name, Float32, self.set_head_pan)
+        if Simulator.using_ros():
+            # Should the full robot state be published each cycle (pos/vel/force), or just joint positions
+            self._publish_full_state = publish_full_state
+            self._pub_robot_state_full = rospy.Publisher('/%s/robot_state_full' % self._name, String, queue_size=0)
+            self._sub_head_pan = rospy.Subscriber('/%s/set_head_pan' % self._name, Float32, self.set_head_pan)
 
         self._init_local_vars()
 
@@ -454,6 +456,7 @@ class Sawyer(Manipulator):
         p.setJointMotorControl2(self._simulator_id, self._extra_dof_indices[0], p.POSITION_CONTROL,
                         target_position, target_velocity, maxVelocity=target_velocity)
 
+    @ros_method
     def publish_state(self):
         """
         Publish robot state if using ROS. 
@@ -505,7 +508,7 @@ class Sawyer(Manipulator):
         
         """
         if self._executing_trajectory:
-            rospy.logwarn("Current trajectory for %s not finished executing, but new joint position received!" % self._name)
+            self.logger.warn("Current trajectory for %s not finished executing, but new joint position received!" % self._name)
         return self.move_to_joint_pos(target_position_float32array.data)
 
     def move_to_joint_pos(self, target_position):
@@ -529,7 +532,7 @@ class Sawyer(Manipulator):
                 list_tgt_position, self._arm_joint_default_velocity + self._gripper_joint_default_velocity)
             # p.setJointMotorControlArray(self._simulator_id, self._arm_dof_indices + self._gripper_dof_indices, p.POSITION_CONTROL, targetPositions=target_position)
         else:
-            rospy.logwarn(
+            self.logger.warn(
                 "Invalid joint configuration provided for Sawyer %s. Needs to be 7 floats (arm) or 9 floats (arm+gripper)" % self._name)
 
     def move_to_joint_pos_vel_callback(self, target_position_vel_float32array):
@@ -543,7 +546,7 @@ class Sawyer(Manipulator):
             TYPE: Description
         """
         if len(target_position_vel_float32array.data) != 18:
-            rospy.logwarn(
+            self.logger.warn(
                 "Invalid position and velocity configuration provided for Sawyer %s. Must have 18 floats for 9 position and 9 velocity targets." % self._name)
             return
         return self.move_to_joint_pos_with_vel(target_position_vel_float32array.data[:9], target_position_vel_float32array.data[9:])
@@ -608,7 +611,7 @@ class Sawyer(Manipulator):
         joints_list = self._arm_dof_indices
         
         if len(joints_list) is not len(desired_vel):
-            rospy.logwarn("wrong size torque list")
+            self.logger.warn("wrong size torque list")
             return
 
         for i, j_idx in enumerate(joints_list):
@@ -638,7 +641,7 @@ class Sawyer(Manipulator):
             trajectory_json_string (str): JSON formatted string.
         """
         if self._executing_trajectory:
-            rospy.logwarn("Current trajectory for %s not finished executing, but new trajectory received!" % self._name)
+            self.logger.warn("Current trajectory for %s not finished executing, but new trajectory received!" % self._name)
         traj_data = json.loads(trajectory_json_string.data)
         self.execute_trajectory(traj_data)
 
@@ -674,7 +677,7 @@ class Sawyer(Manipulator):
             # Compute distance from current position, compute per-joint velocity to reach in (t - t_{-1}) seconds
             # Each waypoint should have 7-9 values
             if len(target_position) < 7 or len(target_position) > 9:
-                rospy.logwarn("Bad trajectory waypoint passed to Sawyer %s. Had length %d. Aborting trajectory." %
+                self.logger.warn("Bad trajectory waypoint passed to Sawyer %s. Had length %d. Aborting trajectory." %
                               (self._name, len(target_position)))
                 return
 
@@ -715,7 +718,7 @@ class Sawyer(Manipulator):
             bool: True if within epsilon ball, else False.
         '''
         if len(pos) < 7 or len(pos) > 9:
-            rospy.logwarn("Invalid position given to check_if_at_position. Must be length 7, 8, or 9 for Sawyer.")
+            self.logger.warn("Invalid position given to check_if_at_position. Must be length 7, 8, or 9 for Sawyer.")
             return False
 
         cur_pos = self.get_current_joint_states()

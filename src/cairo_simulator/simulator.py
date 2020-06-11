@@ -97,8 +97,14 @@ class Simulator:
             Simulator.__instance = self
 
         self.logger = logger if logger is not None else Logger(handlers=['logging'])
+        self.__init_bullet(gui=use_gui)
         self.__init_vars(use_real_time)
-        self.__init_ros()
+        self.use_ros = use_ros
+        if self.use_ros:
+            if 'rospy' not in sys.modules:
+                raise  'ROS shell environment has not been sourced as rospy could not be imported.'
+            self.__init_ros()
+            self.logger = logger if logger is not None else Logger(handlers=['ros'])
 
     def __del__(self):
         p.disconnect()
@@ -165,7 +171,7 @@ class Simulator:
             p.setRealTimeSimulation(1)
             self._use_real_time = True
         else:
-            rospy.logerr(
+           self.logger.err(
                 "Invalid realtime value given to Simulator.set_real_time: Expected True or False.")
 
     def step(self):
@@ -182,10 +188,11 @@ class Simulator:
 
         cur_time = self.__sim_time
 
-        if cur_time - self.__last_broadcast_time > self._state_broadcast_rate:
-            self.publish_robot_states()
-            self.publish_object_states()
-            self.__last_broadcast_time = cur_time
+        if self.use_ros:
+            if cur_time - self.__last_broadcast_time > self._state_broadcast_rate:
+                self.publish_robot_states()
+                self.publish_object_states()
+                self.__last_broadcast_time = cur_time
 
         self.process_trajectory_queues()
 
@@ -209,6 +216,7 @@ class Simulator:
         """
         self._estop = False
 
+    @ros_method
     def publish_robot_states(self):
         """
         For each registered Robot, publishes its state.
@@ -216,6 +224,7 @@ class Simulator:
         for robot_id in self._robots.keys():
             self._robots[robot_id].publish_state()
 
+    @ros_method
     def publish_object_states(self):
         """
         For each registered SimObject, publishes its state.
@@ -234,8 +243,9 @@ class Simulator:
 
             if self._trajectory_queue_timers[traj_id] is not None and cur_time - self._trajectory_queue_timers[traj_id] > self._motion_timeout:
                 # Action timed out, abort trajectory
-                rospy.logwarn(
-                    "Trajectory for robot %d timed out! Aborting remainder of trajectory." % traj_id)
+                if self.use_ros:
+                    self.logger.warn(
+                        "Trajectory for robot %d timed out! Aborting remainder of trajectory." % traj_id)
                 self.clear_trajectory_queue(traj_id)
                 continue
 
@@ -273,16 +283,18 @@ class Simulator:
                     # Increment progress in the trajectory
                     self._trajectory_queue[traj_id][1] = self._trajectory_queue[traj_id][1][1:]
                 else:
-                    rospy.logerr("No mechanism for handling trajectory execution for Robot Type %s" % (
-                        str(type(self._robots[id]))))
+                    if self.use_ros:
+                        self.logger.err("No mechanism for handling trajectory execution for Robot Type %s" % (
+                            str(type(self._robots[id]))))
                     self.clear_trajectory_queue(traj_id)
                     continue
 
                 # Update trajectory_queue_timer
             elif cur_time - self._trajectory_queue_timers[traj_id] > self._motion_timeout:
                 # Action timed out, abort trajectory
-                rospy.logwarn(
-                    "Trajectory for robot %d timed out! Aborting remainder of trajectory." % traj_id)
+                if self.use_ros:
+                    self.logger.warn(
+                        "Trajectory for robot %d timed out! Aborting remainder of trajectory." % traj_id)
                 self.clear_trajectory_queue(traj_id)
                 continue
 
@@ -306,7 +318,7 @@ class Simulator:
         if simobj_id in self._objects:
             del self._objects[simobj_id]
         else:
-            rospy.logerr(
+            self.logger.err(
                 "Tried to delete object %d, which Simulator doesn't think exists" % simobj_id)
 
     def add_robot(self, robot_obj):
@@ -388,8 +400,10 @@ class SimObject():
         """
         self._name = object_name
         if Simulator.is_instantiated():
+            self.logger = Simulator.get_logger()
             if isinstance(model_file_or_sim_id, int):
                 self._simulator_id = model_file_or_sim_id
+                self.logger.info()
             else:
                 self._simulator_id = self._load_model_file_into_sim(
                     model_file_or_sim_id, fixed_base)
@@ -398,15 +412,23 @@ class SimObject():
             if self._simulator_id is None:
                 raise Exception("Couldn't load object model from %s" %
                                 self.model_file_or_sim_id)
-
             Simulator.get_instance().add_object(self)
 
-            self._state_pub = rospy.Publisher(
-                "/%s/pose" % self._name, PoseStamped, queue_size=1)
+            if Simulator.using_ros():
+                self.__init_ros()
+
         else:
             raise Exception(
                 "Simulator must be instantiated before creating a SimObject.")
 
+    def __init_ros(self):
+        """
+        Initializes ROS pubs and subs 
+        """
+        self._state_pub = rospy.Publisher(
+                    "/%s/pose" % self._name, PoseStamped, queue_size=1)
+
+    @ros_method
     def publish_state(self):
         """
         Publishes the state of the object if using ROS.
@@ -465,6 +487,7 @@ class SimObject():
             position_vec (None, optional):  Desired [x,y,z] position of the object. Current position otherwise.
             orientation_vec (None, optional): Desired orientation of the object as either quaternion or euler angles. Current angle otherwise.
         '''
+        print(self._simulator_id)
         cur_pos, cur_ori = p.getBasePositionAndOrientation(self._simulator_id)
         if orientation_vec is None:
             orientation_vec = cur_ori
@@ -505,16 +528,25 @@ class Robot(ABC):
         super().__init__()
         self._name = robot_name
         self._state = None
+        if Simulator.is_instantiated():
+            self.logger = Simulator.get_logger()
+            self._simulator_id = p.loadURDF(urdf_file, basePosition=position, 
+                baseOrientation=orientation, useFixedBase=fixed_base, flags=urdf_flags)
+            # Register with Simulator manager
+            sim = Simulator.get_instance()
+            sim.add_robot(self)
 
+            if Simulator.using_ros():
+                self.__init_ros
+
+        else:
+            raise Exception(
+                "Simulator must be instantiated before creating a SimObject.")
+
+    def __init_ros(self):
         self._pub_robot_state = rospy.Publisher(
             '/%s/robot_state' % self._name, Float32MultiArray, queue_size=0)
-        self._simulator_id = p.loadURDF(urdf_file, basePosition=position, 
-            baseOrientation=orientation, useFixedBase=fixed_base, flags=urdf_flags)
-
-        # Register with Simulator manager
-        sim = Simulator.get_instance()
-        sim.add_robot(self)
-
+       
     def _populate_dof_indices(self, dof_name_list):
         '''
         Given a list of DoF names (e.g.: ['j0', 'j1', 'j2']) find their corresponding joint indices for use with p.getJointInfo to retrieve state.
@@ -535,7 +567,7 @@ class Robot(ABC):
                     found = True
                     break
             if found is False:
-                rospy.logerr("Could not find joint %s in robot id %d" %
+                self.logger.err("Could not find joint %s in robot id %d" %
                              (dof_name, self._simulator_id))
                 return []
 
