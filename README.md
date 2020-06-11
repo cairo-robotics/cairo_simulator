@@ -3,24 +3,35 @@ A Python3, ROS-integrated, PyBullet-based Robot Simulator Foundation.
 
 # Installation Instructions
 
-### Install Python3 libraries for ROS:
+### Install Python3 libraries for ROS (optional):
+If you want to use Cairo Simulator with ROS, you need to enable Python3 ROS development and source the ROS environment scripts.
+
+Using ROS is optional and the below steps are not strictly necessary.
+
 ```
 sudo apt-get install python3-pip python3-yaml
 pip3 install --user rospkg catkin_pkg
+source /opt/ros/melodic/setup.bash
 ```
 
 ### Install cairo-motion-planning package to system / local environment:
+If you plan on using the simulator to generate motion plans, you must install as a dependency cairo_motion_planning. 
+
 ```
 git clone https://github.com/cairo-robotics/cairo_motion_planning.git
 pip3 install --user path-to-cairo_motion_planning-reop
 ```
 Use the --editable flag if developing cairo-motion-planning and want to see changes reflecting the cairo-simulator.
 
-### Install the PyBullet physics engine: 
-`pip3 install pybullet`
+### Install the dependencies: 
 
-### Source environment if using ROS:
-`source /opt/ros/<rosdistro>/setup.bash`
+#### If using ROS:
+
+After sourcing the ROS environment scripts:
+`pip3 install --user -r requirements.txt`
+
+#### If using a Python virtual environment (i.e. virtualenv, pyenv etc,.):
+`pip3 install pybullet -r requirements.txt`
 
 # Running the Simulator
 Unlike Gazebo, this is not a standalone executable program but rather is a foundation upon which a simulator can be created. The sawyer_test.py file contains a fairly minimal example showing how to use this package, initializing the simulator, a robot, and an object in the world.
