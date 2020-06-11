@@ -17,6 +17,15 @@ import pybullet_data
 
 from cairo_simulator.log import Logger
 
+
+def ros_method(func):
+    def _decorator(self, *args, **kwargs):
+        if not Simulator.is_instantiated() or not Simulator.using_ros():
+            raise Exception("Cannot use ROS based method without an instantiated Simulator set to use ROS.")
+        return func(self, *args, **kwargs)
+    return _decorator
+
+
 class Simulator:
 
     """
