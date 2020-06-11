@@ -1,0 +1,3 @@
+-e git+https://github.com/cairo-robotics/cairo_motion_planning.git@f36d73ad096d00949daec6c199d020c6b0b3d285#egg=cairo_motion_planning
+numpy==1.18.5
+pybullet==2.8.1
