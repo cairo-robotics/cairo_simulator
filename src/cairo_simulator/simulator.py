@@ -18,7 +18,7 @@ import pybullet_data
 from cairo_simulator.log import Logger
 
 
-def ros_method(func):
+def rosmethod(func):
     def _decorator(self, *args, **kwargs):
         if not Simulator.is_instantiated() or not Simulator.using_ros():
             raise Exception("Cannot use ROS based method without an instantiated Simulator set to use ROS.")
@@ -216,7 +216,7 @@ class Simulator:
         """
         self._estop = False
 
-    @ros_method
+    @rosmethod
     def publish_robot_states(self):
         """
         For each registered Robot, publishes its state.
@@ -224,7 +224,7 @@ class Simulator:
         for robot_id in self._robots.keys():
             self._robots[robot_id].publish_state()
 
-    @ros_method
+    @rosmethod
     def publish_object_states(self):
         """
         For each registered SimObject, publishes its state.
@@ -428,7 +428,7 @@ class SimObject():
         self._state_pub = rospy.Publisher(
                     "/%s/pose" % self._name, PoseStamped, queue_size=1)
 
-    @ros_method
+    @rosmethod
     def publish_state(self):
         """
         Publishes the state of the object if using ROS.
@@ -537,7 +537,7 @@ class Robot(ABC):
             sim.add_robot(self)
 
             if Simulator.using_ros():
-                self.__init_ros
+                self.__init_ros()
 
         else:
             raise Exception(

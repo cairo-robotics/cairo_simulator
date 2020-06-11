@@ -14,7 +14,7 @@ import numpy as np
 import pybullet as p
 
 
-from cairo_simulator.simulator import Simulator, Robot, ros_method
+from cairo_simulator.simulator import Simulator, Robot, rosmethod
 from cairo_simulator.utils import ASSETS_PATH, compute_3d_homogeneous_transform
 
 
@@ -456,7 +456,7 @@ class Sawyer(Manipulator):
         p.setJointMotorControl2(self._simulator_id, self._extra_dof_indices[0], p.POSITION_CONTROL,
                         target_position, target_velocity, maxVelocity=target_velocity)
 
-    @ros_method
+    @rosmethod
     def publish_state(self):
         """
         Publish robot state if using ROS. 
@@ -495,9 +495,10 @@ class Sawyer(Manipulator):
 
             self._pub_robot_state_full.publish(String(json.dumps(robot_state)))
 
-        state_vector = Float32MultiArray()
-        state_vector.data = arm_configuration + gripper_configuration
-        self._pub_robot_state.publish(state_vector)
+        # TODO: Address difference between self._pub_robot_state and self._pub_robot_state_full
+        # state_vector = Float32MultiArray()
+        # state_vector.data = arm_configuration + gripper_configuration
+        # self._pub_robot_state.publish(state_vector)
 
     def move_to_joint_pos_callback(self, target_position_float32array):
         """
