@@ -96,7 +96,7 @@ class Simulator:
         else:
             Simulator.__instance = self
 
-        self.__init_bullet(gui=gui)
+        self.logger = logger if logger is not None else Logger(handlers=['logging'])
         self.__init_vars(use_real_time)
         self.__init_ros()
 
