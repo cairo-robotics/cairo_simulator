@@ -134,14 +134,14 @@ def filter_equivalent_pairs(pairs):
     """
     return [pair for pair in pairs if pair[0] != pair[1]]
 
-def get_link_pairs(body, excluded_pairs=set()):
+def get_link_pairs(body, excluded_pairs=[]):
     """
     Gets all link pairs for a given body, less the ecluded_pairs set.
     ~ O(N^2)
     
     Args:
         body (int): The PyBullet body ID.
-        excluded_pairs (set, optional): The set of pairs to ignore / eclude with returning all link pairs.
+        excluded_pairs (list, optional): The set of pairs to ignore / eclude with returning all link pairs.
     
     Returns:
         list: List of link pairs.
@@ -153,7 +153,7 @@ def get_link_pairs(body, excluded_pairs=set()):
     link_pairs = [pair for pair in link_pairs if not check_adjacent_links(body, *pair)]
     link_pairs = [pair for pair in link_pairs if not check_shared_parent_link(body, *pair)]
     link_pairs = [pair for pair in link_pairs if pair not in excluded_pairs and pair[::-1] not in excluded_pairs]
-    link_link_pairs = filter_equivalent_pairs(link_pairs)
+    link_pairs = filter_equivalent_pairs(link_pairs)
     return link_pairs
 
 def get_link_from_joint(robot_id):
