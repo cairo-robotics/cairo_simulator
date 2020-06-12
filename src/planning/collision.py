@@ -4,9 +4,6 @@ interfaces for motion planning.
 """
 import pybullet as p
 
-from cairo_simulator.link import get_link_pairs
-
-
 class DisabledCollisionsContext(): 
 
     """
@@ -93,7 +90,7 @@ def link_collision(body1, link1, body2, link2, max_distance=0):
                               physicsClientId=0)) > 0
 
 
-def self_collision_test(joint_configuration, robot,  link_pairs):
+def self_collision_test(joint_configuration, robot, link_pairs):
     """
     Tests whether a give joint configuration will result in self collision. 
 
