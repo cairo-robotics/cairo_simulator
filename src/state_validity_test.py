@@ -9,6 +9,7 @@ from cairo_simulator.manipulators import Sawyer
 from cairo_simulator.log import Logger
 from planning.collision import self_collision_test, DisabledCollisionsContext
 from cairo_simulator.utils import ASSETS_PATH
+from cairo_simulator.link import get_joint_info_by_name
 
 from cairo_motion_planning.samplers import UniformSampler
 from cairo_motion_planning.state_space import SawyerConfigurationSpace
@@ -29,6 +30,9 @@ def main():
     logger = Logger()
     sim = Simulator(logger=logger, use_ros=use_ros) # Initialize the Simulator
 
+    ground_plane = SimObject("Ground", "plane.urdf", [0,0,0])
+
+
     # Add a table and a Sawyer robot
     table = SimObject("Table", ASSETS_PATH + 'table.sdf', (0.9, 0, 0), (0, 0, 1.5708)) # Table rotated 90deg along z-axis
     sawyer_robot = Sawyer("sawyer0", [0, 0, 0.9])
@@ -42,7 +46,15 @@ def main():
     n_samples = 1000
     valid_samples = []
     starttime = timeit.default_timer()
-    with DisabledCollisionsContext(sim):
+
+    # Exclude the ground plane and the pedestal feet from disabled collisions.
+    excluded_bodies = [ground_plane.get_simulator_id()] # the ground plane
+    sawyer_body_idx = sawyer_robot.get_simulator_id()
+    pedestal_feet_idx = get_joint_info_by_name(sawyer_robot.get_simulator_id(), 'pedestal_feet').idx
+    body_link_pair = (sawyer_body_idx, pedestal_feet_idx) # The (sawyer_idx, pedestal_feet_idx) tuple the ecluded from disabled collisions.
+    excluded_body_link_pairs = [body_link_pair]
+
+    with DisabledCollisionsContext(sim, excluded_bodies, excluded_body_link_pairs):
         print("Sampling start time is :",starttime)
         for i in range(0, n_samples):
             sample = sampler.sample()
