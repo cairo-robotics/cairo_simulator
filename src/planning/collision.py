@@ -97,23 +97,19 @@ def self_collision_test(joint_configuration, robot, excluded_pairs):
     """
     Tests whether a give joint configuration will result in self collision. 
 
-    It stores the current joint state, then sets the robot state to the test configuration. 
-    Every link pair of the robot is check for collision. If every link pair is collision free,
-    the function returns true, else if there is a single collision, the function returns false.
+    It sets the robot state to the test configuration. Every link pair of the robot is checked for collision ignored those in the ecluded_pairs list.
+    If every link pair is collision free, the function returns true, else if there is a single collision, the function returns false.
     
     Args:
         joint_configuration (list): The joint configuration to test for self-collision
         robot (int): PyBullet body ID.
-        excluded_pairs (list): LIst of tuples of link pairs to ignore during self-collision check.
+        excluded_pairs (list): List of tuples of link pairs to ignore during self-collision check.
     
     Returns:
         bool: True if no self-collision, else False.
     """
     robot_id = robot.get_simulator_id()
     check_link_pairs = get_link_pairs(robot_id, excluded_pairs=excluded_pairs)
-
-    # Store current joint state information
-    cur_pos = p.getJointStates(robot._simulator_id, robot._arm_dof_indices)
 
     # Set new configuration and get link states
     for i, idx in enumerate(robot._arm_dof_indices):
@@ -125,10 +121,6 @@ def self_collision_test(joint_configuration, robot, excluded_pairs):
             if link_collision(body1=robot_id, body2=robot_id, max_distance=0,
                           link1=link1, link2=link2):
                 self_collisions.append(True)
-
-    # Restore previous joint states
-    for joint, idx in enumerate(robot._arm_dof_indices):
-        p.resetJointState(robot._simulator_id, idx, targetValue=cur_pos[joint][0], targetVelocity=cur_pos[joint][1])
 
     if any(self_collisions):
         return False

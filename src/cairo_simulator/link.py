@@ -24,7 +24,6 @@ def get_joint_info_by_name(body, name):
         _name = p.getJointInfo(body, _id)[12].decode('UTF-8')
         _link_name_to_index[_name] = _id
     link_id = _link_name_to_index.get(name)
-    print(link_id)
     return get_joint_info(body, link_id) if link_id is not None else None
 
 
