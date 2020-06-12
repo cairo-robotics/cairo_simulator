@@ -16,13 +16,17 @@ class DisabledCollisionsContext():
         simulator (simulator.Simulator): The Simulator singleton instance.
     """
     
-    def __init__(self, simulator): 
+    def __init__(self, simulator, excluded_bodies=[], excluded_body_link_pairs=[]): 
         """
         
         Args:
-        simulator (simulator.Simulator): The Simulator singleton instance.        
+        simulator (simulator.Simulator): The Simulator singleton instance.  
+        excluded_bodies (list): A list of PyBullet body IDs to excluded, generally reserved for SimObjects with only one link.
+        excluded_body_link_pairs (list): A list tuples where the first element is the PyBullet Body ID and the second elemend is the link index. 
         """
         self.simulator = simulator
+        self.excluded_bodies = excluded_bodies
+        self.excluded_body_link_pairs = excluded_body_link_pairs
           
     def __enter__(self): 
         self._disable_robot_collisions()
@@ -37,16 +41,19 @@ class DisabledCollisionsContext():
         Disables all self collisions for all robots.
         """
         for robot in self.simulator._robots.keys():
-            links = [idx for idx in range(-1, p.getNumJoints(robot))]
-            for link in links:
-                p.setCollisionFilterGroupMask(robot, link, 0, 0)
+            if robot not in self.excluded_bodies:
+                links = [idx for idx in range(-1, p.getNumJoints(robot))]
+                for link in links:
+                    if (robot, link) not in self.excluded_body_link_pairs:
+                        p.setCollisionFilterGroupMask(robot, link, 0, 0)
 
     def _disable_simobj_collisions(self):
         """
         Disables all collisions between simobjects and robots.
         """
         for sim_obj in self.simulator._objects.keys():
-            p.setCollisionFilterGroupMask(sim_obj, 0, 0, 0)
+            if sim_obj not in self.excluded_bodies:
+                p.setCollisionFilterGroupMask(sim_obj, 0, 0, 0)
 
     def _enable_robot_collisions(self):
         """
