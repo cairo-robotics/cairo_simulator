@@ -7,6 +7,27 @@ import pybullet as p
 
 from cairo_simulator.utils import JointInfo
 
+def get_joint_info_by_name(body, name):
+    """
+    Returns a JointInfo namedtuple for the given body and joint/link name.
+    
+    Args:
+        body (int): PyBullet body ID
+        name (str): Name of link
+    
+    Returns:
+        JointInfo: Namedtuple wrapping p.getJointInfo().
+    """
+    _link_name_to_index = {p.getBodyInfo(body)[0].decode('UTF-8'):-1,}
+            
+    for _id in range(p.getNumJoints(body)):
+        _name = p.getJointInfo(body, _id)[12].decode('UTF-8')
+        _link_name_to_index[_name] = _id
+    link_id = _link_name_to_index.get(name)
+    print(link_id)
+    return get_joint_info(body, link_id) if link_id is not None else None
+
+
 def get_joint_info(body, joint):
     """
     Returns a JointInfo namedtuple for the given body and joint/link
