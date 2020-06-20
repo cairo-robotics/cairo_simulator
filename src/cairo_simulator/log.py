@@ -1,16 +1,16 @@
 import logging
 import os
+import sys
 
 if os.environ.get('ROS_DISTRO'):
     import rospy
 
-
 class Logger():
 
-    def __init__(self, handlers=['std'], level='debug'):
+    def __init__(self, handlers=['stdout'], level='debug'):
         self.level = level
         self.handlers = handlers
-        if 'logging' == handlers:
+        if 'logging' in handlers:
             levels = {
                 "info": logging.INFO,
                 "debug": logging.DEBUG,
@@ -18,47 +18,58 @@ class Logger():
                 "err": logging.ERROR,
                 "crit": logging.CRITICAL
             }
-            logging.basicConfig(level=levels[self.level])
+            
+            self.logger = logging.getLogger("cairo_sim")
+            formatter = logging.Formatter('[%(asctime)s - %(name)s - %(levelname)s] - %(message)s')
+            handler = logging.StreamHandler(stream=sys.stdout)
+            handler.setLevel(levels[self.level])
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+            self.logger.setLevel(levels[self.level])
+
+        for handler in self.handlers:
+            if handler not in ['stdout', 'logging', 'ros']:
+                raise ValueError("Handlers must be one of 'stdout', 'logging', or 'ros'")
 
     def add_handler(self, handle):
         self.handlers.append(handle)
 
     def debug(self, msg):
-        if 'std' in self.handlers:
+        if 'stdout' in self.handlers:
             print(msg)
         if 'ros' in self.handlers:
             rospy.logdebug(msg)
         if 'logging' in self.handlers:
-            logging.debug(msg)
+            self.logger.debug(msg)
 
     def info(self, msg):
-        if 'std' in self.handlers:
+        if 'stdout' in self.handlers:
             print(msg)
         if 'ros' in self.handlers:
             rospy.loginfo(msg)
         if 'logging' in self.handlers:
-            logging.info(msg)
+            self.logger.info(msg)
 
     def warn(self, msg):
-        if 'std' in self.handlers:
+        if 'stdout' in self.handlers:
             print(msg)
         if 'ros' in self.handlers:
             rospy.logwarn(msg)
         if 'logging' in self.handlers:
-            logging.warning(msg)
+            self.logger.warning(msg)
 
     def err(self, msg):
-        if 'std' in self.handlers:
+        if 'stdout' in self.handlers:
             print(msg)
         if 'ros' in self.handlers:
             rospy.logerr(msg)
         if 'logging' in self.handlers:
-            logging.error(msg)
+            self.logger.error(msg)
 
     def crit(self, msg):
-        if 'std' in self.handlers:
+        if 'stdout' in self.handlers:
             print(msg)
         if 'ros' in self.handlers:
             rospy.logfatal(msg)
         if 'logging' in self.handlers:
-            logging.critical(msg)
+            self.logger.critical(msg)
