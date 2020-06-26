@@ -1,4 +1,6 @@
+import sys
 import os
+import time
 from functools import partial
 
 import numpy as np
@@ -18,10 +20,6 @@ from cairo_motion_planning.state_space import SawyerConfigurationSpace
 from cairo_motion_planning.state_validity import StateValidyChecker
 from cairo_motion_planning.local import interpolate_5poly
 
-
-
-import timeit
-
 def main():
 
     ########################################################
@@ -33,13 +31,12 @@ def main():
     #####################################
     # Create a Robot, or two, or three. #
     #####################################
-    sawyer_robot = Sawyer("sawyer0", [0, 0, 0.8])
+    sawyer_robot = Sawyer("sawyer0", [0, 0, .9], fixed_base=1)
 
     #############################################
     # Create sim environment objects and assets #
     #############################################
     ground_plane = SimObject("Ground", "plane.urdf", [0,0,0])
-    table = SimObject("Table", ASSETS_PATH + 'table.sdf', (0.9, 0, 0), (0, 0, 1.5708)) # Table rotated 90deg along z-axis
     sawyer_id = sawyer_robot.get_simulator_id()
 
     ############
@@ -60,17 +57,15 @@ def main():
     sampler = UniformSampler(scs.get_bounds())
 
     valid_samples = []
-    starttime = timeit.default_timer()
-
     # Exclude the ground plane and the pedestal feet from disabled collisions.
     excluded_bodies = [ground_plane.get_simulator_id()] # the ground plane
     pedestal_feet_idx = get_joint_info_by_name(sawyer_id, 'pedestal_feet').idx
     excluded_body_link_pairs = [(sawyer_id, pedestal_feet_idx)]  # The (sawyer_idx, pedestal_feet_idx) tuple the ecluded from disabled collisions.
 
+    time.sleep(1)
 
     # Disabled collisions during planning with certain eclusions in place.
     with DisabledCollisionsContext(sim, excluded_bodies, excluded_body_link_pairs):
-        print("Sampling start time is :",starttime)
         while True:
             sample = sampler.sample()
             if svc.validate(sample):
@@ -78,22 +73,24 @@ def main():
             if len(valid_samples) >= 1:
                 break
         
-        print(np.array(sawyer_robot.get_current_joint_states()[0:7]))
-        print(np.array(valid_samples[0]))
-        # Generate local plan between two points and execute local plan.
-        steps = 100
-        time = 1000
-        qt, qdt, qddt = interpolate_5poly(np.array(sawyer_robot.get_current_joint_states()[0:7]), np.array(valid_samples[0]), steps)
-        traj = list(zip([time * n/steps for n in range(0, steps)], [list(q) for q in qt]))
-        print(traj)
-        sawyer_robot.execute_trajectory(traj)
-        # Loop until someone shuts us down
-        try:
-            while True:
-                sim.step()
-        except KeyboardInterrupt:
-            p.disconnect()
-            sys.exit(0)
+
+    # Generate local plan between two points and execute local plan.
+    steps = 100
+    move_time = 200
+    start_pos = [0]*7
+    print(np.array(sawyer_robot.get_current_joint_states()[0:7]))
+    print(np.array(valid_samples[0]))
+    qt, qdt, qddt = interpolate_5poly(np.array(start_pos[0:7]), np.array(valid_samples[0]), steps)
+    traj = list(zip([move_time * n/steps for n in range(0, steps)], [list(q) for q in qt]))
+    print(traj)
+    sawyer_robot.execute_trajectory(traj)
+    # Loop until someone shuts us down
+    try:
+        while True:
+            sim.step()
+    except KeyboardInterrupt:
+        p.disconnect()
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()
