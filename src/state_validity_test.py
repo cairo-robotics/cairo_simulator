@@ -11,10 +11,9 @@ from planning.collision import self_collision_test, DisabledCollisionsContext
 from cairo_simulator.utils import ASSETS_PATH
 from cairo_simulator.link import get_link_pairs, get_joint_info_by_name
 
-from cairo_motion_planning.samplers import UniformSampler
-from cairo_motion_planning.state_space import SawyerConfigurationSpace
-from cairo_motion_planning.state_validity import StateValidyChecker
-
+from cairo_motion_planning.sampling.samplers import UniformSampler
+from cairo_motion_planning.geometric.state_space import SawyerConfigurationSpace
+from cairo_motion_planning.sampling.state_validity import StateValidyChecker
 
 from functools import partial
 
