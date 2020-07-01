@@ -18,7 +18,7 @@ from planning.trajectory import JointTrajectoryCurve
 
 from cairo_motion_planning.sampling.samplers import UniformSampler
 from cairo_motion_planning.geometric.state_space import SawyerConfigurationSpace
-from cairo_motion_planning.sampling.state_validity import StateValidyChecker
+from cairo_motion_planning.sampling.state_validity import StateValidityChecker
 from cairo_motion_planning.local.interpolation import interpolate_5poly
 
 def main():
@@ -51,7 +51,7 @@ def main():
     self_collision_fn = partial(self_collision_test, robot=sawyer_robot, link_pairs=link_pairs)
 
     # Create a statevaliditychecker
-    svc = StateValidyChecker(self_collision_fn)
+    svc = StateValidityChecker(self_collision_fn)
     # Use a State Space specific to the environment and robots.
     scs = SawyerConfigurationSpace()
     # Create a sampling technique.
