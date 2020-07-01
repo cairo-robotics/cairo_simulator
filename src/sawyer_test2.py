@@ -25,7 +25,7 @@ def main():
 
     # Add a table and a Sawyer robot
     table = SimObject("Table", ASSETS_PATH + 'table.sdf', (0.9, 0, 0), (0, 0, 1.5708)) # Table rotated 90deg along z-axis
-    sawyer_robot = Sawyer("sawyer0", [0, 0, 1.0])
+    sawyer_robot = Sawyer("sawyer0", [0, 0, .8], fixed_base=1)
 
     sim_obj = SimObject('cube0', 'cube_small.urdf', (0.75, 0, .55))
     sim_obj = SimObject('cube1', 'cube_small.urdf', (0.74, 0.05, .55))
@@ -50,7 +50,6 @@ def main():
         pass
 
     sawyer_robot.execute_trajectory(traj)
-
 
     # Loop until someone shuts us down
     try:

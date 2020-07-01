@@ -25,13 +25,17 @@ class DisabledCollisionsContext():
         self.excluded_bodies = excluded_bodies
         self.excluded_body_link_pairs = excluded_body_link_pairs
           
-    def __enter__(self): 
+    def __enter__(self):
+        p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,0) #makes loading faster
         self._disable_robot_collisions()
         self._disable_simobj_collisions()
+        self.state_id = p.saveState()
       
     def __exit__(self, exc_type, exc_value, exc_traceback): 
         self._enable_robot_collisions()
         self._enable_simobj_collisions()
+        p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,1) #re-enable rendering 
+        p.restoreState(self.state_id)
 
     def _disable_robot_collisions(self):
         """
