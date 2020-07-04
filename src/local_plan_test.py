@@ -15,7 +15,6 @@ from planning.collision import self_collision_test, DisabledCollisionsContext
 from cairo_simulator.utils import ASSETS_PATH
 from cairo_simulator.link import get_link_pairs, get_joint_info_by_name
 
-from cairo_motion_planning.sampling.samplers import UniformSampler
 from cairo_motion_planning.geometric.state_space import SawyerConfigurationSpace
 from cairo_motion_planning.sampling.state_validity import StateValidityChecker
 from cairo_motion_planning.local.interpolation import interpolate_5poly
@@ -51,10 +50,8 @@ def main():
 
     # Create a statevaliditychecker
     svc = StateValidityChecker(self_collision_fn)
-    # Use a State Space specific to the environment and robots.
+    # Use a State Space specific to the environment and robots. Intrinsically uses UniformSampler but a different sampling technique could be used.
     scs = SawyerConfigurationSpace()
-    # Create a sampling technique.
-    sampler = UniformSampler(scs.get_bounds())
 
     valid_samples = []
     # Exclude the ground plane and the pedestal feet from disabled collisions.
@@ -67,7 +64,7 @@ def main():
     # Disabled collisions during planning with certain eclusions in place.
     with DisabledCollisionsContext(sim, excluded_bodies, excluded_body_link_pairs):
         while True:
-            sample = sampler.sample()
+            sample = scs.sample()
             if svc.validate(sample):
                 valid_samples.append(sample)
             if len(valid_samples) >= 1:

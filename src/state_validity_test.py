@@ -11,7 +11,6 @@ from planning.collision import self_collision_test, DisabledCollisionsContext
 from cairo_simulator.utils import ASSETS_PATH
 from cairo_simulator.link import get_link_pairs, get_joint_info_by_name
 
-from cairo_motion_planning.sampling.samplers import UniformSampler
 from cairo_motion_planning.geometric.state_space import SawyerConfigurationSpace
 from cairo_motion_planning.sampling.state_validity import StateValidityChecker
 
@@ -33,12 +32,12 @@ def main():
     # Create the Simulator and pass it a Logger (optional) #
     ########################################################
     logger = Logger()
-    sim = Simulator(logger=logger, use_ros=use_ros, use_gui=True, use_real_time=False) # Initialize the Simulator
+    sim = Simulator(logger=logger, use_ros=use_ros, use_gui=True, use_real_time=True) # Initialize the Simulator
 
     #####################################
     # Create a Robot, or two, or three. #
     #####################################
-    sawyer_robot = Sawyer("sawyer0", [0, 0, 0.9])
+    sawyer_robot = Sawyer("sawyer0", [0, 0, 0.9], fixed_base=1)
 
     #############################################
     # Create sim environment objects and assets #
@@ -61,8 +60,6 @@ def main():
     svc = StateValidityChecker(self_collision_fn)
     # Use a State Space specific to the environment and robots.
     scs = SawyerConfigurationSpace()
-    # Create a sampling technique.
-    sampler = UniformSampler(scs.get_bounds())
 
     n_samples = 1000
     valid_samples = []
@@ -77,8 +74,9 @@ def main():
     with DisabledCollisionsContext(sim, excluded_bodies, excluded_body_link_pairs):
         print("Sampling start time is :",starttime)
         for i in range(0, n_samples):
-            sample = sampler.sample()
+            sample = scs.sample()
             if svc.validate(sample):
+                print(sample)
                 valid_samples.append(sample)
         print("The time difference is :", timeit.default_timer() - starttime)
         print("{} valid of {}".format(len(valid_samples), n_samples))
