@@ -52,15 +52,18 @@ def main():
     pedestal_feet_idx = get_joint_info_by_name(sawyer_id, 'pedestal_feet').idx
     excluded_body_link_pairs = [(sawyer_id, pedestal_feet_idx)]  # The (sawyer_idx, pedestal_feet_idx) tuple the ecluded from disabled collisions.
 
+    ############
+    # PLANNING #
+    ############
     # Disabled collisions during planning with certain eclusions in place.
     with DisabledCollisionsContext(sim, excluded_bodies, excluded_body_link_pairs):
         #########################
-        # State space selection #
+        # STATE SPACE SELECTION #
         #########################
         # This inherently uses UniformSampler but a different sampling class could be injected.
         state_space = SawyerConfigurationSpace()
         ##############################
-        # State Validity Formulation #
+        # STATE VALIDITY FORMULATION #
         ##############################
         # Certain links in Sawyer seem to be permentently in self collision. This is how to remove them by name when getting all link pairs to check for self collision.
         excluded_pairs = [(get_joint_info_by_name(sawyer_id, "right_l1_2").idx, get_joint_info_by_name(sawyer_id, "right_l0").idx), 
@@ -69,30 +72,30 @@ def main():
         self_collision_fn = partial(self_collision_test, robot=sawyer_robot, link_pairs=link_pairs)
         # In this case, we only have a self_col_fn.
         svc = StateValidityChecker(self_col_func=self_collision_fn, col_func=None, validity_funcs=None)
-        ############################################
-        # Build the PRM and call the plan function #
-        ############################################
-        # Create the PRM
+        #######
+        # PRM #
+        #######
+        # Use parametric linear interpolation with 10 steps between points.
         interp = partial(parametric_lerp, steps=10)
-        prm = PRM(state_space, svc, interp, params={'max_iters': 5000, 'k': 3, 'ball_radius': 2.5})
+        # See params for PRM specific parameters
+        prm = PRM(state_space, svc, interp, params={'max_iters': 5000, 'k': 3, 'ball_radius': 2.5, 'min_iters':1000})
         logger.info("Planning....")
         plan = prm.plan(np.array([0, 0, 0, 0, 0, 0, 0]), np.array([1.5262755737449423, -0.1698540226273928, 2.7788151824762055, 2.4546623466066135, 0.7146948867821279, 2.7671787952787184, 2.606128412644311]))
         logger.info("Plan found....")
-        ########################################################################
-        # Interpolate between each point in found path through graph and plot  #
-        #######################################################################
+        # get_path() reuses the interp function to get the path between vertices of a successful plan 
         path = prm.get_path(plan)
     if len(path) == 0:
             logger.info("Planning failed....")
             sys.exit(1)
-    ###############################################################
-    # Create a MinJerk spline trajectory through path and execute #
-    ###############################################################
+    ##########
+    # SPLINE #
+    ##########
+    # splinging uses numpy so needs to be converted
     path = [np.array(p) for p in path]
+    # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
     jtc = JointTrajectoryCurve()
     traj = jtc.generate_trajectory(path, move_time=10)
     sawyer_robot.execute_trajectory(traj)
-    # Loop until someone shuts us down
     try:
         while True:
             sim.step()
