@@ -12,11 +12,11 @@ if os.environ.get('ROS_DISTRO'):
     from std_msgs.msg import String
 import numpy as np
 import pybullet as p
-
+from ikpy.chain import Chain
+from ikpy.urdf.URDF import get_chain_from_joints
 
 from cairo_simulator.simulator import Simulator, Robot, rosmethod
-from cairo_simulator.utils import ASSETS_PATH, compute_3d_homogeneous_transform
-
+from cairo_simulator.utils import ASSETS_PATH, compute_3d_homogeneous_transform, quaternion_from_matrix
 
 
 class Manipulator(Robot):
@@ -25,7 +25,7 @@ class Manipulator(Robot):
     Base class for Robot Manipulators with linked/articulated chains.
     """
 
-    def __init__(self, robot_name, urdf_file, position, orientation=[0,0,0,1], fixed_base=0, urdf_flags=0):
+    def __init__(self, robot_name, urdf_file, position, orientation=[0,0,0,1], fixed_base=1, urdf_flags=0):
         """
         Initialize a Robot at coordinates position=[x,y,z] and add it to the simulator manager
 
@@ -48,8 +48,6 @@ class Manipulator(Robot):
                 '/%s/execute_trajectory' % self._name, String, self.execute_trajectory_callback)
         
         # self._ik_service = rospy.Service('/%s/ik_service', Pose, self.ik_service)
-
-        self._end_effector_link_index = -1  # Must be set by instantiating class
 
         # Record joint indices of controllable DoF from PyBullet's loaded model.
         self._arm_dof_indices = []
@@ -76,6 +74,10 @@ class Manipulator(Robot):
         self._init_joint_limits()
         # Default to 50% of max movement speed
         self.set_default_joint_velocity_pct(0.5)
+    
+    @abstractmethod
+    def _init_forward_kinematics(self, urdf_file):
+        pass
 
     @abstractmethod
     def _init_joint_names(self):
@@ -139,45 +141,25 @@ class Manipulator(Robot):
         return resp
     """
 
-    def solve_forward_kinematics(self, joint_configuration, terminal_joint_index=None):
+    def solve_forward_kinematics(self, joint_configuration):
         '''
         Returns the pose (point,quaternion) of the robot's end-effector given the provided joint_configuration
         in both world coords and local inertial frame coords.
 
         Args:
             joint_configuration (list): Vector of motor positions
-            terminal_joint_index (None, optional): Joint/Link index whose position is desired
 
         Returns:
             List: [(world_pos, world_ori), (local_pos, local_ori)]
         '''
+        fk_results = self.fk_chain.forward_kinematics(joints=[0] * 2 + joint_configuration + 3 * [0], full_kinematics=False)
 
-        if terminal_joint_index is None:
-            terminal_joint_index = self._end_effector_link_index
-
-        # Store current joint state information
-        cur_pos = p.getJointStates(self._simulator_id, self._arm_dof_indices)
-
-        # Disable collisions
-        # for idx in self._arm_dof_indices:
-        #    p.setCollisionFilterGroupMask(self._simulator_id, idx, 0, 0)
-
-        # Set new configuration and get link states
-        for i, idx in enumerate(self._arm_dof_indices):
-            p.resetJointState(
-                self._simulator_id, idx, targetValue=joint_configuration[i], targetVelocity=0)
-
-        link_state = p.getLinkState(self._simulator_id, terminal_joint_index)
-        world_pos = link_state[0]
-        world_ori = link_state[1]
-        local_pos = link_state[2]
-        local_ori = link_state[3]
-
-        # Restore previous joint states
-        for joint, idx in enumerate(self._arm_dof_indices):
-            p.resetJointState(
-                self._simulator_id, idx, targetValue=cur_pos[joint][0], targetVelocity=cur_pos[joint][1])
-
+        local_pos = list(fk_results[:3, 3])
+        local_ori = quaternion_from_matrix(fk_results[:3, :3])
+        base_pose, _ = p.getBasePositionAndOrientation(self._simulator_id)
+        
+        world_pos = [sum(x) for x in zip(local_pos, base_pose)]
+        world_ori = local_ori
         return ((world_pos, world_ori), (local_pos, local_ori))
 
     def get_joint_pose_in_world_frame(self, joint_index=None):
@@ -363,6 +345,12 @@ class Sawyer(Manipulator):
             self._sub_head_pan = rospy.Subscriber('/%s/set_head_pan' % self._name, Float32, self.set_head_pan)
 
         self._init_local_vars()
+        self._init_forward_kinematics(ASSETS_PATH + 'sawyer_description/urdf/sawyer_static.urdf')
+    
+    def _init_forward_kinematics(self, urdf_file):
+        gripper_tip_elements = get_chain_from_joints(urdf_file, joints=['right_arm_mount', 'right_j0', 'right_j1', 'right_j2', 'right_j3', 'right_j4', 'right_j5', 'right_j6', 'right_hand', 'right_gripper_base_joint', 'right_gripper_tip_joint'])
+        self.fk_chain = Chain.from_urdf_file(urdf_file, base_elements=gripper_tip_elements, active_links_mask=[True] + 8 * [True] + 3 * [False])
+
 
     def _init_joint_names(self):
         """
@@ -388,7 +376,6 @@ class Sawyer(Manipulator):
         for joint_name in self._arm_dof_names:
             self._arm_ik_indices.append(actuated_joints.index(joint_name))
                 
-
         self._end_effector_link_index = self._arm_dof_indices[-1]
 
     def _init_joint_limits(self):
