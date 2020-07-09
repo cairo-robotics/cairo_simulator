@@ -2,6 +2,7 @@ import os
 from collections import namedtuple
 
 import numpy as np
+from pyquaternion import Quaternion
 
 ASSETS_PATH = os.path.dirname(os.path.abspath(__file__)) + '/../../assets/' # Find ./cairo_simulator/assets/ from ./cairo_simulator/src/cairo_simulator/
 
@@ -54,3 +55,9 @@ def invert_3d_homogeneous_transform(T):
         trans_inv[i,3] = -T[i,3]
     
     return np.matmul(rot_inv, trans_inv)
+
+
+def quaternion_from_matrix(matrix):
+
+    quat = Quaternion(matrix=matrix)
+    return [quat[1], quat[2], quat[3], quat[0]]
