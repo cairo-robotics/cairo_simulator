@@ -4,7 +4,7 @@ from collections import namedtuple
 import numpy as np
 from pyquaternion import Quaternion
 
-ASSETS_PATH = os.path.dirname(os.path.abspath(__file__)) + '/../../assets/' # Find ./cairo_simulator/assets/ from ./cairo_simulator/src/cairo_simulator/
+ASSETS_PATH = os.path.dirname(os.path.abspath(__file__)) + '/../../../assets/' # Find ./cairo_simulator/assets/ from ./cairo_simulator/src/cairo_simulator/
 
 
 JointInfo = namedtuple('JointInfo', ['idx', 'name', 'type',

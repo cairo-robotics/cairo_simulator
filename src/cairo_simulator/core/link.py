@@ -5,7 +5,7 @@ from itertools import product, combinations
 
 import pybullet as p
 
-from cairo_simulator.utils import JointInfo
+from cairo_simulator.core.utils import JointInfo
 
 def get_joint_info_by_name(body, name):
     """

@@ -1,5 +1,5 @@
-from planning.bezier import bezier_curve, bezier_coefficients
-from planning.minjerk import minjerk_coefficients, minjerk_trajectory
+from cairo_planning.local.bezier import bezier_curve, bezier_coefficients
+from cairo_planning.local.minjerk import minjerk_coefficients, minjerk_trajectory
 
 
 class JointTrajectoryCurve():

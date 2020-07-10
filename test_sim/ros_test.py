@@ -5,9 +5,9 @@ if os.environ.get('ROS_DISTRO'):
 
 import pybullet as p
 
-from cairo_simulator.simulator import Simulator, SimObject
-from cairo_simulator.manipulators import Sawyer
-from cairo_simulator.log import Logger
+from cairo_simulator.core.simulator import Simulator, SimObject
+from cairo_simulator.core.log import Logger
+from cairo_simulator.devices.manipulators import Sawyer
 
 
 def main():

@@ -15,8 +15,8 @@ import pybullet as p
 from ikpy.chain import Chain
 from ikpy.urdf.URDF import get_chain_from_joints
 
-from cairo_simulator.simulator import Simulator, Robot, rosmethod
-from cairo_simulator.utils import ASSETS_PATH, compute_3d_homogeneous_transform, quaternion_from_matrix
+from cairo_simulator.core.simulator import Simulator, Robot, rosmethod
+from cairo_simulator.core.utils import ASSETS_PATH, compute_3d_homogeneous_transform, quaternion_from_matrix
 
 
 class Manipulator(Robot):
