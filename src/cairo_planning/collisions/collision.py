@@ -4,6 +4,8 @@ interfaces for motion planning.
 """
 import pybullet as p
 
+__all__ = ['DisabledCollisionsContext', 'link_collision', 'self_collision_test']
+
 class DisabledCollisionsContext(): 
 
     """

@@ -1,13 +1,14 @@
+import os
 import copy
 import json
+from abc import abstractmethod
+
 import numpy as np
-import os
 import pybullet as p
 import pybullet_data
-from abc import abstractmethod
-from .Simulator import Simulator
-from .Simulator import Robot
-from cairo_simulator import Utils
+
+from cairo_simulator.core.simulator import Simulator
+from cairo_simulator.core.simulator import Robot
 
 class GroundVehicle(Robot):
     def __init__(self, robot_name, urdf_file, position, orientation=[0,0,0,1], fixed_base=0, urdf_flags=0):

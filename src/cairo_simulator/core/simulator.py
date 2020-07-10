@@ -15,7 +15,7 @@ if os.environ.get('ROS_DISTRO'):
 import pybullet as p
 import pybullet_data
 
-from cairo_simulator.log import Logger
+from cairo_simulator.core.log import Logger
 
 
 def rosmethod(func):

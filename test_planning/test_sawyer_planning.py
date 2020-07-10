@@ -7,18 +7,18 @@ if os.environ.get('ROS_DISTRO'):
     import rospy
 import numpy as np 
 
-from cairo_simulator.simulator import Simulator, SimObject
-from cairo_simulator.manipulators import Sawyer
-from cairo_simulator.log import Logger
-from planning.collision import self_collision_test, DisabledCollisionsContext
-from cairo_simulator.utils import ASSETS_PATH
-from cairo_simulator.link import get_link_pairs, get_joint_info_by_name
-from planning.trajectory import JointTrajectoryCurve
+from cairo_simulator.core.simulator import Simulator, SimObject
+from cairo_simulator.devices.manipulators import Sawyer
+from cairo_simulator.core.log import Logger
+from cairo_simulator.core.utils import ASSETS_PATH
+from cairo_simulator.core.link import get_link_pairs, get_joint_info_by_name
 
-from cairo_motion_planning.geometric.state_space import SawyerConfigurationSpace
-from cairo_motion_planning.sampling.state_validity import StateValidityChecker
-from cairo_motion_planning.local.interpolation import parametric_lerp
-from cairo_motion_planning.planners.roadmap import PRM
+from cairo_planning.collisions import self_collision_test, DisabledCollisionsContext
+from cairo_planning.geometric.state_space import SawyerConfigurationSpace
+from cairo_planning.sampling import StateValidityChecker
+from cairo_planning.local.interpolation import parametric_lerp
+from cairo_planning.trajectory.curve import JointTrajectoryCurve
+from cairo_planning.planners import PRM
 
 def main():
     ################################

@@ -1,3 +1,19 @@
--e git+https://github.com/cairo-robotics/cairo_motion_planning.git@f36d73ad096d00949daec6c199d020c6b0b3d285#egg=cairo_motion_planning
-numpy==1.18.5
+astroid==2.4.2
+-e git+https://github.com/cairo-robotics/cairo_simulator.git@06307ba9422c7984920c9b64c23d30c82ac2126c#egg=cairo_simulator
+isort==4.3.21
+joblib==0.16.0
+lazy-object-proxy==1.4.3
+mccabe==0.6.1
+numpy==1.19.0
 pybullet==2.8.1
+pylint==2.5.3
+pyquaternion==0.9.5
+python-igraph==0.8.2
+scikit-learn==0.23.1
+scipy==1.5.1
+six==1.15.0
+texttable==1.6.2
+threadpoolctl==2.1.0
+toml==0.10.1
+typed-ast==1.4.1
+wrapt==1.12.1
