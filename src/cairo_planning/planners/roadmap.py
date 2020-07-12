@@ -140,7 +140,7 @@ class PRM():
                 distances, neighbors) if distance <= self.ball_radius and neighbor != sample]
         else:
             return [neighbor for distance, neighbor in sorted(
-                list(zip(distances, neighbors)), key=lambda x: x[0], reverse=True) if neighbor != sample]
+                list(zip(distances, neighbors)), key=lambda x: x[0]) if neighbor != sample]
 
     def _sample(self):
         return np.array(self.state_space.sample())
