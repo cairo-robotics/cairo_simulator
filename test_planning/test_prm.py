@@ -81,7 +81,7 @@ if __name__ == "__main__":
     ############################################
     # Create the PRM
     interp = partial(parametric_lerp, steps=10)
-    prm = PRM(r2_space, svc, interp, params={'n_samples': 2000, 'k': 10, 'ball_radius': .25})
+    prm = PRM(r2_space, svc, interp, params={'n_samples': 1000, 'k': 10, 'ball_radius': .45})
     
     plan = prm.plan(np.array([1, 1]), np.array([9, 9]))
     print(plan)
