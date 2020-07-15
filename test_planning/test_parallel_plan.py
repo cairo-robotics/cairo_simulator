@@ -183,34 +183,35 @@ def parallel_connect_worker(batches):
 
 
 if __name__ == "__main__":
-    with Pool(8) as p:
+    num_workers = 8
+    with Pool(num_workers) as p:
         single_s = timer()
         results = p.map(parallel_sample_worker, [10])
         single_e = timer()
 
     parallel_s = timer()
-    with Pool(8) as p:
+    with Pool(num_workers) as p:
         multi_s = timer()
         results = p.map(parallel_sample_worker, [
-            1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000])
+            1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000])
         samples = list(itertools.chain.from_iterable(results))
         multi_e = timer()
 
     nn = NearestNeighbors(X=np.array(samples), model_kwargs={"leaf_size": 50})
-    with Pool(8) as p:
+    with Pool(num_workers) as p:
         parallel_connect_s = timer()
         tests = []
         for q_sample in samples:
             distances, neighbors = nn.query(q_sample, k=10)
             q_neighbors = [neighbor for distance, neighbor in zip(
-                distances, neighbors) if distance <= 1.0 and distance > 0]
+                distances, neighbors) if distance <= 1.5 and distance > 0]
             tests.append((q_sample, q_neighbors))
-        batches = np.array_split(tests, 8)
+        batches = np.array_split(tests, num_workers)
         results = p.map(parallel_connect_worker, batches)
         parallel_connect_e = timer()
-        connection_pairs = list(itertools.chain.from_iterable(results))
+        connections = list(itertools.chain.from_iterable(results))
         print("{} connections out of {} samples".format(
-            len(connection_pairs), len(samples)))
+            len(connections), len(samples)))
     parallel_e = timer()
     print("Single process sampling time {}:".format(single_e - single_s))
     print("Multiprocess sampling time {}:".format(multi_e - multi_s))
@@ -218,30 +219,6 @@ if __name__ == "__main__":
         parallel_connect_e - parallel_connect_s))
     print("Multiprocess sampling and connection testing time: {}".format(
         parallel_e - parallel_s))
-
-    graph = ig.Graph()
-
-    raw_samples = []
-    for pair in connection_pairs:
-        raw_samples.append(pair[0])
-        raw_samples.append(pair[1])
-    unique_samples = set(raw_samples)
-    for sample in unique_samples:
-        graph.add_vertex(None, **{'value': list(sample)})
-
-    for pair in connection_pairs:
-        graph.add_edge(graph.vs['value'].index(list(pair[0])), graph.vs['value'].index(list(pair[1])), **{'weight': pair[2]})
-
-    graph_path = graph.get_shortest_paths(
-        'start', 'goal', weights='weight', mode='ALL')[0]
-    points = [graph.vs[idx]['value'] for idx in graph_path]
-    pairs = list(zip(points, points[1:]))
-    segments = [parametric_lerp(np.array(p[0]), np.array(p[1]), steps=20)
-                for p in pairs]
-    segments = [[list(val) for val in seg] for seg in segments]
-    path = []
-    for seg in segments:
-        path = path + seg
 
     ################################
     # Environment Checks and Flags #
@@ -263,17 +240,99 @@ if __name__ == "__main__":
     # Create a Robot, or two, or three. #
     #####################################
     sawyer_robot = Sawyer("sawyer0", [0, 0, 0.9], fixed_base=1)
+    sawyer_id = sawyer_robot.get_simulator_id()
 
     #############################################
     # Create sim environment objects and assets #
     #############################################
     ground_plane = SimObject("Ground", "plane.urdf", [0, 0, 0])
 
+    # Exclude the ground plane and the pedestal feet from disabled collisions.
+    excluded_bodies = [ground_plane.get_simulator_id()]  # the ground plane
+    pedestal_feet_idx = get_joint_info_by_name(sawyer_id, 'pedestal_feet').idx
+    # The (sawyer_idx, pedestal_feet_idx) tuple the ecluded from disabled collisions.
+    excluded_body_link_pairs = [(sawyer_id, pedestal_feet_idx)]
+
+    ############
+    # PLANNING #
+    ############
+    # Disabled collisions during planning with certain eclusions in place.
+    with DisabledCollisionsContext(sim, excluded_bodies, excluded_body_link_pairs):
+        #########################
+        # STATE SPACE SELECTION #
+        #########################
+        # This inherently uses UniformSampler but a different sampling class could be injected.
+        state_space = SawyerConfigurationSpace()
+
+        ##############################
+        # STATE VALIDITY FORMULATION #
+        ##############################
+        # Certain links in Sawyer seem to be permentently in self collision. This is how to remove them by name when getting all link pairs to check for self collision.
+        excluded_pairs = [(get_joint_info_by_name(sawyer_id, "right_l1_2").idx, get_joint_info_by_name(sawyer_id, "right_l0").idx),
+                          (get_joint_info_by_name(sawyer_id, "right_l1_2").idx, get_joint_info_by_name(sawyer_id, "head").idx)]
+        link_pairs = get_link_pairs(sawyer_id, excluded_pairs=excluded_pairs)
+        self_collision_fn = partial(
+            self_collision_test, robot=sawyer_robot, link_pairs=link_pairs)
+        # In this case, we only have a self_col_fn.
+        svc = StateValidityChecker(
+            self_col_func=self_collision_fn, col_func=None, validity_funcs=None)
+
+        graph = ig.Graph()
+
+        start = [0, 0, 0, 0, 0, 0, 0]
+        end = [1.5262755737449423, -0.1698540226273928, 2.7788151824762055,
+               2.4546623466066135, 0.7146948867821279, 2.7671787952787184, 2.606128412644311]
+
+        graph.add_vertex("start")
+        # Start is always at the 0 index.
+        graph.vs[0]["value"] = start
+        graph.add_vertex("goal")
+        # Goal is always at the 1 index.
+        graph.vs[1]["value"] = end
+
+        for sample in samples:
+            graph.add_vertex(None, **{'value': list(sample)})
+
+        for pair in connections:
+            graph.add_edge(graph.vs['value'].index(list(pair[0])), graph.vs['value'].index(
+                list(pair[1])), **{'weight': pair[2]})
+
+        distances, neighbors = nn.query(np.array(start), k=10)
+        for q_near in neighbors:
+            if graph.vs['value'].index(q_near) != 0:
+                local_path = parametric_lerp(
+                    np.array(start), np.array(q_near), steps=10)
+                valid = subdivision_evaluate(svc.validate, local_path)
+                if valid:
+                    graph.add_edge(graph.vs['value'].index(start), graph.vs['value'].index(list(q_near)), **{'weight': pair[2]})
+                    break
+        distances, neighbors = nn.query(np.array(end), k=10)
+        for q_near in neighbors:
+            if graph.vs['value'].index(q_near) != 0:
+                local_path = parametric_lerp(
+                    np.array(start), np.array(q_near), steps=10)
+                valid = subdivision_evaluate(svc.validate, local_path)
+                if valid:
+                    graph.add_edge(graph.vs['value'].index(end), graph.vs['value'].index(list(q_near)), **{'weight': pair[2]})
+                    break
+
+        graph_path = graph.get_shortest_paths(
+            'start', 'goal', weights='weight', mode='ALL')[0]
+        points = [graph.vs[idx]['value'] for idx in graph_path]
+        pairs = list(zip(points, points[1:]))
+        segments = [parametric_lerp(np.array(p[0]), np.array(p[1]), steps=20)
+                    for p in pairs]
+        segments = [[list(val) for val in seg] for seg in segments]
+        path = []
+        for seg in segments:
+            path = path + seg
+
     ##########
     # SPLINE #
     ##########
     # splinging uses numpy so needs to be converted
     path = [np.array(p) for p in path]
+    print(path)
     # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
     jtc = JointTrajectoryCurve()
     traj = jtc.generate_trajectory(path, move_time=10)
