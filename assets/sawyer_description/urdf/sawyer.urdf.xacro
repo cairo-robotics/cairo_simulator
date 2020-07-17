@@ -10,17 +10,9 @@
     <xacro:arg name="gazebo" value="${gazebo}"/>
     <xacro:arg name="pedestal" value="${pedestal}"/>
   </xacro:include>
-  <xacro:if value="$(arg gazebo)">
-  <xacro:include filename="sawyer_base.gazebo.xacro">
-    <xacro:arg name="static" value="${static}"/>
-    <xacro:arg name="pedestal" value="${pedestal}"/>
-  </xacro:include>
-  </xacro:if>
   <!-- Electric Gripper End Effector -->
-  <xacro:if value="$(arg electric_gripper)">
   <xacro:include filename="sawyer_electric_gripper.urdf.xacro">
     <xacro:arg name="gazebo" value="${gazebo}"/>
   </xacro:include>
-  </xacro:if>
 
 </robot>

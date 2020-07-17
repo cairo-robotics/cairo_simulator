@@ -131,6 +131,7 @@ class Simulator:
         self._sim_timestep = 1. / \
             240.  # If not using real-time mode, amount of time to pass per step() call
         self.set_real_time(use_real_time)
+        p.setTimeStep(self._sim_timestep)
 
     def __init_bullet(self, gui=True):
         """
@@ -173,6 +174,15 @@ class Simulator:
         else:
            self.logger.err(
                 "Invalid realtime value given to Simulator.set_real_time: Expected True or False.")
+
+    def set_timestep(self, dt):
+        """
+        Sets timestep value for Simulator.step()
+        """
+        self._sim_timestep = dt
+        p.setTimeStep(dt)
+        if self._use_real_time is True:
+            self.logger.warn("Simulator.set_timestep called but Simulator is currently running with _use_real_time=True!")
 
     def step(self):
         """

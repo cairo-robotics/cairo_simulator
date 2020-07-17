@@ -17,7 +17,13 @@
   <material name="sawyer_gray">
     <color rgba="0.75294 0.75294 0.75294 1"/>
   </material>
-  <link name="base"/>
+  <link name="base">
+    <inertial>
+      <origin rpy="0 0 0" xyz="-0.1 0 0.07"/>
+      <mass value=".0"/>
+      <inertia ixx="0.05" ixy="0" ixz="0" iyy="0.06" iyz="0" izz="0.03"/>
+    </inertial>
+  </link>
   <link name="torso">
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>

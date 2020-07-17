@@ -21,11 +21,16 @@ def main():
     use_real_time = True
     logger = Logger()
     sim = Simulator(logger=logger, use_ros=use_ros, use_real_time=use_real_time) # Initialize the Simulator
+    p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,0)
+    p.setPhysicsEngineParameter(enableFileCaching=0)
     ground_plane = SimObject("Ground", "plane.urdf", [0,0,0])
     # Add a table and a Sawyer robot
     table = SimObject("Table", ASSETS_PATH + 'table.sdf', (0.9, 0, 0), (0, 0, 1.5708)) # Table rotated 90deg along z-axis
     print(p.getNumJoints(table.get_simulator_id()))
     sawyer_robot = Sawyer("sawyer0", [0, 0, 0.8], fixed_base=1)
+    
+
+    p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,1)
 
     sim_obj = SimObject('cube0', 'cube_small.urdf', (0.75, 0, .55))
     sim_obj = SimObject('cube1', 'cube_small.urdf', (0.74, 0.05, .55))

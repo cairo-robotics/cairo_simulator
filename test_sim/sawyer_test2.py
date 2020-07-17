@@ -39,8 +39,7 @@ def main():
 
     joint_config = sawyer_robot.solve_inverse_kinematics([0.9,0,1.5], [0,0,0,1])
 
-    joint_config2 = copy.copy(joint_config) #sawyer_robot.solve_inverse_kinematics([0.7,0,1.5], [0,0,0,1])
-    joint_config2[0:3] = [0,0.2,0]
+    joint_config2 = sawyer_robot.solve_inverse_kinematics([0.7,0,1.5], [0,0,0,1])
 
     sawyer_robot.set_default_joint_velocity_pct(0.5)
     traj = ((1., joint_config), (2., joint_config2), (2.5, joint_config), (5, joint_config2))
