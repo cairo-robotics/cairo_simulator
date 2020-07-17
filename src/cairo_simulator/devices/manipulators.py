@@ -152,7 +152,7 @@ class Manipulator(Robot):
         Returns:
             List: [(world_pos, world_ori), (local_pos, local_ori)]
         '''
-        fk_results = self.fk_chain.forward_kinematics(joints=[0] * 2 + joint_configuration + 3 * [0], full_kinematics=False)
+        fk_results = self.fk_chain.forward_kinematics(joints=[0] * 2 + list(joint_configuration) + 3 * [0], full_kinematics=False)
 
         local_pos = list(fk_results[:3, 3])
         local_ori = quaternion_from_matrix(fk_results[:3, :3])
