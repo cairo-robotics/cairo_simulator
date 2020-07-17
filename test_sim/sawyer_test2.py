@@ -19,9 +19,10 @@ def main():
         use_ros = True
     else:
         use_ros = False
-    use_real_time = False
+    use_real_time = True
     logger = Logger()
     sim = Simulator(logger=logger, use_ros=use_ros, use_real_time=use_real_time) # Initialize the Simulator
+    p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,0) # Disable rendering while models load
     ground_plane = SimObject("Ground", "plane.urdf", [0,0,0])
 
     # Add a table and a Sawyer robot
@@ -32,6 +33,8 @@ def main():
     sim_obj = SimObject('cube1', 'cube_small.urdf', (0.74, 0.05, .55))
     sim_obj = SimObject('cube2', 'cube_small.urdf', (0.67, -0.1, .55))
     sim_obj = SimObject('cube3', 'cube_small.urdf', (0.69, 0.1, .55))
+
+    p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,1) # Turn rendering back on
 
     start_pos = [0]*7
     sawyer_robot.move_to_joint_pos(start_pos)

@@ -37,6 +37,7 @@ def main():
     #####################################
     # Create a Robot, or two, or three. #
     #####################################
+    p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,0) # Disable rendering while models load
     sawyer_robot = Sawyer("sawyer0", [0, 0, .9], fixed_base=1)
 
     #############################################
@@ -45,6 +46,7 @@ def main():
     ground_plane = SimObject("Ground", "plane.urdf", [0,0,0])
     table = SimObject("Table", ASSETS_PATH + 'table.sdf', (0.9, 0, 0), (0, 0, 1.5708)) # Table rotated 90deg along z-axis
     sawyer_id = sawyer_robot.get_simulator_id()
+    p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,1) # Turn rendering back on
 
     ############
     # PLANNING #
