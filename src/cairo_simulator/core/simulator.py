@@ -21,7 +21,8 @@ from cairo_simulator.core.log import Logger
 def rosmethod(func):
     def _decorator(self, *args, **kwargs):
         if not Simulator.is_instantiated() or not Simulator.using_ros():
-            raise Exception("Cannot use ROS based method without an instantiated Simulator set to use ROS.")
+            raise Exception(
+                "Cannot use ROS based method without an instantiated Simulator set to use ROS.")
         return func(self, *args, **kwargs)
     return _decorator
 
@@ -96,15 +97,17 @@ class Simulator:
         else:
             Simulator.__instance = self
 
-        self.logger = logger if logger is not None else Logger(handlers=['logging'])
+        self.logger = logger if logger is not None else Logger(handlers=[
+                                                               'logging'])
         self.__init_bullet(gui=use_gui)
         self.__init_vars(use_real_time)
         self.use_ros = use_ros
         if self.use_ros:
             if 'rospy' not in sys.modules:
-                raise  'ROS shell environment has not been sourced as rospy could not be imported.'
+                raise 'ROS shell environment has not been sourced as rospy could not be imported.'
             self.__init_ros()
-            self.logger = logger if logger is not None else Logger(handlers=['ros'])
+            self.logger = logger if logger is not None else Logger(handlers=[
+                                                                   'ros'])
 
     def __del__(self):
         p.disconnect()
@@ -172,7 +175,7 @@ class Simulator:
             p.setRealTimeSimulation(1)
             self._use_real_time = True
         else:
-           self.logger.err(
+            self.logger.err(
                 "Invalid realtime value given to Simulator.set_real_time: Expected True or False.")
 
     def set_timestep(self, dt):
@@ -397,7 +400,7 @@ class SimObject():
     A Simulation Object within the PyBullet physics simulation environment.
     """
 
-    def __init__(self, object_name, model_file_or_sim_id, position=(0,0,0), orientation=(0,0,0,1), fixed_base=0):
+    def __init__(self, object_name, model_file_or_sim_id, position=(0, 0, 0), orientation=(0, 0, 0, 1), fixed_base=0):
         """
         Args:
             object_name (str): Name of the sim object.
@@ -436,7 +439,7 @@ class SimObject():
         Initializes ROS pubs and subs 
         """
         self._state_pub = rospy.Publisher(
-                    "/%s/pose" % self._name, PoseStamped, queue_size=1)
+            "/%s/pose" % self._name, PoseStamped, queue_size=1)
 
     @rosmethod
     def publish_state(self):
@@ -470,13 +473,14 @@ class SimObject():
         """
         sim_id = None
         if filepath[-5:] == '.urdf':
-            sim_id = p.loadURDF(filepath, useFixedBase=fixed_base, flags=p.URDF_MERGE_FIXED_LINKS)
+            sim_id = p.loadURDF(
+                filepath, useFixedBase=fixed_base, flags=p.URDF_MERGE_FIXED_LINKS)
         elif filepath[-4:] == '.sdf':
             sim_id = p.loadSDF(filepath)
-            if isinstance(sim_id, tuple): 
+            if isinstance(sim_id, tuple):
                 for idx, sdf_object_id in enumerate(sim_id[1:]):
-                    loaded_object = SimObject("%s_%d"%(self._name, idx), 
-                                    sdf_object_id)
+                    loaded_object = SimObject("%s_%d" % (self._name, idx),
+                                              sdf_object_id)
                 sim_id = sim_id[0]
         return sim_id
 
@@ -521,7 +525,7 @@ class Robot(ABC):
         pdb.set_trace()
     '''
 
-    def __init__(self, robot_name, urdf_file, position, orientation=[0,0,0,1], fixed_base=0, urdf_flags=0):   
+    def __init__(self, robot_name, urdf_file, position, orientation=[0, 0, 0, 1], fixed_base=0, urdf_flags=0):
         """
         Initialize a Robot at pose=(position, orientation) and add it to the simulator manager.
 
@@ -540,8 +544,8 @@ class Robot(ABC):
         self._state = None
         if Simulator.is_instantiated():
             self.logger = Simulator.get_logger()
-            self._simulator_id = p.loadURDF(urdf_file, basePosition=position, 
-                baseOrientation=orientation, useFixedBase=fixed_base, flags=urdf_flags)
+            self._simulator_id = p.loadURDF(urdf_file, basePosition=position,
+                                            baseOrientation=orientation, useFixedBase=fixed_base, flags=urdf_flags)
             # Register with Simulator manager
             sim = Simulator.get_instance()
             sim.add_robot(self)
@@ -556,7 +560,7 @@ class Robot(ABC):
     def __init_ros(self):
         self._pub_robot_state = rospy.Publisher(
             '/%s/robot_state' % self._name, Float32MultiArray, queue_size=0)
-       
+
     def _populate_dof_indices(self, dof_name_list):
         '''
         Given a list of DoF names (e.g.: ['j0', 'j1', 'j2']) find their corresponding joint indices for use with p.getJointInfo to retrieve state.
@@ -578,11 +582,11 @@ class Robot(ABC):
                     break
             if found is False:
                 self.logger.err("Could not find joint %s in robot id %d" %
-                             (dof_name, self._simulator_id))
+                                (dof_name, self._simulator_id))
                 return []
 
         return dof_index_list
-    
+
     def set_world_pose(self, position, orientation):
         '''
         Set the world pose and orientation of the robot
@@ -591,7 +595,8 @@ class Robot(ABC):
         position (list): World position in the form [x,y,z]
         orientation (list): Quaternion in the form [x,y,z,w]
         '''
-        p.resetBasePositionAndOrientation(self._simulator_id, position, orientation)
+        p.resetBasePositionAndOrientation(
+            self._simulator_id, position, orientation)
 
     def get_simulator_id(self):
         """
