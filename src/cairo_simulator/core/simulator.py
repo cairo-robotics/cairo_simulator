@@ -82,7 +82,7 @@ class Simulator:
     def get_logger():
         return Simulator.__instance.logger
 
-    def __init__(self, logger=None, use_real_time=True, use_gui=True, use_ros=False):
+    def __init__(self, run_parallel=False, logger=None, use_real_time=True, use_gui=True, use_ros=False):
         """
         Args:
             use_real_time (bool, optional): Whether or not to use real_time for simulation steps.
@@ -91,12 +91,13 @@ class Simulator:
         Raises:
             Exception: One may only construct the simulator once and instead must ue get_instnct method of already instantiated. 
         """
+        if run_parallel:
+            Simulator.__instance = None
         if Simulator.__instance is not None:
             raise Exception(
                 "You may only initialize -one- simulator per program! Use get_instance instead.")
         else:
             Simulator.__instance = self
-
         self.logger = logger if logger is not None else Logger(handlers=[
                                                                'logging'])
         self.__init_bullet(gui=use_gui)
@@ -151,7 +152,6 @@ class Simulator:
         # artifact from PyBullet port. Get's the default Bullet assets.
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         p.setGravity(0, 0, -9.81)
-        # Potential TODO: Remove ground plane out of init. Speed up rendering: we could remove the plane.
 
     def __init_ros(self):
         """
