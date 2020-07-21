@@ -14,6 +14,7 @@ from cairo_planning.planners.parallel_workers import parallel_connect_worker, pa
 
 __all__ = ['PRM']
 
+
 class PRM():
 
     def __init__(self, state_space, state_validity_checker, interpolation_fn, params):
