@@ -78,7 +78,7 @@ class PRM():
         while count <= self.n_samples:
             q_rand = self._sample()
             if self._validate(q_rand):
-                if count % 100 == 0:
+                if count % 500 == 0:
                     print("{} valid samples...".format(count))
                 valid_samples.append(q_rand)
                 count += 1
