@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from functools import partial
 import os
 
+import pybullet as p
+
 from cairo_planning.sampling import StateValidityChecker
 from cairo_planning.geometric.state_space import SawyerConfigurationSpace
 from cairo_planning.collisions import self_collision_test
@@ -86,23 +88,24 @@ class SawyerSimContext(AbstractSimContext):
             use_ros = True
         else:
             use_ros = False
-
         self.logger = Logger(**logger_config)
         self.sim = Simulator(logger=self.logger, use_ros=use_ros, **sim_config)
-        p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,0) # Disable rendering while models load
+        self.logger.info("Simulator {} instantiated with config {}".format(self.sim, sim_config))
+        # Disable rendering while models load
+        p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
         self.sawyer_robot = Sawyer(**sawyer_config)
         self.sim_objects = [SimObject(**config)
                             for config in sim_obj_configs]
-        p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,1) # Turn rendering back on
+        # Turn rendering back on
+        p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
         self.state_space = SawyerConfigurationSpace()
         self._setup_state_validity(self.sawyer_robot)
-        self._setup_collision_exclusions()
+        # self._setup_collision_exclusions()
 
     def _setup_state_validity(self, sawyer_robot):
         sawyer_id = self.sawyer_robot.get_simulator_id()
-        #excluded_pairs = [(get_joint_info_by_name(sawyer_id, "right_l1_2").idx, get_joint_info_by_name(sawyer_id, "right_l0").idx),
-        #                  (get_joint_info_by_name(sawyer_id, "right_l1_2").idx, get_joint_info_by_name(sawyer_id, "head").idx)]
-        excluded_pairs = []
+        excluded_pairs = [(get_joint_info_by_name(sawyer_id, 'right_l6').idx,
+                           get_joint_info_by_name(sawyer_id, 'right_connector_plate_base').idx)]
         link_pairs = get_link_pairs(sawyer_id, excluded_pairs=excluded_pairs)
         self_collision_fn = partial(
             self_collision_test, robot=sawyer_robot, link_pairs=link_pairs)
