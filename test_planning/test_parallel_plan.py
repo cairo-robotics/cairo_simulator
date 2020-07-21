@@ -8,6 +8,7 @@ if os.environ.get('ROS_DISTRO'):
 import numpy as np
 
 from cairo_simulator.core.context import SawyerSimContext
+
 from cairo_planning.planners.roadmap import PRMParallel
 from cairo_planning.local.interpolation import parametric_lerp
 from cairo_planning.trajectory.curve import JointTrajectoryCurve
@@ -17,23 +18,20 @@ if __name__ == "__main__":
     sim_context = SawyerSimContext(None, setup=False)
     sim_context.setup(sim_overrides={"run_parallel": True})
     sim = sim_context.get_sim_instance()
+    logger = sim_context.get_logger()
+    sawyer_robot = sim_context.get_robot()
     svc = sim_context.get_state_validity()
 
-    interp_fn = partial(parametric_lerp, steps=10)
+    interp_fn = partial(parametric_lerp, steps=5)
     prm = PRMParallel(SawyerSimContext, None, svc, interp_fn, params={
-                       'n_samples': 6000, 'k': 10, 'ball_radius': 1.7})
+                       'n_samples': 16000, 'k': 10, 'ball_radius': 1.3})
     plan = prm.plan(np.array([0, 0, 0, 0, 0, 0, 0]), np.array([1.5262755737449423, -0.1698540226273928,
                                                                2.7788151824762055, 2.4546623466066135, 0.7146948867821279, 2.7671787952787184, 2.606128412644311]))
     path = prm.get_path(plan)
     
-    logger = sim_context.get_logger()
-    sawyer_robot = sim_context.get_robot()
     sawyer_robot.move_to_joint_pos([0, 0, 0, 0, 0, 0, 0])
-
     time.sleep(3)
-    ##########
-    # SPLINE #
-    ##########
+
     # splinging uses numpy so needs to be converted
     path = [np.array(p) for p in path]
     logger.info("Length of path: {}".format(len(path)))
