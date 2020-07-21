@@ -13,9 +13,10 @@ def parallel_sample_worker(num_samples, sim_context_cls, sim_config):
     svc = sim_context.get_state_validity()
 
     # Disabled collisions during planning with certain exclusions in place.
-    collision_exclusisions = sim_context.get_collision_exclusions()
+    # collision_exclusions = sim_context.get_collision_exclusions()
+    collision_exclusions = {}
 
-    with DisabledCollisionsContext(sim, **collision_exclusisions):
+    with DisabledCollisionsContext(sim, **collision_exclusions):
         valid_samples = []
         count = 0
         while count < num_samples:
@@ -37,9 +38,10 @@ def parallel_connect_worker(batches, interp_fn, distance_fn, sim_context_cls, si
     _ = sawyer_robot.get_simulator_id()
 
     # Disabled collisions during planning with certain exclusions in place.
-    collision_exclusisions = sim_context.get_collision_exclusions()
+    # collision_exclusions = sim_context.get_collision_exclusions()
+    collision_exclusions = {}
 
-    with DisabledCollisionsContext(sim, **collision_exclusisions):
+    with DisabledCollisionsContext(sim, **collision_exclusions):
         connections = []
         for batch in batches:
             q_sample = batch[0]
