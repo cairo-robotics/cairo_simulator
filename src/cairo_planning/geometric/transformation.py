@@ -2,7 +2,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 
 
-def reference_transform(euler_angles, translations, degrees=False):
+def transform_mat(euler_angles, translations, degrees=False):
     """
     Generations a SE(3) or 4x4 transformation matrix:
 
@@ -28,4 +28,3 @@ def reference_transform(euler_angles, translations, degrees=False):
         'zyx', euler_angles[::-1], degrees=degrees).as_matrix()
     return np.vstack([np.hstack([rot_mat, np.array(euler_angles).reshape(3, 1)]), np.array([0, 0, 0, 1])])
 
-def constraint_matrix(x_limits, y_limts, z_limits)
