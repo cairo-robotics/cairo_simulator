@@ -1,6 +1,7 @@
 import os
 import sys
 from functools import partial
+import time
 
 import pybullet as p
 if os.environ.get('ROS_DISTRO'):
@@ -28,6 +29,14 @@ def getMotorJointStates(robot):
     joint_torques = [state[3] for state in nonfixed_joint_states]
     return joint_names, joint_positions, joint_velocities, joint_torques
 
+def getJointStates(robot):
+    joint_states = p.getJointStates(robot, range(p.getNumJoints(robot)))
+    joint_positions = [state[0] for state in joint_states]
+    joint_velocities = [state[1] for state in joint_states]
+    joint_torques = [state[3] for state in joint_states]
+    return joint_positions, joint_velocities, joint_torques
+
+
 def main():
     sim_context = SawyerSimContext(setup=False)
     sim_context.setup(sim_overrides={"use_gui": False})
@@ -39,37 +48,42 @@ def main():
     sawyer_id = sawyer_robot.get_simulator_id()
     ground_plane = sim_context.get_sim_objects(['Ground'])[0]
     
+    # Get the robot moving!
+    sawyer_robot.move_to_joint_pos(target_position=[1]*7)
+    p.stepSimulation()
+    
+    # Get current states
+    pos, vel, torq = getJointStates(sawyer_id)
     names, mpos, mvel, mtorq = getMotorJointStates(sawyer_id)
+    print("Moving joint names:")
     print(names)
-    # link_idx = get_joint_info_by_name(sawyer_id, 'right_gripper_tip').idx
-
-    sawyerEELink = p.getNumJoints(sawyer_id) - 1
+    
+    sawyerEELink = get_joint_info_by_name(sawyer_id, 'right_l6').idx
     result = p.getLinkState(sawyer_id,
                         sawyerEELink,
                         computeLinkVelocity=1,
                         computeForwardKinematics=1)
     link_trn, link_rot, com_trn, com_rot, frame_pos, frame_rot, link_vt, link_vr = result
+
     # Get the Jacobians for the CoM of the end-effector link.
     # Note that in this example com_rot = identity, and we would need to use com_rot.T * com_trn.
     # The localPosition is always defined in terms of the link frame coordinates.
-
     zero_vec = [0.0] * len(mpos)
-    print(zero_vec)
     jac_t, jac_r = p.calculateJacobian(sawyer_id, sawyerEELink, com_trn, mpos, zero_vec, zero_vec)
-    print(np.array([np.array(jac_r), np.array(jac_t)]))
+    J = np.vstack([np.array(jac_t), np.array(jac_r)])[:, [0, 2, 3, 4, 5, 6, 7]]
+    print("JACOBIAN")
+    print(J)
+    J_cross = np.dot(J.T, np.linalg.inv(np.dot(J, J.T)))
+    print("PSEUDOINVERSE JACOBIAN")
+    print(J_cross)
     
-    # print(p.getNumJoints(sawyer_id))
-    # print(p.calculateJacobian(sawyer_id, 
-    #               link_idx, 
-    #               [0, 0, 0],
-    #               [0] * 27,
-    #               [0] * 27,
-    #               [0] * 27))
+    test_pose = np.array([1, 1, 1, 0, 0, 0])
+    test_q = np.dot(J_cross, test_pose.T)
     
-# [1.5262755737449423, -0.1698540226273928, 2.7788151824762055, 2.4546623466066135, 0.7146948867821279, 2.7671787952787184, 2.606128412644311]
-
-
-    
+    print("Link linear position and velocity of CoM from getLinkState:")
+    print(link_vt, link_vr)
+    print("Link linear velocity of CoM from linearJacobian * q_dot:")
+    print(np.dot(J, np.array(mvel)[[0, 2, 3, 4, 5, 6, 7]].T))
 
 
 if __name__ == "__main__":
