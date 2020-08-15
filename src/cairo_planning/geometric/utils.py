@@ -37,13 +37,47 @@ def angle_between(v1, v2):
     return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
 
 
-def quat2euler(x, y, z, w):
+def wrap_to_interval(angles, lower=-np.pi):
+    """
+    Wraps an angle into a semi-closed interval of width 2*pi.
+    By default, this interval is `[-pi, pi)`.  However, the lower bound of the
+    interval can be specified to wrap to the interval `[lower, lower + 2*pi)`.
+    If `lower` is an array the same length as angles, the bounds will be
+    applied element-wise to each angle in `angles`.
+    See: http://stackoverflow.com/a/32266181
+    @param angles an angle or 1D array of angles to wrap
+    @type  angles float or numpy.array
+    @param lower optional lower bound on wrapping interval
+    @type  lower float or numpy.array
+    """
+    return (angles - lower) % (2 * np.pi) + lower
 
-    roll = math.atan2(2 * y * w + 2 * x * z, 1 - 2 * y * y - 2 * z * z)
-    pitch = math.atan2(2 * x * w + 2 * y * z, 1 - 2 * x * x - 2 * z * z)
-    yaw = math.asin(2 * x * y + 2 * z * w)
 
-    return np.rad2deg(roll), np.rad2deg(pitch), np.rad2deg(yaw)
+def geodesic_error(t1, t2):
+    """
+    Computes the error in global coordinates between two transforms.
+    @param t1 current transform
+    @param t2 goal transform
+    @return a 4-vector of [dx, dy, dz, solid angle]
+    """ 
+    t_rel = np.dot(np.linalg.inv(t1), t2)
+    t2_t = np.transpose(t2)
+    R = np.dot(t1, t2_t)
+    angle = np.arccos((np.trace(R) - 1) / 2)
+    trans = np.dot(t1[0:3, 0:3], t_rel[0:3, 3])
+    return np.hstack((trans, angle))
+
+
+def geodesic_distance(t1, t2, r=1.0):
+    """
+    Computes the geodesic distance between two transforms
+    @param t1 current transform
+    @param t2 goal transform
+    @param r in units of meters/radians converts radians to meters
+    """
+    error = geodesic_error(t1, t2)
+    error[3] = r * error[3]
+    return np.linalg.norm(error)
 
 
 def point_in_polygon(x, y, poly):
