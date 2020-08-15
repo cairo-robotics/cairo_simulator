@@ -1,14 +1,15 @@
 import numpy as np
 
-from cairo_planning.constraints.projection import displacement, delta_x, constraint_matrix, delta_x_dist
-from cairo_planning.geometric.transformation import transform_mat
+from cairo_planning.constraints.projection import displacement, delta_x, delta_x_dist
+from cairo_planning.geometric.transformation import transform_mat, bound_matrix
 
 if __name__ == "__main__":
-    To = transform_mat([.5, .5, .01], [0, 3.14, 0])
+    To = transform_mat([.5, .5, .92], [.3, .94, 0])
     print(To)
-    Tc = transform_mat([0, 1, 0], [0, 0, 0])
+    Tc = transform_mat([0, 0, .9], [0, 0, 0])
     print(Tc)
-    C = constraint_matrix([(-1000, 1000), (-1000, 1000), (0, 0)], [(-6.28, 6.28), (-6.28, 6.28), (-6.28, 6.28)])
+    C = bound_matrix([(-1000, 1000), (-1000, 1000), (0, 0)],
+                     [(-.4, .4), (-.4, .4), (-1000, 1000)])
     print(C)
     Tcobj = np.matmul(np.linalg.inv(Tc), To)
     print(Tcobj)
