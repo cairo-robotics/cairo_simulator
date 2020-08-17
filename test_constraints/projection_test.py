@@ -13,7 +13,7 @@ from cairo_simulator.core.utils import ASSETS_PATH
 from cairo_simulator.core.link import get_joint_info_by_name
 
 from cairo_planning.collisions import DisabledCollisionsContext
-from cairo_planning.geometric.transformation import xyzrpy2trans, bounds_matrix, quat2euler
+from cairo_planning.geometric.transformation import xyzrpy2trans, bounds_matrix, quat2euler, euler2quat
 from cairo_planning.constraints.projection import project_config
 from cairo_planning.geometric.tsr import TSR
 from cairo_planning.geometric.utils import geodesic_distance, wrap_to_interval
@@ -46,12 +46,12 @@ def main():
             "model_file_or_sim_id": "plane.urdf",
             "position": [0, 0, 0]
         },
-        {
-            "object_name": "Table",
-            "model_file_or_sim_id": ASSETS_PATH + 'table.sdf',
-            "position": [0.7, 0, 0],
-            "orientation":  [0, 0, 1.5708]
-        },
+        # {
+        #     "object_name": "Table",
+        #     "model_file_or_sim_id": ASSETS_PATH + 'table.sdf',
+        #     "position": [0.7, 0, 0],
+        #     "orientation":  [0, 0, 1.5708]
+        # },
         {
             "object_name": "cube0",
             "model_file_or_sim_id": "cube_small.urdf",
@@ -82,23 +82,17 @@ def main():
     _ = sawyer_robot.get_simulator_id()
     _ = sim_context.get_sim_objects(['Ground'])[0]
 
-    # print(quat2euler([0.016451, 0.99929, 0.025687, -0.022076]))
-    # sys.exit(0)
 
     n_samples = 100
     valid_samples = []
     starttime = timeit.default_timer()
-    world_pose, local_pose = sawyer_robot.solve_forward_kinematics(
-        [-0.626087713274031, -0.251570581828223, 1.1761527213148701, 1.3243884916200983, -1.0814323842364368, 1.3859965931599048, 0.8195787252207536])
 
-    T0_w = xyzrpy2trans([.516, .1, .9, 3.08945626, -0.04328909, -0.0340513], degrees=False)
+    T0_w = xyzrpy2trans([.7, 0, 0, 0, 0, 0], degrees=False)
 
-    Tw_e = np.array([[1., 0., 0., 0],  # no offset in x
-                     [0., 1., 0., 0.],  # no offset in y
-                     [0., 0., 1., 0.9],  # height above table height
-                     [0., 0., 0., 1.]])
-    Bw = bounds_matrix([(0, 100), (-100, 100), (-.1, .1)],  # allow some tolerance in the vertical and only positve in x
-                       [(-.05, .05), (-.05, .05), (-np.pi, np.pi)])  # any rotation about z, about x, and y.
+    Tw_e = xyzrpy2trans([-.2, 0, 1.2, 3.1098106, -0.04498105, 3.09090845], degrees=False)
+    
+    Bw = bounds_matrix([(0, 100), (-.025, .025), (-.025, .025)],  # allow some tolerance in the vertical and hortizontal and only positve in x
+                       [(-.01, .01), (-.01, .01), (-np.pi, np.pi)])  # any rotation about z, with limited rotation about x, and y.
     tsr = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw,
               manipindex=0, bodyandlink=16)
 
@@ -109,7 +103,7 @@ def main():
             sample = scs.sample()
             if svc.validate(sample):
                 q_constrained = project_config(sawyer_robot, np.array(
-                    sample), np.array(sample), T0_w, Bw, .025, .01)
+                    sample), np.array(sample), tsr, .01, .01)
                 normalized_q_constrained = []
                 if q_constrained is not None:
                     for value in q_constrained:
@@ -129,6 +123,7 @@ def main():
         while sawyer_robot.check_if_at_position(list(sample), 0.5) is False:
             time.sleep(0.1)
             pass
+        time.sleep(1.5)
 
     # # Loop until someone shuts us down
     try:
