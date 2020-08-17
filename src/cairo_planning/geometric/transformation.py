@@ -21,14 +21,20 @@ def rpy_jacobian(J_r, euler_angles):
 
 
 def quat2euler(wxyz, degrees=False):
-    r = R.from_quat([wxyz[3], wxyz[0], wxyz[1], wxyz[2]])
-    return r.as_euler("zyx", degrees=degrees)
+    r = R.from_quat([wxyz[1], wxyz[2], wxyz[3], wxyz[0]])
+    return r.as_euler("ZYX", degrees=degrees)
+
+
+def euler2quat(rpy, degrees=False):
+    r = R.from_euler(
+        'ZYX', rpy, degrees=degrees)
+    return r.as_quat()
 
 
 def pose2trans(xyzwxyz):
     trans = xyzwxyz[0:3]
     quat = xyzwxyz[3:7]
-    rot_mat = R.from_quat(np.array([quat[3], quat[0], quat[1], quat[2]])).as_matrix()
+    rot_mat = R.from_quat(np.array([quat[1], quat[2], quat[3], quat[0]])).as_matrix()
     return np.vstack([np.hstack([rot_mat, np.array(trans).reshape(3, 1)]),
                np.array([0, 0, 0, 1])])
 
@@ -56,7 +62,7 @@ def xyzrpy2trans(xyzrpy, degrees=False):
     trans = xyzrpy[0:3]
     rpy = xyzrpy[3:6]
     rot_mat = R.from_euler(
-        'zyx', rpy, degrees=degrees).as_matrix()
+        'ZYX', rpy, degrees=degrees).as_matrix()
     return np.vstack([np.hstack([rot_mat, np.array(trans).reshape(3, 1)]), np.array([0, 0, 0, 1])])
 
 
