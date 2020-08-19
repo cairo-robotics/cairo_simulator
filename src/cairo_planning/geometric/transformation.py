@@ -6,28 +6,45 @@ def pseudoinverse(M):
     """
     Moore–Penrose pseudoinverse assuming full row rank. Generally used for Jacobian matrices of robot configurations.
     """
-    return np.dot(M.T, np.linalg.inv(np.dot(M, M.T)))
+    return np.linalg.pinv(M)
 
 
-def rpy_jacobian(J_r, euler_angles):
-    roll = euler_angles[0]
-    pitch = euler_angles[1]
-    B = np.eye(3)
-    B[1, 1] = np.cos(roll)
-    B[1, 2] = -np.cos(pitch) * np.sin(roll)
-    B[2, 1] = np.sin(roll)
-    B[2, 2] = np.cos(pitch) * np.cos(roll)
-    return np.dot(B, J_r)
+def analytic_zyx_jacobian(J_r, ypr):
+    """Generates the Euler mapping matric from J(q) -> J(x) for the equation
+    to produce the analytical jacobian given ZYX extrinsic euler angles x (ypr).
+    
+    Ja(q) = E(x)*J(q)
+
+    Provides the pseudoinverse mapping:
+    q' = Ja(q)^+ * x'
+
+    Args:
+        J_r ([type]): [description]
+        ypr ([type]): [description]
+
+    Returns:
+        [type]: [description]
+    """
+    yaw = ypr[0]
+    pitch = ypr[1]
+    E = np.zeros([3, 3])
+    E[0, 2] = 1
+    E[1, 1] = -np.sin(yaw)
+    E[1, 2] = np.cos(yaw)
+    E[2, 0] = np.cos(pitch) * np.cos(yaw)
+    E[2, 1] = np.cos(pitch) * np.sin(yaw)
+    E[2, 2] = -np.sin(yaw)
+    return np.dot(np.linalg.inv(E), J_r)
 
 
-def quat2euler(wxyz, degrees=False):
+def quat2ypr(wxyz, degrees=False):
     r = R.from_quat([wxyz[1], wxyz[2], wxyz[3], wxyz[0]])
     return r.as_euler("ZYX", degrees=degrees)
 
 
-def euler2quat(rpy, degrees=False):
+def ypr2quat(ypr, degrees=False):
     r = R.from_euler(
-        'ZYX', rpy, degrees=degrees)
+        'ZYX', ypr, degrees=degrees)
     return r.as_quat()
 
 
@@ -39,7 +56,7 @@ def pose2trans(xyzwxyz):
                np.array([0, 0, 0, 1])])
 
 
-def xyzrpy2trans(xyzrpy, degrees=False):
+def xyzypr2trans(xyzypr, degrees=False):
     """
     Generates a SE(3) or 4x4 isometric transformation matrix:
 
@@ -51,7 +68,7 @@ def xyzrpy2trans(xyzrpy, degrees=False):
     Parameters
     ----------
     translations : array-like
-        x, y, z, r (roll), p (pitch), y (yaw) translations and rotations as a single vector
+        x, y, z, y (yaw), p (pitch), r (roll),  translations and rotations as a single vector
     degrees : bool
         Whether or not euler_angles are in degrees (True), or radians (False)
     Returns
@@ -59,10 +76,10 @@ def xyzrpy2trans(xyzrpy, degrees=False):
     : ndarray
         4x4 transformation matrix
     """
-    trans = xyzrpy[0:3]
-    rpy = xyzrpy[3:6]
+    trans = xyzypr[0:3]
+    ypr = xyzypr[3:6]
     rot_mat = R.from_euler(
-        'ZYX', rpy, degrees=degrees).as_matrix()
+        'ZYX', ypr, degrees=degrees).as_matrix()
     return np.vstack([np.hstack([rot_mat, np.array(trans).reshape(3, 1)]), np.array([0, 0, 0, 1])])
 
 
@@ -70,7 +87,7 @@ def bounds_matrix(translation_limits, rotation_limits):
     x_limits = np.array(translation_limits[0])
     y_limits = np.array(translation_limits[1])
     z_limits = np.array(translation_limits[2])
-    roll_limits = np.array(rotation_limits[0])
+    yaw_limits = np.array(rotation_limits[0])
     pitch_limits = np.array(rotation_limits[1])
-    yaw_limits = np.array(rotation_limits[2])
-    return np.vstack([x_limits, y_limits, z_limits, roll_limits, pitch_limits, yaw_limits])
+    roll_limits = np.array(rotation_limits[2])
+    return np.vstack([x_limits, y_limits, z_limits, yaw_limits, pitch_limits, roll_limits])
