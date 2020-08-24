@@ -5,12 +5,13 @@ from cairo_planning.local.interpolation import parametric_lerp
 
 class STOMP():
 
-    def __init__(self, sim, robot, obstacle_ids, excluded_bodies, excluded_body_link_pairs,
+    def __init__(self, sim, robot, obstacles, excluded_bodies, excluded_body_link_pairs,
                  start_state_config, goal_state_config, N, max_iterations = 500, K = 5, h = 10):
         # Sim and robot specific initializations
         self.sim = sim
         self.robot = robot
-        self.obstacle_ids = obstacle_ids
+        self.robot_id = self.robot.get_simulator_id()
+        self.obstacle_ids = [obstacle.get_simulator_id() for obstacle in obstacles]
         self.excluded_bodies = excluded_bodies
         self.excluded_body_link_pairs = excluded_body_link_pairs
 

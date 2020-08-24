@@ -31,15 +31,16 @@ def init_sim_with_sawyer():
     p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
     # Add small cubes on the table (table top bounds are known in world coordinate)
     # TODO add large obstacles
-    sim_obj = SimObject('cube0', 'cube_small.urdf', (0.75, 0, .55))
-    sim_obj = SimObject('cube1', 'cube_small.urdf', (0.74, 0.05, .55))
-    sim_obj = SimObject('cube2', 'cube_small.urdf', (0.67, -0.1, .55))
-    sim_obj = SimObject('cube3', 'cube_small.urdf', (0.69, 0.1, .55))
-    return sim, ground_plane, table, sawyer_robot
+    sim_obj1 = SimObject('cube0', 'cube_small.urdf', (0.75, 0, .55))
+    sim_obj2 = SimObject('cube1', 'cube_small.urdf', (0.74, 0.05, .55))
+    sim_obj3 = SimObject('cube2', 'cube_small.urdf', (0.67, -0.1, .55))
+    sim_obj4 = SimObject('cube3', 'cube_small.urdf', (0.69, 0.1, .55))
+    obstacles = [sim_obj1, sim_obj2, sim_obj3, sim_obj4]
+    return sim, ground_plane, table, sawyer_robot, obstacles
 
 def main():
     # Setup simulator
-    sim, ground_plane, table, sawyer_robot = init_sim_with_sawyer()
+    sim, ground_plane, table, sawyer_robot, obstacles = init_sim_with_sawyer()
     sawyer_id = sawyer_robot.get_simulator_id()
 
     sawyer_robot.move_to_joint_pos([0.006427734375,
@@ -53,9 +54,10 @@ def main():
 
     # Exclude the ground plane and the pedestal feet from disabled collisions.
     excluded_bodies = [ground_plane.get_simulator_id()]  # the ground plane
-    pedestal_feet_idx = get_joint_info_by_name(sawyer_id, 'pedestal_feet').idx
-    # The (sawyer_idx, pedestal_feet_idx) tuple the excluded from disabled collisions.
-    excluded_body_link_pairs = [(sawyer_id, pedestal_feet_idx)]
+    # pedestal_feet_idx = get_joint_info_by_name(sawyer_id, 'pedestal_feet').idx
+    # # The (sawyer_idx, pedestal_feet_idx) tuple the excluded from disabled collisions.
+    # excluded_body_link_pairs = [(sawyer_id, pedestal_feet_idx)]
+    excluded_body_link_pairs = []
 
     start_state_config = np.array([0.006427734375,
                                   -0.4784267578125,
@@ -71,7 +73,7 @@ def main():
                                     0.33058203125,
                                     1.0955361328125,
                                     1.14510546875])
-    stomp = STOMP(sim, sawyer_robot, excluded_bodies, excluded_body_link_pairs,
+    stomp = STOMP(sim, sawyer_robot, obstacles, excluded_bodies, excluded_body_link_pairs,
                   start_state_config, goal_state_config, N = 10)
     stomp.print_trajectory()
     trajectory_data = stomp.get_trajectory(1)
