@@ -35,14 +35,14 @@ def init_sim_with_sawyer():
     sim_obj2 = SimObject('cube1', 'cube_small.urdf', (0.74, 0.05, .55))
     sim_obj3 = SimObject('cube2', 'cube_small.urdf', (0.67, -0.1, .55))
     sim_obj4 = SimObject('cube3', 'cube_small.urdf', (0.69, 0.1, .55))
-    obstacles = [sim_obj1, sim_obj2, sim_obj3, sim_obj4]
-    return sim, ground_plane, table, sawyer_robot, obstacles
+    obstacles = [sim_obj1, sim_obj2, sim_obj3, sim_obj4, table]
+    return sim, sawyer_robot, obstacles
 
 def main():
     # Setup simulator
-    sim, ground_plane, table, sawyer_robot, obstacles = init_sim_with_sawyer()
-    sawyer_id = sawyer_robot.get_simulator_id()
+    sim, sawyer_robot, obstacles = init_sim_with_sawyer()
 
+    # Moving Sawyer to a start position
     sawyer_robot.move_to_joint_pos([0.006427734375,
                                     -0.4784267578125,
                                     -2.6830537109375,
@@ -52,12 +52,6 @@ def main():
                                     1.310236328125])
     time.sleep(3)
 
-    # Exclude the ground plane and the pedestal feet from disabled collisions.
-    excluded_bodies = [ground_plane.get_simulator_id()]  # the ground plane
-    # pedestal_feet_idx = get_joint_info_by_name(sawyer_id, 'pedestal_feet').idx
-    # # The (sawyer_idx, pedestal_feet_idx) tuple the excluded from disabled collisions.
-    # excluded_body_link_pairs = [(sawyer_id, pedestal_feet_idx)]
-    excluded_body_link_pairs = []
 
     start_state_config = np.array([0.006427734375,
                                   -0.4784267578125,
@@ -73,11 +67,20 @@ def main():
                                     0.33058203125,
                                     1.0955361328125,
                                     1.14510546875])
-    stomp = STOMP(sim, sawyer_robot, obstacles, excluded_bodies, excluded_body_link_pairs,
-                  start_state_config, goal_state_config, N = 10)
+    sawyer_id = sawyer_robot.get_simulator_id()
+    excluded_pairs = [
+        (get_joint_info_by_name(sawyer_id, "right_l1").idx, get_joint_info_by_name(sawyer_id, "right_l0").idx),
+        (get_joint_info_by_name(sawyer_id, "right_l1").idx, get_joint_info_by_name(sawyer_id, "head").idx)]
+    link_pairs = get_link_pairs(sawyer_id, excluded_pairs=excluded_pairs)
+
+    # Initializing STOMP
+    stomp = STOMP(sim, sawyer_robot, link_pairs, obstacles,
+                  start_state_config, goal_state_config, N=10)
     stomp.print_trajectory()
     trajectory_data = stomp.get_trajectory(1)
     sawyer_robot.execute_trajectory(trajectory_data)
+    for i in range(10):
+        print(stomp.state_cost(stomp.trajectory[i]))
 
     # Loop until someone shuts us down
     try:
