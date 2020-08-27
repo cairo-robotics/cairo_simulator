@@ -15,7 +15,8 @@ class STOMP():
         self.sim = sim
         self.robot = robot
         self.robot_id = self.robot.get_simulator_id()
-        self.link_pairs = link_pairs
+        self.dof = len(start_state_config)
+        self.link_pairs = link_pairs # The link pairs to check self collision for
         self.obstacle_ids = [obstacle.get_simulator_id() for obstacle in obstacles]
 
         # Start and goal state in joint space
@@ -57,40 +58,91 @@ class STOMP():
         print(self.trajectory)
 
     def plan(self):
-        for _ in range(self.max_iterations):
-            # Disabled collisions during planning with certain exclusions in place.
-            with DisabledCollisionsContext(self.sim):
-
-                pass
-
-    def state_cost(self, joint_configuration):
-        return self._collision_cost(joint_configuration)
-
-    def _collision_cost(self, joint_configuration):
-        with DisabledCollisionsContext(self.sim):
-            collision_cost = self._self_collision_cost(list(joint_configuration), self.robot,
-                                                      self.link_pairs, self.closeness_penalty)
-            collision_cost += self._obstacle_collision_cost(list(joint_configuration), self.robot,
-                                                            get_movable_links(self.robot_id), self.obstacle_ids,
-                                                            self.closeness_penalty)
-        return collision_cost
-
-    def create_K_noisy_trajectories(self):
-
-        # Adding trajectory + noise
-        # Transposing trajectory for adding the noise via broadcasting. The result will be transposed again.
-        trajectory_transpose = self.trajectory.transpose()
-        K_noisy_trajectories = []
-        for _ in range(self.K):
-            # noise has length equals to the N (waypoints)
-            noise = np.random.multivariate_normal(np.zeros((self.N)), self.M)
-            #TODO Clipping beyond joint limits
-            noisy_trajectory = (trajectory_transpose + noise).transpose()
-            K_noisy_trajectories.append((noisy_trajectory, noise))
-        return K_noisy_trajectories
+        self.trajectory_cost = self._compute_trajectory_cost()
+        for iteration in range(self.max_iterations):
+            K_noises, K_noisy_trajectories = self._create_K_noisy_trajectories()
+            P = self._compute_probabilities(K_noisy_trajectories)
+            self._update_trajectory(P, K_noises)
+            new_cost = self._compute_trajectory_cost()
+            if abs(self.trajectory_cost - new_cost) < self.convergence_diff:
+                print("Feasible path found...")
+                return
+            self.trajectory_cost = new_cost
+        print("Reached maximum iterations without sufficient cost improvement...")
 
     def get_trajectory(self, time_between_each_waypoint = 5):
         return [(time_between_each_waypoint * (i+1), list(waypoint)) for i, waypoint in enumerate(self.trajectory)]
+
+    def _state_cost(self, joint_configuration):
+        return self._collision_cost(joint_configuration)
+
+    def _collision_cost(self, joint_configuration):
+        collision_cost = self._self_collision_cost(list(joint_configuration), self.robot,
+                                                  self.link_pairs, self.closeness_penalty)
+        collision_cost += self._obstacle_collision_cost(list(joint_configuration), self.robot,
+                                                        get_movable_links(self.robot_id), self.obstacle_ids,
+                                                        self.closeness_penalty)
+        return collision_cost
+
+    def _create_K_noisy_trajectories(self):
+        # Adding trajectory + noise
+        # Performing the sampling and update for one joint at a time as mentioned in the literature
+        K_noisy_trajectories = []
+        K_noises = []
+        # TODO: Saving K best noisy trajectories so far
+        for k in range(self.K):
+            # single_noise is for one entire trajectory so in the end it will have a shape (waypoints x joints)
+            single_noise = []
+            for i in range(self.dof):
+                # joint_i_noise has length equals to the N (waypoints)
+                joint_i_noise = np.random.multivariate_normal(np.zeros((self.N)), self.M)
+                # TODO: Clipping beyond joint limits
+                single_noise.append(joint_i_noise)
+            # Transposing because we want rows as waypoints and columns as joints
+            single_noise = np.array(single_noise).transpose()
+            single_noisy_trajectory = self.trajectory + single_noise
+            K_noisy_trajectories.append(single_noisy_trajectory.copy())
+            K_noises.append(single_noise.copy())
+        return K_noises, K_noisy_trajectories
+
+    def _compute_probabilities(self, K_noisy_trajectories):
+        S = np.zeros((self.K, self.N))
+        P = np.zeros((self.K, self.N))
+        exp_values = np.zeros((self.K, self.N))
+
+        with DisabledCollisionsContext(self.sim):
+            for k in range(self.K):
+                for i in range(self.N):
+                    S[k][i] = self._state_cost(K_noisy_trajectories[k][i])
+
+        S_max_for_each_i = np.max(S, axis=0)
+        S_min_for_each_i = np.min(S, axis=0)
+
+        for k in range(self.K):
+            for i in range(self.N):
+                exp_values[k][i] = np.exp((self.h*-1*(S[k][i] - S_min_for_each_i[i]))/
+                                          (S_max_for_each_i[i] - S_min_for_each_i[i]))
+
+        sum_exp_values_for_each_i = np.sum(exp_values, axis=0)
+        for k in range(self.K):
+            for i in range(self.N):
+                P[k][i] = exp_values[k][i]/sum_exp_values_for_each_i[i]
+        return P
+
+    def _update_trajectory(self, P, K_noises):
+        # TODO: Shouldn't update the start and the goal waypoints
+        delta_trajectory = np.zeros_like(self.trajectory)
+        for i in range(self.N):
+            delta_trajectory_i = np.zeros((self.dof))
+            for k in range(self.K):
+                delta_trajectory_i += P[k][i] * K_noises[k][i]
+            delta_trajectory[i] = delta_trajectory_i
+
+        # Smoothening the delta trajectory updates by projecting onto basis vector R^-1
+        smoothened_delta_trajectory = np.matmul(self.M, delta_trajectory)
+
+        # Updating the trajectories
+        self.trajectory += smoothened_delta_trajectory
 
     def _obstacle_collision_cost(self, joint_configuration, robot, links, obstacle_ids, closeness_penalty):
         robot_id = robot.get_simulator_id()
@@ -106,11 +158,11 @@ class STOMP():
                                               linkIndexA=link, physicsClientId=0)
                 if closest_point_object:
                     distance = closest_point_object[0][8]
-                    print("Obstacle distance = ", distance)
+                    # print("Obstacle distance = ", distance)
                     cost = closeness_penalty - distance
                     if max_cost < cost:
                         max_cost = cost
-
+        # TODO: velocity of the link is not multiplied as in the literature
         return max_cost
 
     def _self_collision_cost(self, joint_configuration, robot, link_pairs, closeness_penalty):
@@ -123,7 +175,7 @@ class STOMP():
         Args:
             joint_configuration (list): The joint configuration to test for self-collision
             robot (Manipulator Class instance): Manipulator Class instance
-            TODO complete args
+            TODO: complete args
         Returns:
             float: The cost of collision
         """
@@ -145,6 +197,20 @@ class STOMP():
                     if max_cost < cost:
                         max_cost = cost
         return max_cost
+
+    def _compute_trajectory_cost(self):
+        cost = 0
+        with DisabledCollisionsContext(self.sim):
+            for i in range(self.N):
+                cost += self._state_cost(self.trajectory[i])
+
+        # Adding the control cost / acceleration cost for each DOF separately as mentioned in the literature
+        for j in range(self.dof):
+            control_cost_for_joint_j = 0.5 * np.matmul(np.matmul(self.trajectory[:,j].reshape((1, self.N)), self.R),
+                                    self.trajectory[:,j].reshape((self.N, 1)))
+            cost += control_cost_for_joint_j[0]
+        return cost
+
 
 
 
