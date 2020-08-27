@@ -36,11 +36,10 @@ def project_config(manipulator, q_old, q_s, TSR, epsilon, q_step):
         # within_joint_limits(manipulator, q_s)
 
 
-def within_joint_limits(manipulator, q_s, indices):
+def within_joint_limits(manipulator, q_s):
     """
-    TODO: Needs to address the index differences of the motor joints vs head pan etc,.
+    TODO: Fragile in that _arm_joint_limits assumes same ordering of limits as the indices of q_s
     """
-    print("Entered this within_joint_limits function")
     for idx, limits in enumerate(manipulator._arm_joint_limits):
         if q_s[idx] < limits[0] or q_s[idx] > limits[1]:
             return False
