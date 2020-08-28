@@ -1,0 +1,104 @@
+{
+    "excluded_pairs": [
+        [
+            8,
+            3
+        ],
+        [
+            8,
+            4
+        ]
+    ],
+    "joint_limits": {
+        "10": [
+            -3.0439,
+            3.0439
+        ],
+        "11": [
+            -2.9761,
+            2.9761
+        ],
+        "13": [
+            -2.9761,
+            2.9761
+        ],
+        "16": [
+            -4.7124,
+            4.7124
+        ],
+        "22": [
+            0.0,
+            0.020833
+        ],
+        "24": [
+            -0.020833,
+            0.0
+        ],
+        "3": [
+            -3.0503,
+            3.0503
+        ],
+        "4": [
+            -5.0952,
+            0.9064
+        ],
+        "8": [
+            -3.8095,
+            2.2736
+        ],
+        "9": [
+            -3.0426,
+            3.0426
+        ]
+    },
+    "link_index_to_name": {
+        "-1": "base",
+        "0": "torso",
+        "1": "pedestal",
+        "10": "right_l3",
+        "11": "right_l4",
+        "12": "right_arm_itb",
+        "13": "right_l5",
+        "14": "right_hand_camera",
+        "15": "right_wrist",
+        "16": "right_l6",
+        "17": "right_hand",
+        "18": "right_gripper_base",
+        "19": "right_connector_plate_base",
+        "2": "right_arm_base_link",
+        "20": "right_connector_plate_mount",
+        "21": "right_electric_gripper_base",
+        "22": "right_gripper_l_finger",
+        "23": "right_gripper_l_finger_tip",
+        "24": "right_gripper_r_finger",
+        "25": "right_gripper_r_finger_tip",
+        "26": "right_gripper_tip",
+        "3": "right_l0",
+        "4": "head",
+        "5": "screen",
+        "6": "head_camera",
+        "7": "right_torso_itb",
+        "8": "right_l1",
+        "9": "right_l2"
+    },
+    "sample_configurations": {
+        "config0": [
+            0.006427734375,
+            -0.4784267578125,
+            -2.6830537109375,
+            -1.5901376953125,
+            0.1734560546875,
+            1.1468447265625,
+            1.310236328125
+        ],
+        "config1": [
+            -0.9232412109375,
+            0.2353603515625,
+            -2.51373828125,
+            -0.6898984375,
+            0.33058203125,
+            1.0955361328125,
+            1.14510546875
+        ]
+    }
+}

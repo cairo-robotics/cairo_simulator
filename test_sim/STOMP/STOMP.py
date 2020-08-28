@@ -20,8 +20,8 @@ class STOMP():
         self.obstacle_ids = [obstacle.get_simulator_id() for obstacle in obstacles]
 
         # Start and goal state in joint space
-        self.start_state_config = start_state_config
-        self.goal_state_config = goal_state_config
+        self.start_state_config = np.array(start_state_config) if isinstance(start_state_config, list) else start_state_config
+        self.goal_state_config = np.array(goal_state_config) if isinstance(goal_state_config, list) else goal_state_config
 
         # STOMP specific initializations
         self.max_iterations = max_iterations
@@ -65,7 +65,7 @@ class STOMP():
             self._update_trajectory(P, K_noises)
             new_cost = self._compute_trajectory_cost()
             if abs(self.trajectory_cost - new_cost) < self.convergence_diff:
-                print("Feasible path found...")
+                print("Feasible path found in {} iterations ...".format(iteration))
                 return
             self.trajectory_cost = new_cost
         print("Reached maximum iterations without sufficient cost improvement...")

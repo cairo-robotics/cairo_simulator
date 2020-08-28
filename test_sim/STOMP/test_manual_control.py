@@ -11,10 +11,7 @@ from cairo_simulator.core.log import Logger
 from cairo_simulator.core.simulator import Simulator, SimObject
 from cairo_simulator.devices.manipulators import Sawyer
 from cairo_simulator.core.link import get_link_pairs, get_joint_info_by_name
-from STOMP import STOMP
-from utils import load_configuration, save_config_to_configuration_file
-
-
+from utils import load_configuration, save_config_to_configuration_file, manual_control
 
 def init_sim_with_sawyer():
     # Setup simulator
@@ -44,7 +41,6 @@ def init_sim_with_sawyer():
 def main():
     # Load sawyer specific configuration
     sawyer_configuration = load_configuration('sawyer_configuration.json')
-    excluded_pairs = sawyer_configuration['excluded_pairs']
     sample_configurations = sawyer_configuration['sample_configurations']
 
     # Setup simulator
@@ -52,34 +48,7 @@ def main():
 
     # Moving Sawyer to a start position
     sawyer_robot.move_to_joint_pos(sample_configurations['config0'])
-    time.sleep(3)
-
-
-    start_state_config = sample_configurations['config0']
-    goal_state_config = sample_configurations['config1']
-    sawyer_id = sawyer_robot.get_simulator_id()
-    link_pairs = get_link_pairs(sawyer_id, excluded_pairs=excluded_pairs)
-
-    # Initializing STOMP
-    stomp = STOMP(sim, sawyer_robot, link_pairs, obstacles,
-                  start_state_config, goal_state_config, N=10)
-
-
-    # stomp.print_trajectory()
-    #
-    # stomp.plan()
-    # stomp.print_trajectory()
-    # trajectory_data = stomp.get_trajectory(1)
-    # sawyer_robot.execute_trajectory(trajectory_data)
-
-    # Loop until someone shuts us down
-    try:
-        while True:
-            sim.step()
-    except KeyboardInterrupt:
-        p.disconnect()
-        sys.exit(0)
-
+    manual_control(sawyer_robot)
 
 if __name__ == "__main__":
     main()
