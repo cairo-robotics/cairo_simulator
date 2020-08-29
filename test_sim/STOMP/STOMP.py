@@ -17,7 +17,7 @@ class STOMP():
         self.robot_id = self.robot.get_simulator_id()
         self.dof = len(start_state_config)
         self.link_pairs = link_pairs # The link pairs to check self collision for
-        self.obstacle_ids = [obstacle.get_simulator_id() for obstacle in obstacles]
+        self.obstacle_ids = obstacles
 
         # Start and goal state in joint space
         self.start_state_config = np.array(start_state_config) if isinstance(start_state_config, list) else start_state_config

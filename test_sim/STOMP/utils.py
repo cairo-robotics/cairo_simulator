@@ -50,6 +50,22 @@ def manual_control(robot, file_name = "sawyer_configuration.json"):
     p.disconnect()
     sys.exit(0)
 
+# method to add collision constraint for planning a trajectory
+def create_cuboid_obstacle(name, shape , mass, position, orientation=None,
+                      size=None, radius=None, height=None):
+
+    if orientation is None:
+        orientation = [0, 0, 0, 1]
+    if position is not None:
+        if radius is not None:
+            col_id = p.createCollisionShape(shape, radius=radius, height=height)
+            vis_id = p.createCollisionShape(shape, radius=radius, height=height)
+        if size is not None:
+            col_id = p.createCollisionShape(shape, halfExtents=size)
+            vis_id = p.createCollisionShape(shape, halfExtents=size)
+
+    shape_id = p.createMultiBody(mass, col_id, vis_id, basePosition=position, baseOrientation=orientation)
+    return shape_id
 
 ######################################################################
 ### Code snippet to generate the Sawyer configuration json file ######
