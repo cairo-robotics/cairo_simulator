@@ -63,10 +63,8 @@ def main():
     stomp = STOMP(sim, sawyer_robot, link_pairs, obstacles,
                   start_state_config, goal_state_config, N=10)
 
-    stomp.print_trajectory()
-
     stomp.plan()
-    stomp.print_trajectory()
+    stomp.visualize_trajectory()
     trajectory_data = stomp.get_trajectory(1)
     sawyer_robot.execute_trajectory(trajectory_data)
 
