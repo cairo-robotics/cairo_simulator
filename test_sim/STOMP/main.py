@@ -61,7 +61,7 @@ def main():
 
     # Initializing STOMP
     stomp = STOMP(sim, sawyer_robot, link_pairs, obstacles,
-                  start_state_config, goal_state_config, N=10)
+                  start_state_config, goal_state_config, N=20)
 
     stomp.plan()
     stomp.visualize_trajectory()

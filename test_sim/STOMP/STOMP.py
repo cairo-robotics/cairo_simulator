@@ -39,7 +39,7 @@ class STOMP():
         self.check_distance = 3
         self.convergence_diff = 0.01
         self.closeness_penalty = 0.05
-        self.control_coefficient = 0.05
+        self.control_coefficient = 0.1
         self.debug = True
 
     def _init_A(self):
@@ -79,7 +79,14 @@ class STOMP():
         # The visualization or the forward kinematics overestimates the Z axis for some unknown reason
         for i, configuration in enumerate(self.trajectory):
             end_effector_world_position = self.robot.solve_forward_kinematics(configuration)[0][0]
-            p.addUserDebugText(text=str(i), textPosition=end_effector_world_position, textColorRGB=[1.0,0.0,0.0], textSize=1.0)
+            if i == 0:
+                text_string, color = "Start", [0.0,1.0,0.0]
+            elif i == self.N - 1:
+                text_string, color = "Goal", [0.0,1.0,0.0]
+            else:
+                text_string, color = str(i), [1.0,0.0,0.0]
+            p.addUserDebugText(text=text_string, textPosition=end_effector_world_position, textColorRGB=color, textSize=1.0)
+
 
     def _state_cost(self, joint_configuration):
         return self._collision_cost(joint_configuration)
@@ -121,7 +128,7 @@ class STOMP():
         with DisabledCollisionsContext(self.sim):
             for k in range(self.K):
                 for i in range(self.N):
-                    S[k][i] = self._state_cost(K_noisy_trajectories[k][i])
+                    S[k][i] = self._state_cost(K_noisy_trajectories[k][i]) + self._control_cost()/self.N
 
         S_max_for_each_i = np.max(S, axis=0)
         S_min_for_each_i = np.min(S, axis=0)
@@ -138,7 +145,6 @@ class STOMP():
         return P
 
     def _update_trajectory(self, P, K_noises):
-        # TODO: Shouldn't update the start and the goal waypoints
         delta_trajectory = np.zeros_like(self.trajectory)
         for i in range(self.N):
             delta_trajectory_i = np.zeros((self.dof))
@@ -217,13 +223,8 @@ class STOMP():
             for i in range(self.N):
                 cost += self._state_cost(self.trajectory[i])
         state_cost = cost
+        cost += self._control_cost()
 
-        # Adding the control cost / acceleration cost for each DOF separately as mentioned in the literature
-        for j in range(self.dof):
-            control_cost_for_joint_j = self.control_coefficient * np.matmul(
-                np.matmul(self.trajectory[:,j].reshape((1, self.N)), self.R),
-                                    self.trajectory[:,j].reshape((self.N, 1)))
-            cost += control_cost_for_joint_j[0][0]
         if self.debug:
             print("State Cost = ", state_cost)
             print("Control Cost = ", cost - state_cost)
@@ -231,6 +232,12 @@ class STOMP():
             print("")
         return cost
 
-
-
-
+    def _control_cost(self):
+        cost = 0.0
+        # Adding the control cost / acceleration cost for each DOF separately as mentioned in the literature
+        for j in range(self.dof):
+            control_cost_for_joint_j = self.control_coefficient * np.matmul(
+                np.matmul(self.trajectory[:, j].reshape((1, self.N)), self.R),
+                self.trajectory[:, j].reshape((self.N, 1)))
+            cost += control_cost_for_joint_j[0][0]
+        return cost
