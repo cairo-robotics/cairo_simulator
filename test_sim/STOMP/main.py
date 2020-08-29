@@ -63,7 +63,6 @@ def main():
     stomp = STOMP(sim, sawyer_robot, link_pairs, obstacles,
                   start_state_config, goal_state_config, N=10)
 
-
     stomp.print_trajectory()
 
     stomp.plan()

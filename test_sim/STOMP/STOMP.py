@@ -64,7 +64,7 @@ class STOMP():
             P = self._compute_probabilities(K_noisy_trajectories)
             self._update_trajectory(P, K_noises)
             new_cost = self._compute_trajectory_cost()
-            if abs(self.trajectory_cost - new_cost) < self.convergence_diff:
+            if self.trajectory_cost - new_cost < self.convergence_diff and self.trajectory_cost - new_cost > 0:
                 print("Feasible path found in {} iterations ...".format(iteration))
                 return
             self.trajectory_cost = new_cost
@@ -200,16 +200,21 @@ class STOMP():
 
     def _compute_trajectory_cost(self):
         cost = 0
+        state_cost = 0
         with DisabledCollisionsContext(self.sim):
             for i in range(self.N):
                 cost += self._state_cost(self.trajectory[i])
-
+        state_cost = cost
+        print("State Cost = ", state_cost)
         # Adding the control cost / acceleration cost for each DOF separately as mentioned in the literature
         for j in range(self.dof):
             control_cost_for_joint_j = 0.5 * np.matmul(np.matmul(self.trajectory[:,j].reshape((1, self.N)), self.R),
                                     self.trajectory[:,j].reshape((self.N, 1)))
             cost += control_cost_for_joint_j[0]
-        return cost
+        print("Control Cost = ", cost[0] - state_cost)
+        print("Total Cost = ", cost[0])
+        print("")
+        return cost[0]
 
 
 

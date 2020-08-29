@@ -50,7 +50,8 @@ def manual_control(robot, file_name = "sawyer_configuration.json"):
     p.disconnect()
     sys.exit(0)
 
-# method to add collision constraint for planning a trajectory
+# Method to add collision constraint for planning a trajectory
+# Function borrowed from https://github.com/k-maheshkumar/trajopt_reimpl/blob/master/scripts/simulation/SimulationWorld.py
 def create_cuboid_obstacle(name, shape , mass, position, orientation=None,
                       size=None, radius=None, height=None):
 
