@@ -33,7 +33,7 @@ def init_sim_with_sawyer():
 
     p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
 
-    sim_obj1 = create_cuboid_obstacle(name='box0', shape=p.GEOM_BOX, mass=1, position=[0.74, 0.05, .55],
+    sim_obj1 = create_cuboid_obstacle(name='box0', shape=p.GEOM_BOX, mass=1, position=[1.0, 0.05, .55],
                                       size=[0.09, 0.09, 0.35])
     # Interested in only PyBullet object IDs for obstacles
     obstacles = [sim_obj1, table.get_simulator_id()]
@@ -61,10 +61,12 @@ def main():
 
     # Initializing STOMP
     stomp = STOMP(sim, sawyer_robot, link_pairs, obstacles,
-                  start_state_config, goal_state_config, N=20)
-
+                  start_state_config, goal_state_config, N=10,
+                  control_coefficient=0.1, play_pause=True)
+    # stomp.visualize_trajectory(show_only_dot=True)
     stomp.plan()
     stomp.visualize_trajectory()
+    stomp.print_trajectory()
     trajectory_data = stomp.get_trajectory(1)
     sawyer_robot.execute_trajectory(trajectory_data)
 
