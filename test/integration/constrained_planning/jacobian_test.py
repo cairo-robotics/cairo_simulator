@@ -63,17 +63,11 @@ def main():
                                 computeLinkVelocity=1,
                                 computeForwardKinematics=1)
         link_trn, link_rot, com_trn, com_rot, frame_pos, frame_rot, link_vt, link_vr = result
-        print(mpos)
         # Get the Jacobians for the CoM of the end-effector link.
         # Note that in this example com_rot = identity, and we would need to use com_rot.T * com_trn.
         # The localPosition is always defined in terms of the link frame coordinates.
         zero_vec = [0.0] * len(mpos)
-        print(sawyer_id)
-        print(sawyerEELink)
-        print(type(com_trn))
-        print(type(mpos))
-        print(type(zero_vec))
-        print(type(zero_vec))
+
         jac_t, jac_r = p.calculateJacobian(
             sawyer_id, sawyerEELink, com_trn, mpos, zero_vec, zero_vec)
         J = np.vstack([np.array(jac_t), np.array(jac_r)])[
@@ -88,6 +82,8 @@ def main():
         print(link_vt, link_vr)
         print("Link linear and angular velocity of CoM from linearJacobian * q_dot:")
         print(np.dot(J, np.array(mvel)[[0, 2, 3, 4, 5, 6, 7]].T))
+        print()
+        print()
         print("Link joint velocities of CoM from getLinkState:")
         print(np.array(mvel)[[0, 2, 3, 4, 5, 6, 7]])
         print("Link q given link linear position and velocity using J_cross * x_dot.")
