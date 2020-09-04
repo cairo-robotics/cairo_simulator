@@ -24,12 +24,16 @@ if __name__ == "__main__":
 
     interp_fn = partial(parametric_lerp, steps=5)
     prm = PRMParallel(SawyerSimContext, None, svc, interp_fn, params={
-                       'n_samples': 16000, 'k': 10, 'ball_radius': 1.3})
+                       'n_samples': 8000, 'k': 8, 'ball_radius': 1.5})
     plan = prm.plan(np.array([0, 0, 0, 0, 0, 0, 0]), np.array([1.5262755737449423, -0.1698540226273928,
                                                                2.7788151824762055, 2.4546623466066135, 0.7146948867821279, 2.7671787952787184, 2.606128412644311]))
     path = prm.get_path(plan)
     
     sawyer_robot.move_to_joint_pos([0, 0, 0, 0, 0, 0, 0])
+    time.sleep(3)
+    while sawyer_robot.check_if_at_position([0, 0, 0, 0, 0, 0, 0], 0.5) is False:
+        time.sleep(0.1)
+        sim.step()
     time.sleep(3)
 
     # splinging uses numpy so needs to be converted
