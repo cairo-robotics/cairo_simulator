@@ -64,13 +64,21 @@ def displacement_from_TSR(T0_s, TSR):
     return min(distances), deltas[distances.index(min(distances))]
 
 
-def displacements(T):
-    Tc_obj = T[0:3, 3]
-    Rc_obj = T[0:3, 0:3]
-    yaw = np.arctan2(Rc_obj[1, 0], Rc_obj[0, 0])
-    pitch = -np.arcsin(Rc_obj[2, 0])
-    roll = np.arctan2(Rc_obj[2, 1], Rc_obj[2, 2])
-    return np.hstack([Tc_obj, yaw, pitch, roll])
+def displacement(Tm):
+    """
+    Constructs the displacment vector given a relative transformation. It returns the transform 
+    as [tx, ty, tz, r, p, y] that represents the dispalcement from target w in translation and euler rotations.
+
+    Args:
+        Tm (ndarray): The transformation matrix.
+
+    Returns:
+        ndarray: The displacement vector.
+    """
+    Tv = Tm[0:3, 3]
+    Rt = Tm[0:3, 0:3]
+    rpy = rot2rpy(Rt)
+    return np.hstack([Tv, rpy[0], rpy[1], rpy[2]])
 
 def generate_equivalent_displacement_angles(ypr):
     yaws = [ypr[0] + np.pi, ypr[0] - np.pi]
