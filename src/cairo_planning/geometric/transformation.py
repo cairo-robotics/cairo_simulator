@@ -4,29 +4,36 @@ from scipy.spatial.transform import Rotation as R
 
 def pseudoinverse(M):
     """
-    Moore–Penrose pseudoinverse assuming full row rank. Generally used for Jacobian matrices of robot configurations.
+    Moore–Penrose pseudoinverse assuming full row rank.
+    
+    Args:
+        M (ndarray): The angular Jacobian matrix.
+
+    Returns:
+        ndarray: The pseudoinverse matrix.
     """
     return np.linalg.pinv(M)
 
 
 def analytic_xyz_jacobian(J_r, rpy):
-    """Generates the Euler mapping matric from J(q) -> J(x) for the equation
-    to produce the analytical jacobian given ZYX extrinsic euler angles x (ypr).
+    """
+    Generates the Euler mapping matrix E in order to produce the analytical jacobian given xyz extrinsic euler angles.
+
+    Provides the a task space liner mapping to a robot configuration given that x consists of translation and RPY euler angles:
+    Erpy = E^-1
+    Ja(q) = Erpy * J(q)
+    q' = Ja(q)^-1 * x'
     
-    Ja(q) = E(x)*J(q)
-
-    Provides the pseudoinverse mapping:
-    q' = Ja(q)^+ * x'
-
+    Based on the E matrix for XYZ angles found on page 23 of: https://ethz.ch/content/dam/ethz/special-interest/mavt/robotics-n-intelligent-systems/rsl-dam/documents/RobotDynamics2016/RD2016script.pdf
+    
     Args:
-        J_r ([type]): [description]
-        ypr ([type]): [description]
+        J_r (ndarray): The angular Jacobian matrix.
+        rpy (array-like): The current rpy.
 
     Returns:
-        [type]: [description]
+        ndarry: The analytic Jacobian for XYZ / RPY extrinsic rotations.
     """
-    yaw = ypr[0]
-    pitch = ypr[1]
+    # XYZ
     E = np.zeros([3, 3])
     E[0, 0] = 1 
     E[0, 2] = np.sin(rpy[1])
@@ -38,20 +45,47 @@ def analytic_xyz_jacobian(J_r, rpy):
 
 
 def quat2rpy(wxyz, degrees=False):
+    """
+    Converts a quaternion in wxyz form to euler angle rotation xyz/rpy extrinsic form.
+
+    Args:
+        wxyz (array-like): wxyz quaternion vector.
+        degrees (bool, optional): False for radians, True for degrees. Defaults to False.
+
+    Returns:
+        ndarray: Returns the rpy angles of the quaternion.
+    """
     r = R.from_quat([wxyz[1], wxyz[2], wxyz[3], wxyz[0]])
     return r.as_euler("xyz", degrees=degrees)
 
 
 def rpy2quat(rpy, degrees=False):
-    r = R.from_euler(
-        'ZYX', ypr, degrees=degrees)
-    return r.as_quat()
+    """
+    Produces the quaternion representation of euler angles in extrinsic RPY form.
 
+    Args:
+        rpy (array-like): The RPY vector
+        degrees (bool, optional): False for radians, True for degrees. Defaults to False.
 
+    Returns:
+        ndarray: The quaternion in wxzy form.
+    """
     quat = R.from_euler(
         'xyz', rpy, degrees=degrees).as_quat()
     return np.array((quat[3], quat[0], quat[1], quat[2]))
+
+
 def pose2trans(xyzwxyz):
+    """
+    Converts a pose vector [x, y, z, w, x, y, z] consisting of stacked position and quaternion orientation 
+    to a transformation matrix.
+
+    Args:
+        xyzwxyz (array-like): The pose vector. Quatnernion in wxyz form.
+
+    Returns:
+        ndarray: Trasnformation matrix.
+    """
     trans = xyzwxyz[0:3]
     quat = xyzwxyz[3:7]
     rot_mat = R.from_quat(
@@ -106,6 +140,16 @@ def xyzrpy2trans(xyzrpy, degrees=False):
 
 
 def bounds_matrix(translation_limits, rotation_limits):
+    """
+    Produces the 6x2 bounds matrix for use in a TSR object.
+
+    Args:
+        translation_limits (list): 3x2 List of translation limits/bounds.
+        rotation_limits ([type]): 3x2 List of rotation limits/bounds.
+
+    Returns:
+        ndarray: The Bw matrix for a TSR.
+    """
     x_limits = np.array(translation_limits[0])
     y_limits = np.array(translation_limits[1])
     z_limits = np.array(translation_limits[2])
