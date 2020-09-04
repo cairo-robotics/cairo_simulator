@@ -2,10 +2,33 @@ from itertools import product
 
 import numpy as np
 
-from cairo_planning.geometric.transformation import pose2trans, pseudoinverse, analytic_zyx_jacobian, quat2ypr
+from cairo_planning.geometric.transformation import pose2trans, pseudoinverse, analytic_xyz_jacobian, quat2rpy, rot2rpy
 
 
-def project_config(manipulator, q_old, q_s, TSR, epsilon, q_step):
+def project_config(manipulator, q_old, q_s, tsr, epsilon, q_step, iter_count=200, e_step=.25):
+    """
+    This function projects a sampled configuration point down to a constraint manifold defined implicitly by a 
+    Task Space Region representation. http://cs.brown.edu/courses/csci2951-k/papers/berenson12.pdf
+
+    This is also an equivalent approach to First-Order Retraction given by Mike Stillman's '07 IROS paper:
+    docs.google.com/document/d/10sXEhzFRSnvFcl3XxNGhnD4N2SedqwdAvK3dsihxVUA/edit#heading=h.2ye70wns7io3
+
+    
+
+    Args:
+        manipulator (Manipulator): Cairo Simuilator Manipulator object. 
+        q_old (ndarray): Old/prior configuration. TODO: Incorporate q_old and q_step which are utilized by the EXTEND function.
+        q_s (ndarray): Current configuration.
+        tsr (TSR): Task Space Region object that implicitly defines a constraint manifold.
+        epsilon (float): Threshold distance within which the project sample is deemed close enough to manifold.
+        q_step (float): Size of step size used for EXTEND of RRT planner. TODO: Incorporate q_old and q_step which are utilized by the EXTEND function.
+        iter_count (int): Max number of projection iterations to try for a given sample before giving up.
+        e_step (float): The fractional step size of the configuration error q_error to used during the update step.
+
+    Returns:
+        [ndarray, None]: Returns the projected point, or None if the number of iterations exceeds the max  
+                         or if the projected sample is not within the manipulators joint limts.
+    """
     count = 0
     while True:
         count += 1
@@ -35,17 +58,41 @@ def project_config(manipulator, q_old, q_s, TSR, epsilon, q_step):
 
 def within_joint_limits(manipulator, q_s):
     """
-    TODO: Fragile in that _arm_joint_limits assumes same ordering of limits as the indices of q_s
+    Given the manipulator object, checks if the given sample is within the joint limits.
+
+    TODO: Fragile in that it assumes the _arm_joint_limits indices map correctly to the indices of q_s. 
+    Works for the Sawyer Manipulator class for now.
+
+    Args:
+        manipulator (Manipualtor): Cairo Simulator Manipulator object.
+        q_s (ndarray): Current configuration vecot of the manipulator
+
+    Returns:
+        [bool]: True if within limits, else False
     """
     for idx, limits in enumerate(manipulator._arm_joint_limits):
         if q_s[idx] < limits[0] or q_s[idx] > limits[1]:
             return False
     return True
 
-def displacement_from_TSR(T0_s, TSR):
-    T0_sp = np.dot(T0_s, np.linalg.inv(TSR.Tw_e))
-    Tw_sp = np.dot(np.linalg.inv(TSR.T0_w), T0_sp)
-    disp = displacements(Tw_sp)
+
+def distance_from_TSR(T0_s, tsr):
+    """
+    Given the current transform matrix T0_s representing the current sample, this function calculates
+    the task space error (translation, euler) from a the given Task Space Region (TSR) according
+    to the TSR's bounds. It produces the minimum distance given equivalent euler angles and returns both that
+    minimum distance and the corresponding task space error vector. 
+
+    It uses generate_equivalent_displacement_angles() in order to create the equivalent angles (+/- pi) to apply
+    to the YPR portions of the displacement vector and uses distance the smallest distance.
+
+    Args:
+        T0_s (ndarray): Transformation Matrix
+        tsr ([type]): Task Space Region object.
+
+    Returns:
+        float, ndarray: The min distance from a TSR and the corresponding task space error vector.
+    """
     # pose of the grasp location or the pose of the object held by the hand in world coordinates
     T0_sp = np.dot(T0_s, np.linalg.inv(tsr.Tw_e))
     # T0_sp in terms of the coordinates of the target frame w given by the Task Space Region tsr.
@@ -80,7 +127,7 @@ def displacement(Tm):
     rpy = rot2rpy(Rt)
     return np.hstack([Tv, rpy[0], rpy[1], rpy[2]])
 
-def generate_equivalent_displacement_angles(ypr):
+
 def generate_equivalent_euler_angles(rpy):
     """
     Given rpy angles, produces a set of rpy's that are equivalent +/- pi 
@@ -97,11 +144,25 @@ def generate_equivalent_euler_angles(rpy):
     yaws = [rpy[2] + np.pi, rpy[2] - np.pi]
     return list(product(rolls, pitches, yaws))
 
-def delta_x(displacement, constraint_matrix):
+
+def delta_x(displacement, constraint_bounds):
+    """
+    Given a vector of displacements and a bounds/constraint matrix it produces a differential vector
+    that represents the distance the displacement is from the bounds dictated by the constraint bounds. 
+
+    For each displacement value, if the value is within the limits of the respective bound, it will be 0.
+
+    Args:
+        displacement (array-like): Vector representing translation and euler displacement from a TSR.
+        constraint_bounds ([type]): The bounds/constraint matrix of the TSR.
+
+    Returns:
+        ndarray: The delta / differential vector.
+    """
     delta = []
     for i in range(0, displacement.shape[0]):
-        cmin = constraint_matrix[i, 0]
-        cmax = constraint_matrix[i, 1]
+        cmin = constraint_bounds[i, 0]
+        cmax = constraint_bounds[i, 1]
         di = displacement[i]
         if di > cmax:
             delta.append(di - cmax)
@@ -113,4 +174,14 @@ def delta_x(displacement, constraint_matrix):
 
 
 def delta_x_dist(del_x):
+    """
+    Returns the 2-norm of a vector del_x representing the deltas of each respective
+    diemsnions that a displacement vector is from the TSR constraint bounds.
+
+    Args:
+        del_x (ndarray): The delta vector from the constraint bounds of a TSR.
+
+    Returns:
+        float: 2-norm
+    """
     return np.linalg.norm(del_x)
