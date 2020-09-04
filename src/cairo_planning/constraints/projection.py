@@ -81,10 +81,21 @@ def displacement(Tm):
     return np.hstack([Tv, rpy[0], rpy[1], rpy[2]])
 
 def generate_equivalent_displacement_angles(ypr):
-    yaws = [ypr[0] + np.pi, ypr[0] - np.pi]
-    pitches = [ypr[1] + np.pi, ypr[1] - np.pi]
-    rolls = [ypr[2] + np.pi, ypr[2] - np.pi]
-    return list(product(yaws, pitches, rolls))
+def generate_equivalent_euler_angles(rpy):
+    """
+    Given rpy angles, produces a set of rpy's that are equivalent +/- pi 
+    but might ultimately produce smaller distances from a TSR.
+
+    Args:
+        rpy (array-like): The roll, pitch, yaw vector.
+
+    Returns:
+        list: The cartesian product of yaws, pitches, and rolls to create a list of rpy displacements.
+    """
+    rolls = [rpy[0] + np.pi, rpy[0] - np.pi]
+    pitches = [rpy[1] + np.pi, rpy[1] - np.pi]
+    yaws = [rpy[2] + np.pi, rpy[2] - np.pi]
+    return list(product(rolls, pitches, yaws))
 
 def delta_x(displacement, constraint_matrix):
     delta = []
