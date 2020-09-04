@@ -9,31 +9,28 @@ def project_config(manipulator, q_old, q_s, TSR, epsilon, q_step):
     count = 0
     while True:
         count += 1
-        world_pose, local_pose = manipulator.solve_forward_kinematics(q_s)
+        world_pose, _ = manipulator.solve_forward_kinematics(q_s)
         trans, quat = world_pose[0], world_pose[1]
         T0_s = pose2trans(np.hstack([trans + quat]))
-        d_vector = displacement_from_TSR(T0_s, TSR)
-        print(d_vector)
-        print(np.linalg.norm(d_vector))
-        if np.linalg.norm(d_vector) < epsilon:
-            print(d_vector)
-            print(np.linalg.norm(d_vector))
-            print(trans, quat2ypr(quat))
+        min_distance, x_err = distance_from_TSR(T0_s, tsr)
+        # print(x_err)
+        # print(min_distance)
+        if min_distance < epsilon:
             return q_s
-        elif count > 5000:
+        elif count > iter_count:
             return None
         J = manipulator.get_jacobian(q_s)
         J_t = J[0:3, :]
         # obtain the analytic jacobian
-        J_rpy = analytic_zyx_jacobian(J[3:6, :], quat2ypr(quat))
+        J_rpy = analytic_xyz_jacobian(J[3:6, :], quat2rpy(quat))
         Ja = np.vstack([np.array(J_t), np.array(J_rpy)])
         J_cross = pseudoinverse(Ja)
-        # J_cross = pseudoinverse(J)
-        q_error = np.dot(J_cross, d_vector)
-        q_s = q_s - .1 * q_error
+        q_error = np.dot(J_cross, x_err)
+        q_s = q_s - e_step * q_error
         # if np.linalg.norm(q_s - q_old) > 2 * q_step or not within_joint_limits(manipulator, q_s):
-        #     return 
-        # within_joint_limits(manipulator, q_s)
+        #     return
+        if not within_joint_limits(manipulator, q_s):
+            return None
 
 
 def within_joint_limits(manipulator, q_s):
@@ -49,15 +46,22 @@ def displacement_from_TSR(T0_s, TSR):
     T0_sp = np.dot(T0_s, np.linalg.inv(TSR.Tw_e))
     Tw_sp = np.dot(np.linalg.inv(TSR.T0_w), T0_sp)
     disp = displacements(Tw_sp)
+    # pose of the grasp location or the pose of the object held by the hand in world coordinates
+    T0_sp = np.dot(T0_s, np.linalg.inv(tsr.Tw_e))
+    # T0_sp in terms of the coordinates of the target frame w given by the Task Space Region tsr.
+    Tw_sp = np.dot(np.linalg.inv(tsr.T0_w), T0_sp)
+    # Generate the displacement vector of Tw_sp. Displacement represents the error given T0_s relative to Tw_e transform.
+    disp = displacement(Tw_sp)
     # Since there are equivalent angle displacements for rpy, generate those equivalents by added +/- PI.
     # Use the smallest delta_x_dist of the equivalency set.
-    yprs = generate_equivalent_displacement_angles([disp[3], disp[4], disp[5]])
+    rpys = generate_equivalent_euler_angles([disp[3], disp[4], disp[5]])
     deltas = []
-    deltas.append(delta_x(disp, TSR.Bw))
-    for ypr in yprs:
-        deltas.append(delta_x(np.hstack([disp[0:3], ypr[0], ypr[1], ypr[2]]), TSR.Bw))
+    deltas.append(delta_x(disp, tsr.Bw))
+    for rpy in rpys:
+        deltas.append(
+            delta_x(np.hstack([disp[0:3], rpy[0], rpy[1], rpy[2]]), tsr.Bw))
     distances = [delta_x_dist(delta) for delta in deltas]
-    return deltas[distances.index(min(distances))]
+    return min(distances), deltas[distances.index(min(distances))]
 
 
 def displacements(T):
