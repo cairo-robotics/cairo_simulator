@@ -13,7 +13,7 @@ from cairo_simulator.core.utils import ASSETS_PATH
 from cairo_simulator.core.link import get_joint_info_by_name
 
 from cairo_planning.collisions import DisabledCollisionsContext
-from cairo_planning.geometric.transformation import xyzypr2trans, bounds_matrix, quat2ypr, ypr2quat
+from cairo_planning.geometric.transformation import xyzrpy2trans, bounds_matrix, quat2rpy
 from cairo_planning.constraints.projection import project_config
 from cairo_planning.geometric.tsr import TSR
 from cairo_planning.geometric.utils import geodesic_distance, wrap_to_interval
@@ -83,26 +83,26 @@ def main():
     _ = sim_context.get_sim_objects(['Ground'])[0]
 
 
-    n_samples = 20
+    n_samples = 10
     valid_samples = []
     starttime = timeit.default_timer()
 
-    # Utilizes YPR convention
-    T0_w = xyzypr2trans([.7, 0, 0, 0, 0, 0], degrees=False)
+    # Utilizes RPU convention
+    T0_w = xyzrpy2trans([.7, 0, 0, 0, 0, 0], degrees=False)
 
-    # Utilizes YPR convention
-    Tw_e = xyzypr2trans([-.2, 0, 1.2, 3.1098106, -0.04498105, 3.09090845], degrees=False)
+    # Utilizes RPY convention
+    Tw_e = xyzrpy2trans([-.2, 0, 1.0, 3.14, 0, 3.14], degrees=False)
     
-    # Utilizes YPR convention
-    Bw = bounds_matrix([(0, 100), (-.025, .025), (-.025, .025)],  # allow some tolerance in the vertical and hortizontal and only positve in x
-                       [(-np.pi, np.pi), (-.01, .01), (-.01, .01)])  # any rotation about z, with limited rotation about x, and y.
+    # Utilizes RPY convention
+    Bw = bounds_matrix([(0, 100), (-.025, .025), (-.025, .025)],  # allow some tolerance in the z and y and only positve in x
+                       [(-.01, .01), (-.01, .01), (-np.pi, np.pi)])  # any rotation about z, with limited rotation about x, and y.
     tsr = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw,
               manipindex=0, bodyandlink=16)
 
     # Disabled collisions during planning with certain eclusions in place.
     with DisabledCollisionsContext(sim, [], []):
         print("Sampling start time is :", starttime)
-        for i in range(0, n_samples):
+        while len(valid_samples) < n_samples:
             sample = scs.sample()
             if svc.validate(sample):
                 q_constrained = project_config(sawyer_robot, np.array(
@@ -122,8 +122,7 @@ def main():
     for sample in valid_samples:
         world_pose, local_pose = sawyer_robot.solve_forward_kinematics(sample)
         trans, quat = world_pose[0], world_pose[1]
-        print(trans, quat2ypr(quat))
-        # print(tsr.distance(TSR.))
+        print(trans, quat2rpy(quat))
         sawyer_robot.move_to_joint_pos(list(sample))
         while sawyer_robot.check_if_at_position(list(sample), 0.5) is False:
             time.sleep(0.1)

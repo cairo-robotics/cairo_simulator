@@ -1,15 +1,15 @@
 import numpy as np
 
 from cairo_planning.constraints.projection import displacements, delta_x, delta_x_dist
-from cairo_planning.geometric.transformation import xyzypr2trans, bounds_matrix
+from cairo_planning.geometric.transformation import xyzrpy2trans, bounds_matrix
 
 if __name__ == "__main__":
-    To = xyzypr2trans([.5, .5, .92, .3, .94, 0])
+    To = xyzrpy2trans([.5, .5, .92, .94, 0, .3])
     print(To)
-    Tc = xyzypr2trans([0, 0, .9, 0, 0, 0])
+    Tc = xyzrpy2trans([0, 0, .9, 0, 0, 0])
     print(Tc)
     C = bounds_matrix([(-1000, 1000), (-1000, 1000), (0, 0)],
-                     [(-.4, .4), (-.4, .4), (-1000, 1000)])
+                     [(-.4, .4), (-1000, 1000), (-.4, .4)])
     print(C)
     Tcobj = np.matmul(np.linalg.inv(Tc), To)
     print(Tcobj)
