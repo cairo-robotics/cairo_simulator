@@ -86,20 +86,20 @@ class STOMP():
         print(self.trajectory)
 
     def plan(self):
-        self.trajectory_cost = self._compute_trajectory_cost()
+        self.trajectory_cost = self._compute_trajectory_cost(self.trajectory)
         finish_button_value = False # Only used for interactive visualization
         invalid_iterations = 0
         invalid_iterations_cost = 0
 
         for iteration in range(self.max_iterations):
-            K_noises, K_noisy_trajectories = self._create_K_noisy_trajectories()
-            P = self._compute_probabilities(K_noisy_trajectories)
+            K_plus_previous_best_noises, K_plus_previous_best_noisy_trajectories = self._return_K_plus_previous_best_noisy_trajectories()
+            P = self._compute_probabilities(K_plus_previous_best_noisy_trajectories)
 
             # This function only helps in the visualization of per iteration evolution of the trajectory
             # when the self.play_pause flag is set and has nothing to do with the actual planning
             self._interactive_planning_visualization()
 
-            validity_joint_change = self._update_trajectory(P, K_noises)
+            validity_joint_change = self._update_trajectory(P, K_plus_previous_best_noises)
             new_cost = self._compute_trajectory_cost(self.trajectory, print_costs=self.debug)
             validity_cost = True
 
@@ -209,9 +209,23 @@ class STOMP():
 
     def _return_K_plus_previous_best_noisy_trajectories(self):
         K_noises, K_noisy_trajectories = self._create_K_noisy_trajectories()
-        sorted_K_noisy_trajectories_with_noises = sorted([(self._compute_trajectory_cost(K_noisy_trajectories[k]),
-                                                    K_noisy_trajectories[k], K_noises[k]) for k in range(self.K)],
-                                                         key=lambda x:x[0])
+        # If we don't want any cached trajectory then we simply return the K new noisy ones
+        if self.max_rollouts == self.K:
+            return K_noises, K_noisy_trajectories
+
+        K_plus_previous_best_noises, K_plus_previous_best_noisy_trajectories = K_noises.copy(), K_noisy_trajectories.copy()
+        K_noisy_trajectories_with_noises = [(self._compute_trajectory_cost(K_noisy_trajectories[k]),
+                                                    K_noisy_trajectories[k], K_noises[k]) for k in range(self.K)]
+        K_plus_previous_best_noisy_trajectories_with_noises = K_noisy_trajectories_with_noises
+        K_plus_previous_best_noisy_trajectories_with_noises.extend(self.previous_best_noisy_trajectories)
+        K_plus_previous_best_noisy_trajectories_with_noises.sort(key=lambda x:x[0])
+
+        for trajectory_tuple in self.previous_best_noisy_trajectories:
+            K_plus_previous_best_noisy_trajectories.append(trajectory_tuple[1])
+            K_plus_previous_best_noises.append(trajectory_tuple[2])
+        # Updating the best cached noisy trajectories
+        self.previous_best_noisy_trajectories = K_plus_previous_best_noisy_trajectories_with_noises[:self.max_rollouts - self.K]
+        return K_plus_previous_best_noises, K_plus_previous_best_noisy_trajectories
 
 
     def _add_and_clip_noise(self, trajectory, single_noise):
