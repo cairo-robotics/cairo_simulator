@@ -1,8 +1,45 @@
 import json
 import sys
 import time
-
+import numpy as np
 import pybullet as p
+
+# The coefficients are from https://en.wikipedia.org/wiki/Finite_difference_coefficient#Central_finite_difference
+FINITE_DIFF_RULE_LENGTH = 7
+FINITE_CENTRAL_DIFF_COEFFS =    [[0, 0        , 0        , 1        , 0        , 0         , 0      ], # position
+                                [0, 1.0/12.0 , -2.0/3.0 , 0        , 2.0/3.0  , -1.0/12.0 , 0      ], # velocity
+                                [0, -1/12.0  , 16/12.0  , -30/12.0 , 16/12.0  , -1/12.0   , 0      ], # acceleration (five point stencil)
+                                [0, 1/12.0   , -17/12.0 , 46/12.0  , -46/12.0 , 17/12.0   , -1/12.0]]  # jerk
+
+def generate_finite_difference_matrix(N, derivative_order, dt):
+    difference_matrix = np.zeros((N, N))
+    multiplier = 1.0/pow(dt, derivative_order)
+    for i in range(N):
+        for j in range(int(-FINITE_DIFF_RULE_LENGTH/2), int(FINITE_DIFF_RULE_LENGTH/2)):
+            index = i + j
+            if index < 0:
+                index = 0
+                continue
+            if index >= N:
+                index = N-1
+                continue
+            difference_matrix[i][index] = multiplier * \
+                                FINITE_CENTRAL_DIFF_COEFFS[derivative_order][j+int(FINITE_DIFF_RULE_LENGTH/2)]
+    return difference_matrix
+
+def generate_smoothing_matrix(N, derivative_order, dt):
+    start_index_padded = FINITE_DIFF_RULE_LENGTH - 1
+    N_padded = N + 2 * (FINITE_DIFF_RULE_LENGTH - 1)
+    finite_diff_matrix_A_padded = generate_finite_difference_matrix(N_padded, derivative_order, dt)
+    # The padded matrix is unused but was used for generating initial guess trajectory using a different criteria
+    control_cost_matrix_R_padded = dt*np.matmul(finite_diff_matrix_A_padded.transpose(), finite_diff_matrix_A_padded)
+    control_cost_matrix_R = control_cost_matrix_R_padded[start_index_padded:start_index_padded + N,
+                            start_index_padded:start_index_padded + N]
+    inv_control_cost_matrix_R = np.linalg.inv(control_cost_matrix_R)
+    projection_matrix_M = np.copy(inv_control_cost_matrix_R)
+    scale_factor = np.max(projection_matrix_M, axis=0)
+    projection_matrix_M = projection_matrix_M / (N * scale_factor)
+    return control_cost_matrix_R, projection_matrix_M
 
 def load_configuration(file_name = "sawyer_configuration.json"):
     with open(file_name) as f:
@@ -68,6 +105,8 @@ def create_cuboid_obstacle(name, shape , mass, position, orientation=None,
     shape_id = p.createMultiBody(mass, col_id, vis_id, basePosition=position, baseOrientation=orientation)
     return shape_id
 
+
+
 ######################################################################
 ### Code snippet to generate the Sawyer configuration json file ######
 ######################################################################
@@ -99,3 +138,7 @@ def create_cuboid_obstacle(name, shape , mass, position, orientation=None,
 #     import json
 #     with open('sawyer_configuration.json', 'w') as f:
 #         json.dump(sawyer_configuration, f, indent=4, sort_keys=True)
+
+if __name__ == "__main__":
+    a, b, c = generate_smoothing_matrix(20, 2, 1)
+    d = 1
