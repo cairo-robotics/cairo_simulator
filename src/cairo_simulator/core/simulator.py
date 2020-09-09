@@ -79,6 +79,19 @@ class Simulator:
             return False
 
     @staticmethod
+    def get_client_id():
+        """
+        Gets the physics client ID.
+
+        Returns:
+            int: self._physics_client if instantiated, else -1.
+        """
+        if Simulator.__instance is not None:
+            return Simulator.__instance._physics_client
+        else:
+            return -1
+
+    @staticmethod
     def get_logger():
         return Simulator.__instance.logger
 
@@ -501,7 +514,6 @@ class SimObject():
             position_vec (None, optional):  Desired [x,y,z] position of the object. Current position otherwise.
             orientation_vec (None, optional): Desired orientation of the object as either quaternion or euler angles. Current angle otherwise.
         '''
-        print(self._simulator_id)
         cur_pos, cur_ori = p.getBasePositionAndOrientation(self._simulator_id)
         if orientation_vec is None:
             orientation_vec = cur_ori

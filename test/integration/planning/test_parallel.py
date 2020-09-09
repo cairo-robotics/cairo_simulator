@@ -50,7 +50,7 @@ def parallel_sample_worker(num_samples):
     # Exclude the ground plane and the pedestal feet from disabled collisions.
     excluded_bodies = [ground_plane.get_simulator_id()]  # the ground plane
     pedestal_feet_idx = get_joint_info_by_name(sawyer_id, 'pedestal_feet').idx
-    # The (sawyer_idx, pedestal_feet_idx) tuple the ecluded from disabled collisions.
+    # The (sawyer_idx, pedestal_feet_idx) tuple to exclude from disabled collisions.
     excluded_body_link_pairs = [(sawyer_id, pedestal_feet_idx)]
 
     ############
