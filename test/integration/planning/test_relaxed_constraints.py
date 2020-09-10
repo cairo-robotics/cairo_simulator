@@ -18,7 +18,7 @@ from cairo_planning.collisions import self_collision_test, DisabledCollisionsCon
 from cairo_planning.geometric.state_space import SawyerConfigurationSpace
 from cairo_planning.sampling import StateValidityChecker
 from cairo_planning.local.interpolation import parametric_lerp
-from cairo_planning.trajectory.curve import JointTrajectoryCurve
+from cairo_planning.local.curve import JointTrajectoryCurve
 from cairo_planning.planners import PRM
 from cairo_planning.constraints.pose_contraints import orientation
 

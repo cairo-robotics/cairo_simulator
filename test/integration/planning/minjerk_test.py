@@ -13,7 +13,7 @@ from cairo_simulator.core.context import SawyerSimContext
 
 from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.local.interpolation import interpolate_5poly
-from cairo_planning.trajectory.curve import JointTrajectoryCurve
+from cairo_planning.local.curve import JointTrajectoryCurve
 
 
 def main():
