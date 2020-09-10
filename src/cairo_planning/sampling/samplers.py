@@ -22,6 +22,32 @@ class UniformSampler():
         return [random.uniform(limit[0], limit[1]) for limit in dimension_limits]
 
 
+class DistributionSampler():
+    
+    def __init__(self, distribution_model):
+        """
+        Samples from a fitted model that represents the distribution of discrete points. This could be a keyframe distribution, trajectory distribution, or any arbitrary distrubtion. Sampling checks if the values are within limits (usually the joint limits of the robot) passed in as an argument ot the sample function.
+
+        Args:
+            distribution_model (object): The distribution model. Expects a sample() member function.
+        """
+        self.model = distribution_model
+        
+    def _within_limits(self, sample, limits):
+        for idx, limit in enumerate(limits):
+            if sample[idx] < limit[0] or sample[idx] > limit[1]:
+                return False
+        return True
+        
+    def sample(self, dimension_limits):
+        within_limits = False
+        while not within_limits:
+            sample = self.model.sample()
+            within_limits = self._within_limits(sample, dimension_limits)
+            if within_limits:
+                return sample
+
+
 class GaussianSampler():
 
     """
