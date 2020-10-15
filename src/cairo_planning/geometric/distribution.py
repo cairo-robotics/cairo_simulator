@@ -1,4 +1,4 @@
-from sklearn.neighbors.kde import KernelDensity
+from sklearn.neighbors import KernelDensity
 
 
 class KernelDensityDistribution():
