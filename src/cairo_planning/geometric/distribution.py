@@ -15,4 +15,4 @@ class KernelDensityDistribution():
         self.model.fit(X)
     
     def sample(self):
-        return self.model.sample(1)
+        return self.model.sample(1)[0]
