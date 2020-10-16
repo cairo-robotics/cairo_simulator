@@ -40,12 +40,17 @@ class DistributionSampler():
         return True
         
     def sample(self, dimension_limits):
+        count = 1
         within_limits = False
         while not within_limits:
+            count += 1
             sample = self.model.sample()
             within_limits = self._within_limits(sample, dimension_limits)
+            print(within_limits)
             if within_limits:
                 return sample
+            if count >= 10000:
+                raise RuntimeError("Could not effectively sample a single point within the joint limits after 10000 attempts.")
 
 
 class GaussianSampler():
