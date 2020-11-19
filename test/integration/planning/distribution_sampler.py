@@ -1,12 +1,13 @@
-from cairo_planning.geometric.state_space import DistributionSpace
-from cairo_planning.geometric.distribution import KernelDensityDistribution
-from cairo_planning.sampling.samplers import DistributionSampler
-
-import networkx as nx
-
 from collections import OrderedDict
 import json
 import pprint
+import os
+
+import networkx as nx
+
+from cairo_planning.geometric.state_space import DistributionSpace
+from cairo_planning.geometric.distribution import KernelDensityDistribution
+from cairo_planning.sampling.samplers import DistributionSampler
 
 if __name__ == "__main__":
     #############################################
@@ -26,7 +27,7 @@ if __name__ == "__main__":
     #############################################
     #         Import Serialized LfD Graph       #
     #############################################
-    with open("/home/carl/cairo/cairo_simulator/test/integration/planning/serialization_test.json", "r") as f:
+    with open(os.path.dirname(os.path.abspath(__file__)) + "/serialization_test.json", "r") as f:
         serialized_data = json.load(f)
     config = serialized_data["config"]
     intermediate_trajectories = serialized_data["intermediate_trajectories"]
@@ -51,13 +52,16 @@ if __name__ == "__main__":
     start_keyframe_dist = KernelDensityDistribution()
     start_keyframe_dist.fit(end_data)
 
+    # Create a distribution for each intermeditate trajectory set.
+    # Build into distribution samplers.
     for keyframe_id, keyframe_data in keyframes.items():
         if keyframe_data["keyframe_type"] == "constraint_transition" or keyframe_id == end_id:
             # Create keyframe distrubtion
             data = [obsv['robot']['joint_angle'] for obsv in keyframe_data["observations"]]
             keyframe_dist = KernelDensityDistribution()
             keyframe_dist.fit(data)
-            planning_G.add_nodes_from([(keyframe_id, {"model": keyframe_dist})])
+            # Let's use random keyframe observation point for planning.
+            planning_G.add_nodes_from([(keyframe_id, {"model": keyframe_dist, "point": data[0]})])
             # Create intermediate trajectory distribution.
             inter_trajs = intermediate_trajectories[keyframe_id]
             inter_trajs_data = [[obsv['robot']['joint_angle'] for obsv in traj] for traj in inter_trajs]
@@ -67,22 +71,31 @@ if __name__ == "__main__":
             planning_G.add_edge(prior_id, keyframe_id)
             planning_G[prior_id][keyframe_id].update({"model": inter_dist})
             planning_space = DistributionSpace(sampler=DistributionSampler(inter_dist), limits=limits)
-            planning_G[prior_id][keyframe_id].update({"state_space": planning_space})
+            planning_G[prior_id][keyframe_id].update({"planning_space": planning_space})
             prior_id = keyframe_id
         if keyframe_id == start_id:
             data = [obsv['robot']['joint_angle'] for obsv in keyframe_data["observations"]]
             keyframe_dist = KernelDensityDistribution()
             keyframe_dist.fit(data)
-            planning_G.add_nodes_from([(keyframe_id, {"model": keyframe_dist})])
+            planning_G.add_nodes_from([(keyframe_id, {"model": keyframe_dist, "point": data[0]})])
             prior_id = keyframe_id
 
-    print(planning_G.nodes())
+
     for edge in planning_G.edges():
-        state_space = planning_G.get_edge_data(*edge)['state_space']
-        for _ in range(0, 1000):
-            print(state_space.sample())
-    # Create a distribution for each intermeditate trajectory set.
-    # Build into distribution samplers.
+        planning_space = planning_G.get_edge_data(*edge)['planning_space']
+        for _ in range(0, 10):
+            print(planning_space.sample())
+
+    # create a planner 
+    print(planning_G.nodes())
+    start_node_data = planning_G.nodes['1']['point']
+    edge_data = planning_G['1']['11']
+    print(start_node_data)
+
+
+    
+
     # Motion plan between the points.
+    # For now we will try setting up a plan between two points only. 
     # Connect motion plans and spline between to execute path plans.
 
