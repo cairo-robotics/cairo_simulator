@@ -46,7 +46,6 @@ class DistributionSampler():
             count += 1
             sample = self.model.sample()
             within_limits = self._within_limits(sample, dimension_limits)
-            print(within_limits)
             if within_limits:
                 return sample
             if count >= 10000:
