@@ -2,9 +2,21 @@ from collections import OrderedDict
 import json
 import pprint
 import os
+import sys
+from functools import partial
+import time
 
+if os.environ.get('ROS_DISTRO'):
+    import rospy
+import numpy as np
 import networkx as nx
 
+from cairo_simulator.core.context import SawyerSimContext
+from cairo_planning.context import SawyerPlanningContext
+from cairo_planning.collisions import DisabledCollisionsContext
+from cairo_planning.local.interpolation import parametric_lerp
+from cairo_planning.local.curve import JointTrajectoryCurve
+from cairo_planning.planners import PRM
 from cairo_planning.geometric.state_space import DistributionSpace
 from cairo_planning.geometric.distribution import KernelDensityDistribution
 from cairo_planning.sampling.samplers import DistributionSampler
@@ -86,16 +98,61 @@ if __name__ == "__main__":
         for _ in range(0, 10):
             print(planning_space.sample())
 
-    # create a planner 
-    print(planning_G.nodes())
-    start_node_data = planning_G.nodes['1']['point']
-    edge_data = planning_G['1']['11']
-    print(start_node_data)
-
-
+    ####################################
+    # SIMULATION AND PLANNING CONTEXTS #
+    ####################################
     
+   
+    start_point = planning_G.nodes['1']['point']
+    end_point = planning_G.nodes['11']['point']
+    state_space = planning_G['1']['11']['planning_space']
 
-    # Motion plan between the points.
-    # For now we will try setting up a plan between two points only. 
-    # Connect motion plans and spline between to execute path plans.
+    sim_context = SawyerSimContext(None, setup=False, planning_context=None)
+    sim_context.setup(sim_overrides={"run_parallel": True})
+    sim = sim_context.get_sim_instance()
+    logger = sim_context.get_logger()
+    sawyer_robot = sim_context.get_robot()
+    svc = sim_context.get_state_validity()
+
+    interp_fn = partial(parametric_lerp, steps=5)
+    with DisabledCollisionsContext(sim, [], []):
+        #######
+        # PRM #
+        #######
+        # Use parametric linear interpolation with 10 steps between points.
+        interp = partial(parametric_lerp, steps=10)
+        # See params for PRM specific parameters
+        prm = PRM(state_space, svc, interp_fn, params={
+                  'n_samples': 5000, 'k': 6, 'ball_radius': 1.25})
+        logger.info("Planning....")
+        plan = prm.plan(np.array(start_point), np.array(end_point))
+        # get_path() reuses the interp function to get the path between vertices of a successful plan
+        path = prm.get_path(plan)
+    if len(path) == 0:
+        logger.info("Planning failed....")
+        sys.exit(1)
+    logger.info("Plan found....")
+
+    sawyer_robot.move_to_joint_pos(start_point)
+    time.sleep(3)
+    while sawyer_robot.check_if_at_position(start_point, 0.5) is False:
+        time.sleep(0.1)
+        sim.step()
+    time.sleep(3)
+
+    # splinging uses numpy so needs to be converted
+    path = [np.array(p) for p in path]
+    logger.info("Length of path: {}".format(len(path)))
+    if len(path) > 0:
+        # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
+        jtc = JointTrajectoryCurve()
+        traj = jtc.generate_trajectory(path, move_time=10)
+        sawyer_robot.execute_trajectory(traj)
+        try:
+            while True:
+                sim.step()
+        except KeyboardInterrupt:
+            sys.exit(0)
+    else:
+        logger.err("No path found.")
 

@@ -5,7 +5,6 @@ import os
 import pybullet as p
 
 from cairo_planning.sampling import StateValidityChecker
-from cairo_planning.geometric.state_space import SawyerConfigurationSpace
 from cairo_planning.collisions import self_collision_test
 
 from cairo_simulator.core.link import get_link_pairs, get_joint_info_by_name
@@ -51,8 +50,9 @@ class AbstractSimContext(ABC):
 
 class SawyerSimContext(AbstractSimContext):
 
-    def __init__(self, configuration=None, setup=True):
+    def __init__(self, configuration=None, setup=True, planning_context=None):
         self.config = configuration if configuration is not None else {}
+        self.planning_context = planning_context
         if setup:
             self.setup()
 
@@ -98,7 +98,6 @@ class SawyerSimContext(AbstractSimContext):
                             for config in sim_obj_configs]
         # Turn rendering back on
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
-        self.state_space = SawyerConfigurationSpace()
         self._setup_state_validity(self.sawyer_robot)
         # self._setup_collision_exclusions()
 
@@ -145,7 +144,7 @@ class SawyerSimContext(AbstractSimContext):
         return self.svc
 
     def get_state_space(self):
-        return self.state_space
+        return self.planning_context.get_state_space()
 
     def get_collision_exclusions(self):
         return self.collision_exclusions
