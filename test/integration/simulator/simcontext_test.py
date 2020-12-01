@@ -12,7 +12,7 @@ from cairo_simulator.core.link import get_joint_info_by_name
 
 from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.local.interpolation import parametric_lerp
-from cairo_planning.trajectory.curve import JointTrajectoryCurve
+from cairo_planning.local.curve import JointTrajectoryCurve
 from cairo_planning.planners import PRM
 
 

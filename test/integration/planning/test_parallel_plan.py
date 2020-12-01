@@ -11,7 +11,7 @@ from cairo_simulator.core.context import SawyerSimContext
 
 from cairo_planning.planners.roadmap import PRMParallel
 from cairo_planning.local.interpolation import parametric_lerp
-from cairo_planning.trajectory.curve import JointTrajectoryCurve
+from cairo_planning.local.curve import JointTrajectoryCurve
 
 
 if __name__ == "__main__":

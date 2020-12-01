@@ -25,7 +25,7 @@ from cairo_planning.local.evaluation import subdivision_evaluate
 from cairo_planning.local.interpolation import parametric_lerp, cumulative_distance
 from cairo_planning.local.neighbors import NearestNeighbors
 from cairo_planning.constraints.pose_contraints import orientation
-from cairo_planning.trajectory.curve import JointTrajectoryCurve
+from cairo_planning.local.curve import JointTrajectoryCurve
 
 
 def parallel_sample_worker(num_samples):
