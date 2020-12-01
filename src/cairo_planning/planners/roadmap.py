@@ -37,7 +37,7 @@ class PRM():
         # Create NN datastructure
         print("Creating NN datastructure...")
         self.nn = NearestNeighbors(X=np.array(
-            samples), model_kwargs={"leaf_size": 50})
+            samples), model_kwargs={"leaf_size": 100})
         # Generate NN connectivity.
         print("Generating nearest neighbor connectivity...")
         connections = self._generate_connections(samples=samples)
