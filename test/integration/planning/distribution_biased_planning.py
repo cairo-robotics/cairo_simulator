@@ -93,60 +93,59 @@ if __name__ == "__main__":
             prior_id = keyframe_id
 
 
-    for edge in planning_G.edges():
-        planning_space = planning_G.get_edge_data(*edge)['planning_space']
-        for _ in range(0, 10):
-            print(planning_space.sample())
-
-    ####################################
-    # SIMULATION AND PLANNING CONTEXTS #
-    ####################################
-    
-   
-    start_point = planning_G.nodes['1']['point']
-    end_point = planning_G.nodes['11']['point']
-    state_space = planning_G['1']['11']['planning_space']
-
+    final_path = []
     sim_context = SawyerSimContext(None, setup=False, planning_context=None)
-    sim_context.setup(sim_overrides={"run_parallel": True})
+    sim_context.setup(sim_overrides={"run_parallel": False})
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
     sawyer_robot = sim_context.get_robot()
     svc = sim_context.get_state_validity()
-
     interp_fn = partial(parametric_lerp, steps=5)
-    with DisabledCollisionsContext(sim, [], []):
-        #######
-        # PRM #
-        #######
-        # Use parametric linear interpolation with 10 steps between points.
-        interp = partial(parametric_lerp, steps=10)
-        # See params for PRM specific parameters
-        prm = PRM(state_space, svc, interp_fn, params={
-                  'n_samples': 5000, 'k': 6, 'ball_radius': 1.25})
-        logger.info("Planning....")
-        plan = prm.plan(np.array(start_point), np.array(end_point))
-        # get_path() reuses the interp function to get the path between vertices of a successful plan
-        path = prm.get_path(plan)
-    if len(path) == 0:
-        logger.info("Planning failed....")
-        sys.exit(1)
-    logger.info("Plan found....")
 
-    sawyer_robot.move_to_joint_pos(start_point)
+    initial_start_point = planning_G.nodes[list(planning_G.nodes)[0]]['point']
+    print(initial_start_point)
+    for edge in planning_G.edges():
+        start_point = planning_G.nodes[edge[0]]['point']
+        end_point = planning_G.nodes[edge[1]]['point']
+        state_space = planning_G.get_edge_data(*edge)['planning_space']
+
+        ####################################
+        # SIMULATION AND PLANNING CONTEXTS #
+        ####################################
+        with DisabledCollisionsContext(sim, [], []):
+            #######
+            # PRM #
+            #######
+            # Use parametric linear interpolation with 10 steps between points.
+            interp = partial(parametric_lerp, steps=10)
+            # See params for PRM specific parameters
+            prm = PRM(state_space, svc, interp_fn, params={
+                    'n_samples': 6000, 'k': 3, 'ball_radius': .25})
+            logger.info("Planning....")
+            plan = prm.plan(np.array(start_point), np.array(end_point))
+            # get_path() reuses the interp function to get the path between vertices of a successful plan
+            path = prm.get_path(plan)
+        if len(path) == 0:
+            logger.info("Planning failed....")
+            sys.exit(1)
+        logger.info("Plan found....")
+
+        # splinging uses numpy so needs to be converted
+        path = [np.array(p) for p in path]
+        logger.info("Length of path: {}".format(len(path)))
+        final_path = final_path + path
+
+    sawyer_robot.move_to_joint_pos(initial_start_point)
     time.sleep(3)
-    while sawyer_robot.check_if_at_position(start_point, 0.5) is False:
+    while sawyer_robot.check_if_at_position(initial_start_point, 0.5) is False:
         time.sleep(0.1)
         sim.step()
     time.sleep(3)
 
-    # splinging uses numpy so needs to be converted
-    path = [np.array(p) for p in path]
-    logger.info("Length of path: {}".format(len(path)))
     if len(path) > 0:
         # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
         jtc = JointTrajectoryCurve()
-        traj = jtc.generate_trajectory(path, move_time=10)
+        traj = jtc.generate_trajectory(final_path, move_time=10)
         sawyer_robot.execute_trajectory(traj)
         try:
             while True:
