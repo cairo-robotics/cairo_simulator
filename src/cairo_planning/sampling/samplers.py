@@ -52,6 +52,8 @@ class DistributionSampler():
                 raise RuntimeError("Could not effectively sample a single point within the joint limits after 10000 attempts.")
 
 
+
+
 class GaussianSampler():
 
     """
