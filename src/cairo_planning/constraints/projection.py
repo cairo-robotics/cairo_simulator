@@ -16,7 +16,7 @@ def project_config(manipulator, q_old, q_s, tsr, epsilon, q_step, iter_count=200
     
 
     Args:
-        manipulator (Manipulator): Cairo Simuilator Manipulator object. 
+        manipulator (Manipulator): Cairo Simulator Manipulator object. 
         q_old (ndarray): Old/prior configuration. TODO: Incorporate q_old and q_step which are utilized by the EXTEND function.
         q_s (ndarray): Current configuration.
         tsr (TSR): Task Space Region object that implicitly defines a constraint manifold.
