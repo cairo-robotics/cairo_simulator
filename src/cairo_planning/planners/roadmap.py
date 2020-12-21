@@ -77,11 +77,12 @@ class PRM():
         valid_samples = []
         while count <= self.n_samples:
             q_rand = self._sample()
-            if self._validate(q_rand):
-                if count % 500 == 0:
-                    print("{} valid samples...".format(count))
-                valid_samples.append(q_rand)
-                count += 1
+            if np.any(q_rand):
+                if self._validate(q_rand):
+                    if count % 500 == 0:
+                        print("{} valid samples...".format(count))
+                    valid_samples.append(q_rand)
+                    count += 1
         return valid_samples
 
     def _generate_connections(self, samples):
