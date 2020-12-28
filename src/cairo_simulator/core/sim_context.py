@@ -6,6 +6,7 @@ import pybullet as p
 
 from cairo_planning.sampling import StateValidityChecker
 from cairo_planning.collisions import self_collision_test
+from cairo_planning.core.planning_context import SawyerPlanningContext
 
 from cairo_simulator.core.link import get_link_pairs, get_joint_info_by_name
 from cairo_simulator.core.log import Logger
@@ -52,7 +53,7 @@ class SawyerSimContext(AbstractSimContext):
 
     def __init__(self, configuration=None, setup=True, planning_context=None):
         self.config = configuration if configuration is not None else {}
-        self.planning_context = planning_context
+        self.planning_context = planning_context if planning_context is not None else SawyerPlanningContext()
         if setup:
             self.setup()
 
