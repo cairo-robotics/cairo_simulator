@@ -5,7 +5,7 @@ if os.environ.get('ROS_DISTRO'):
     import rospy
 import numpy as np
 
-from cairo_simulator.core.context import SawyerSimContext
+from cairo_simulator.core.sim_context import SawyerSimContext
 from cairo_simulator.core.link import get_joint_info_by_name
 from cairo_simulator.core.utils import JointInfo
 

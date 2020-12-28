@@ -6,7 +6,7 @@ if os.environ.get('ROS_DISTRO'):
     import rospy
 import timeit
 
-from cairo_simulator.core.context import SawyerSimContext
+from cairo_simulator.core.sim_context import SawyerSimContext
 
 from cairo_planning.collisions import DisabledCollisionsContext
 
