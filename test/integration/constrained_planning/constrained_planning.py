@@ -79,6 +79,7 @@ if __name__ == "__main__":
     # Create a distribution for each intermeditate trajectory set.
     # Build into distribution samplers.
     for keyframe_id, keyframe_data in keyframes.items():
+        pprint.pprint(keyframe_data)
         if keyframe_data["keyframe_type"] == "constraint_transition" or keyframe_id == end_id:
             # Create keyframe distrubtion
             data = [obsv['robot']['joint_angle'] for obsv in keyframe_data["observations"]]
@@ -99,10 +100,10 @@ if __name__ == "__main__":
             T0_w = xyzrpy2trans([.7, 0, 0, 0, 0, 0], degrees=False)
 
             # Utilizes RPY convention
-            Tw_e = xyzrpy2trans([-.2, 0, 1.0, 3.14, 0, 3.14], degrees=False)
-            
+            Tw_e = xyzrpy2trans([-.2, 0, 1.0, np.pi/2, 3*np.pi/2, 0], degrees=False)
+    
             # Utilizes RPY convention
-            Bw = bounds_matrix([(-1000, 1000), (-1000, 1000), (-1000, 1000)],  # No positional constraint bounds.
+            Bw = bounds_matrix([(-100, 100), (-100, 100), (-100, 100)],  # allow some tolerance in the z and y and only positve in x
                             [(-.01, .01), (-.01, .01), (-np.pi, np.pi)])  # any rotation about z, with limited rotation about x, and y.
             tsr = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw,
                     manipindex=0, bodyandlink=16)
@@ -121,9 +122,6 @@ if __name__ == "__main__":
     final_path = []
 
     initial_start_point = planning_G.nodes[list(planning_G.nodes)[0]]['point']
-    print(initial_start_point)
-
-
   
     for edge in planning_G.edges():
         valid_samples = []
@@ -131,6 +129,7 @@ if __name__ == "__main__":
         
         start_point = planning_G.nodes[edge[0]]['point']
         end_point = planning_G.nodes[edge[1]]['point']
+        print(start_point, end_point)
         state_space = planning_G.get_edge_data(*edge)['planning_space']
 
         ####################################
@@ -144,7 +143,7 @@ if __name__ == "__main__":
             interp = partial(parametric_lerp, steps=10)
             # See params for PRM specific parameters
             prm = PRM(state_space, svc, interp_fn, params={
-                    'n_samples': 500, 'k': 6, 'ball_radius': .5})
+                    'n_samples': 800, 'k': 6, 'ball_radius': .5})
             logger.info("Planning....")
             plan = prm.plan(np.array(start_point), np.array(end_point))
             # get_path() reuses the interp function to get the path between vertices of a successful plan
@@ -165,6 +164,8 @@ if __name__ == "__main__":
         time.sleep(0.1)
         sim.step()
     time.sleep(3)
+
+    key = input("Press any key to excute plan.")
 
     if len(path) > 0:
         # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
