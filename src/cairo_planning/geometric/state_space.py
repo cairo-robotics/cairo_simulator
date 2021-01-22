@@ -105,7 +105,7 @@ class SawyerTSRConstrainedSpace():
     def _project(self, sample):
         if self.svc.validate(sample):
             q_constrained = project_config(self.robot, np.array(
-                sample), np.array(sample), self.TSR, .01, .01)
+                sample), np.array(sample), self.TSR, .1, .01)
             normalized_q_constrained = []
             if q_constrained is not None:
                 for value in q_constrained:

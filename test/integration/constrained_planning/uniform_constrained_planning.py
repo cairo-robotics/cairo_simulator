@@ -19,10 +19,11 @@ from cairo_planning.local.curve import JointTrajectoryCurve
 from cairo_planning.planners import PRM
 from cairo_planning.geometric.state_space import SawyerTSRConstrainedSpace
 from cairo_planning.geometric.distribution import KernelDensityDistribution
-from cairo_planning.sampling.samplers import DistributionSampler
 from cairo_planning.geometric.transformation import xyzrpy2trans, bounds_matrix, quat2rpy
 from cairo_planning.geometric.tsr import TSR
 from cairo_planning.geometric.utils import geodesic_distance, wrap_to_interval
+from cairo_planning.sampling.samplers import UniformSampler
+
 
 if __name__ == "__main__":
     #############################################
@@ -72,30 +73,17 @@ if __name__ == "__main__":
     start_id = next(iter(keyframes.keys()))
     end_id = next(reversed(keyframes.keys()))
 
-    end_data = [obsv['robot']['joint_angle'] for obsv in keyframes[next(reversed(keyframes.keys()))]["observations"]]
-    start_keyframe_dist = KernelDensityDistribution()
-    start_keyframe_dist.fit(end_data)
-
-    # Create a distribution for each intermeditate trajectory set.
-    # Build into distribution samplers.
     constraint_transition_count = 0
     for keyframe_id, keyframe_data in keyframes.items():
         print(keyframe_id)
         if keyframe_data["keyframe_type"] == "constraint_transition" or keyframe_id == end_id:
             # Create keyframe distrubtion
             data = [obsv['robot']['joint_angle'] for obsv in keyframe_data["observations"]]
-            keyframe_dist = KernelDensityDistribution()
             keyframe_dist.fit(data)
             # Let's use random keyframe observation point for planning.
             planning_G.add_nodes_from([(keyframe_id, {"model": keyframe_dist, "point": data[0]})])
-            # Create intermediate trajectory distribution.
-            inter_trajs = intermediate_trajectories[keyframe_id]
-            inter_trajs_data = [[obsv['robot']['joint_angle'] for obsv in traj] for traj in inter_trajs]
-            inter_data = [item for sublist in inter_trajs_data for item in sublist]
-            inter_dist = KernelDensityDistribution()
-            inter_dist.fit(inter_data)
             planning_G.add_edge(prior_id, keyframe_id)
-            planning_G[prior_id][keyframe_id].update({"model": inter_dist})
+
 
             # Utilizes RPY convention
             T0_w = xyzrpy2trans([.7, 0, 0, 0, 0, 0], degrees=False)
@@ -115,7 +103,7 @@ if __name__ == "__main__":
             tsr = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw,
                     manipindex=0, bodyandlink=16)
 
-            planning_space = SawyerTSRConstrainedSpace(sampler=DistributionSampler(inter_dist), limits=limits, svc=svc, TSR=tsr, robot=sawyer_robot)
+            planning_space = SawyerTSRConstrainedSpace(sampler=UniformSampler(),limits=limits, svc=svc, TSR=tsr, robot=sawyer_robot)
             planning_G[prior_id][keyframe_id].update({"planning_space": planning_space})
             prior_id = keyframe_id
         if keyframe_id == start_id:
@@ -124,6 +112,7 @@ if __name__ == "__main__":
             keyframe_dist.fit(data)
             planning_G.add_nodes_from([(keyframe_id, {"model": keyframe_dist, "point": data[0]})])
             prior_id = keyframe_id
+
 
 
     final_path = []
@@ -150,9 +139,10 @@ if __name__ == "__main__":
             interp = partial(parametric_lerp, steps=10)
             # See params for PRM specific parameters
             prm = PRM(state_space, svc, interp_fn, params={
-                    'n_samples': 250, 'k': 6, 'ball_radius': .75})
+                    'n_samples': 3000, 'k': 6, 'ball_radius': 1.75})
             logger.info("Planning....")
             plan = prm.plan(np.array(start_point), np.array(end_point))
+            print(plan)
             # get_path() reuses the interp function to get the path between vertices of a successful plan
             path = prm.get_path(plan)
         if len(path) == 0:

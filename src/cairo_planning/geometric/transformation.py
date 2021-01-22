@@ -37,7 +37,7 @@ def analytic_xyz_jacobian(J_r, rpy):
     E = np.zeros([3, 3])
     E[0, 0] = 1 
     E[0, 2] = np.sin(rpy[1])
-    E[1, 1] = -np.cos(rpy[0])
+    E[1, 1] = np.cos(rpy[0])
     E[1, 2] = -np.cos(rpy[1]) * np.sin(rpy[0])
     E[2, 1] = np.sin(rpy[0]) 
     E[2, 2] = np.cos(rpy[0]) * np.cos(rpy[1])
