@@ -5,25 +5,22 @@ import numpy as np
 from cairo_planning.geometric.transformation import pose2trans, pseudoinverse, analytic_xyz_jacobian, quat2rpy, rot2rpy
 
 
-def project_config(manipulator, q_old, q_s, tsr, epsilon, q_step, iter_count=200, e_step=.25):
+def project_config(manipulator, q_old, q_s, tsr, epsilon, q_step, iter_count=10000, e_step=.25):
     """
     This function projects a sampled configuration point down to a constraint manifold defined implicitly by a 
     Task Space Region representation. http://cs.brown.edu/courses/csci2951-k/papers/berenson12.pdf
 
-    This is also an equivalent approach to First-Order Retraction given by Mike Stillman's '07 IROS paper:
-    docs.google.com/document/d/10sXEhzFRSnvFcl3XxNGhnD4N2SedqwdAvK3dsihxVUA/edit#heading=h.2ye70wns7io3
-
-    
+    This is also an equivalent approach to First-Order Retraction given by Mike Stillman's '07 IROS paper: https://www.ri.cmu.edu/pub_files/pub4/stilman_michael_2006_4/stilman_michael_2006_4.pdf
 
     Args:
-        manipulator (Manipulator): Cairo Simuilator Manipulator object. 
+        manipulator (Manipulator): Cairo Simulator Manipulator object. 
         q_old (ndarray): Old/prior configuration. TODO: Incorporate q_old and q_step which are utilized by the EXTEND function.
         q_s (ndarray): Current configuration.
         tsr (TSR): Task Space Region object that implicitly defines a constraint manifold.
         epsilon (float): Threshold distance within which the project sample is deemed close enough to manifold.
         q_step (float): Size of step size used for EXTEND of RRT planner. TODO: Incorporate q_old and q_step which are utilized by the EXTEND function.
         iter_count (int): Max number of projection iterations to try for a given sample before giving up.
-        e_step (float): The fractional step size of the configuration error q_error to used during the update step.
+        e_step (float): The fractional step size of the configuration error q_error to use during the update step.
 
     Returns:
         [ndarray, None]: Returns the projected point, or None if the number of iterations exceeds the max  

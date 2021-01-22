@@ -8,7 +8,7 @@ if os.environ.get('ROS_DISTRO'):
     import rospy
 import numpy as np
 
-from cairo_simulator.core.context import SawyerSimContext
+from cairo_simulator.core.sim_context import SawyerSimContext
 
 from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.local.interpolation import parametric_lerp

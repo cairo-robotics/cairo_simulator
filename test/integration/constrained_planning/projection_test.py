@@ -8,12 +8,15 @@ if os.environ.get('ROS_DISTRO'):
     import rospy
 import numpy as np
 
-from cairo_simulator.core.context import SawyerSimContext
+from cairo_simulator.core.sim_context import SawyerSimContext
+from cairo_planning.core.planning_context import SawyerPlanningContext
 from cairo_simulator.core.utils import ASSETS_PATH
 from cairo_simulator.core.link import get_joint_info_by_name
 
 from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.geometric.transformation import xyzrpy2trans, bounds_matrix, quat2rpy
+from cairo_planning.geometric.state_space import SawyerTSRConstrainedSpace
+from cairo_planning.sampling.samplers import UniformSampler
 from cairo_planning.constraints.projection import project_config
 from cairo_planning.geometric.tsr import TSR
 from cairo_planning.geometric.utils import geodesic_distance, wrap_to_interval
@@ -83,19 +86,19 @@ def main():
     _ = sim_context.get_sim_objects(['Ground'])[0]
 
 
-    n_samples = 10
+    n_samples = 4
     valid_samples = []
     starttime = timeit.default_timer()
 
-    # Utilizes RPU convention
+    # Utilizes RPY convention
     T0_w = xyzrpy2trans([.7, 0, 0, 0, 0, 0], degrees=False)
 
     # Utilizes RPY convention
-    Tw_e = xyzrpy2trans([-.2, 0, 1.0, 3.14, 0, 3.14], degrees=False)
+    Tw_e = xyzrpy2trans([-.2, 0, 1.0, np.pi/2, np.pi, 0], degrees=False)
     
     # Utilizes RPY convention
-    Bw = bounds_matrix([(0, 100), (-.025, .025), (-.025, .025)],  # allow some tolerance in the z and y and only positve in x
-                       [(-.01, .01), (-.01, .01), (-np.pi, np.pi)])  # any rotation about z, with limited rotation about x, and y.
+    Bw = bounds_matrix([(0, 100), (-100, 100), (-100, 100)],  # allow some tolerance in the z and y and only positve in x
+                       [(-.07, .07), (-.07, .07), (-.07, .07)])  # any rotation about z, with limited rotation about x, and y.
     tsr = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw,
               manipindex=0, bodyandlink=16)
 
@@ -106,7 +109,7 @@ def main():
             sample = scs.sample()
             if svc.validate(sample):
                 q_constrained = project_config(sawyer_robot, np.array(
-                    sample), np.array(sample), tsr, .01, .01)
+                    sample), np.array(sample), tsr, .1, .01)
                 normalized_q_constrained = []
                 if q_constrained is not None:
                     for value in q_constrained:
