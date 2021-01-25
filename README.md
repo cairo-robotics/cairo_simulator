@@ -28,6 +28,11 @@ or from the top level directory
 
 `pip3 install -e ./`
 
+Note that for some versions of Python, the igraph install will need to be compiled. You might have to install the below system dependencies:
+
+`sudo apt install build-essential python-dev libxml2 libxml2-dev zlib1g-dev bison flex automake autoconf`
+
+
 # Running the Simulator
 Unlike Gazebo, this is not a standalone executable program but rather is a foundation upon which a simulator can be created. The sawyer_test.py file contains a fairly minimal example showing how to use this package, initializing the simulator, a robot, and an object in the world.
 
