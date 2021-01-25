@@ -45,8 +45,10 @@ class PRM():
         self._build_graph(samples, connections)
         print("Attaching start and end to graph...")
         self._attach_start_and_end()
+        print("Finding feasible best path in graph if available...")
         if self._success():
-            return self.best_sequence()
+            plan = self._smooth(self.best_sequence())
+            return plan
         else:
             return []
 
@@ -72,12 +74,46 @@ class PRM():
         # Goal is always at the 1 index.
         self.graph.vs[1]["value"] = list(q_goal)
 
+    def _smooth(self, plan):
+        def shortcut(plan):
+            idx_range = [i for i in range(0, len(plan))]
+            indexed_plan = list(zip(idx_range, plan))
+            print(indexed_plan)
+            for curr_idx, vid1 in indexed_plan:
+                for test_idx, vid2 in indexed_plan[::-1]:
+                    print(curr_idx, test_idx)
+                    p1 = self.graph.vs[vid1]["value"]
+                    p2 = self.graph.vs[vid2]["value"]
+                    valid, _ = self._extend(np.array(p1), np.array(p2))
+                    if test_idx == curr_idx + 1:
+                        break
+                    if valid and curr_idx < test_idx:
+                        print(p1)
+                        print(p2)
+                        print(curr_idx, test_idx)
+                        print(plan)
+                        del plan[curr_idx+1:test_idx]
+                        print(plan)
+                        return False, plan
+            return True, plan
+        
+        finished = False
+        current_plan = plan
+        while not finished:
+            finished, new_plan = shortcut(current_plan)
+            if new_plan is None:
+                finished = True
+                break
+            current_plan = new_plan
+        return current_plan
+       
+
     def _generate_samples(self):
         sampling_times = [0]
         count = 0
         valid_samples = []
         while count <= self.n_samples:
-            start_time = timer()
+            # start_time = timer()
             q_rand = self._sample()
             if np.any(q_rand):
                 if self._validate(q_rand):
