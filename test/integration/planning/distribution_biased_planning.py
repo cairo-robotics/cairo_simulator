@@ -16,7 +16,7 @@ from cairo_planning.core.planning_context import SawyerPlanningContext
 from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.local.interpolation import parametric_lerp
 from cairo_planning.local.curve import JointTrajectoryCurve
-from cairo_planning.planners import PRM
+from cairo_planning.planners import LazyPRM
 from cairo_planning.geometric.state_space import DistributionSpace
 from cairo_planning.geometric.distribution import KernelDensityDistribution
 from cairo_planning.sampling.samplers import DistributionSampler
@@ -119,8 +119,8 @@ if __name__ == "__main__":
             # Use parametric linear interpolation with 10 steps between points.
             interp = partial(parametric_lerp, steps=10)
             # See params for PRM specific parameters
-            prm = PRM(state_space, svc, interp_fn, params={
-                    'n_samples': 6000, 'k': 3, 'ball_radius': .25})
+            prm = LazyPRM(state_space, svc, interp_fn, params={
+                    'n_samples': 2000, 'k': 8, 'ball_radius': 2.0})
             logger.info("Planning....")
             plan = prm.plan(np.array(start_point), np.array(end_point))
             # get_path() reuses the interp function to get the path between vertices of a successful plan
