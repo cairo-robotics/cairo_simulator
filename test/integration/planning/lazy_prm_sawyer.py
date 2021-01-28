@@ -54,6 +54,9 @@ def main():
     jtc = JointTrajectoryCurve()
     traj = jtc.generate_trajectory(path, move_time=2)
     sawyer_robot.execute_trajectory(traj)
+
+    key = input("Press any key to excute plan.")
+
     try:
         while True:
             sim.step()

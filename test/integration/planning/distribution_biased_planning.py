@@ -12,6 +12,7 @@ import numpy as np
 import networkx as nx
 
 from cairo_simulator.core.sim_context import SawyerSimContext
+from cairo_simulator.core.simulator import SimObject
 from cairo_planning.core.planning_context import SawyerPlanningContext
 from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.local.interpolation import parametric_lerp
@@ -101,6 +102,8 @@ if __name__ == "__main__":
     sawyer_robot = sim_context.get_robot()
     svc = sim_context.get_state_validity()
     interp_fn = partial(parametric_lerp, steps=5)
+    sim_obj = SimObject('test', 'r2d2.urdf', (.6, 0.0, .6), fixed_base=1)
+
 
     initial_start_point = planning_G.nodes[list(planning_G.nodes)[0]]['point']
     print(initial_start_point)
@@ -140,7 +143,8 @@ if __name__ == "__main__":
     while sawyer_robot.check_if_at_position(initial_start_point, 0.5) is False:
         time.sleep(0.1)
         sim.step()
-    time.sleep(3)
+
+    key = input("Press any key to excute plan.")
 
     if len(path) > 0:
         # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
