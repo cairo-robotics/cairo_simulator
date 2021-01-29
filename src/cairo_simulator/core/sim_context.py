@@ -5,10 +5,10 @@ import os
 import pybullet as p
 
 from cairo_planning.sampling import StateValidityChecker
-from cairo_planning.collisions import self_collision_test
+from cairo_planning.collisions import self_collision_test, robot_body_collision_test, multi_collision_test
 from cairo_planning.core.planning_context import SawyerPlanningContext
 
-from cairo_simulator.core.link import get_link_pairs, get_joint_info_by_name
+from cairo_simulator.core.link import get_link_pairs, get_between_body_link_pairs, get_joint_info_by_name
 from cairo_simulator.core.log import Logger
 from cairo_simulator.devices.manipulators import Sawyer
 from cairo_simulator.core.simulator import Simulator, SimObject
@@ -103,14 +103,10 @@ class SawyerSimContext(AbstractSimContext):
         # self._setup_collision_exclusions()
 
     def _setup_state_validity(self, sawyer_robot):
-        sawyer_id = self.sawyer_robot.get_simulator_id()
-        excluded_pairs = [(get_joint_info_by_name(sawyer_id, 'right_l6').idx,
-                           get_joint_info_by_name(sawyer_id, 'right_connector_plate_base').idx)]
-        link_pairs = get_link_pairs(sawyer_id, excluded_pairs=excluded_pairs)
-        self_collision_fn = partial(
-            self_collision_test, robot=sawyer_robot, link_pairs=link_pairs)
+        self_collision_fn = self._setup_self_collision_fn(sawyer_robot)
+        collision_fn = self._setup_collision_fn(sawyer_robot)
         self.svc = StateValidityChecker(
-            self_col_func=self_collision_fn, col_func=None, validity_funcs=None)
+            self_col_func=self_collision_fn, col_func=collision_fn, validity_funcs=None)
 
     def _setup_collision_exclusions(self):
         ground_plane = self.get_sim_objects(['Ground'])[0]
@@ -125,6 +121,22 @@ class SawyerSimContext(AbstractSimContext):
             "excluded_bodies": excluded_bodies,
             "excluded_body_link_pairs": excluded_body_link_pairs
         }
+    
+    def _setup_self_collision_fn(self, sawyer_robot):
+        sawyer_id = self.sawyer_robot.get_simulator_id()
+        excluded_pairs = [(get_joint_info_by_name(sawyer_id, 'right_l6').idx,
+                           get_joint_info_by_name(sawyer_id, 'right_connector_plate_base').idx)]
+        link_pairs = get_link_pairs(sawyer_id, excluded_pairs=excluded_pairs)
+        return partial(self_collision_test, robot=sawyer_robot, link_pairs=link_pairs)
+    
+    def _setup_collision_fn(self, sawyer_robot):
+        collision_body_ids = self.sim.get_collision_bodies()
+        if len(collision_body_ids) == 0: return None
+        collision_fns = []
+        for col_body_id in collision_body_ids:
+            collision_fns.append(partial(robot_body_collision_test, robot=sawyer_robot, object_body_id=col_body_id))
+        return partial(multi_collision_test, robot_object_collision_fns=collision_fns)
+
 
     def get_logger(self):
         return self.logger

@@ -166,9 +166,37 @@ def filter_equivalent_pairs(pairs):
     return [pair for pair in pairs if pair[0] != pair[1]]
 
 
-def get_link_pairs(body, excluded_pairs=[]):
+def get_link_pairs(body, excluded_pairs=None):
     """
-    Gets all link pairs for a given body, less the ecluded_pairs set.
+    Gets all link pairs for a given body, less the excluded_pairs set.
+    ~ O(N^2)
+
+    Args:
+        body (int): The PyBullet body ID.
+        excluded_pairs (list, optional): The set of pairs to ignore / exclude with returning all link pairs.
+
+    Returns:
+        list: List of link pairs.
+    """
+    if excluded_pairs is None:
+        excluded_pairs = []
+    movable_links = get_movable_links(body)
+    fixed_links = get_fixed_links(body)
+    link_pairs = list(product(movable_links, fixed_links))
+    link_pairs.extend(list(combinations(movable_links, 2)))
+    link_pairs = [
+        pair for pair in link_pairs if not check_adjacent_links(body, *pair)]
+    link_pairs = [
+        pair for pair in link_pairs if not check_shared_parent_link(body, *pair)]
+    link_pairs = [
+        pair for pair in link_pairs if pair not in excluded_pairs and pair[::-1] not in excluded_pairs]
+    link_pairs = filter_equivalent_pairs(link_pairs)
+    return link_pairs
+
+
+def get_between_body_link_pairs(body1, body2, excluded_pairs=None):
+    """
+    Gets all link pairs for a between two simulation bodies, less the excluded_pairs set.
     ~ O(N^2)
 
     Args:
@@ -178,14 +206,17 @@ def get_link_pairs(body, excluded_pairs=[]):
     Returns:
         list: List of link pairs.
     """
-    movable_links = get_movable_links(body)
-    fixed_links = get_fixed_links(body)
-    link_pairs = list(product(movable_links, fixed_links))
-    link_pairs.extend(list(combinations(movable_links, 2)))
-    link_pairs = [
-        pair for pair in link_pairs if not check_adjacent_links(body, *pair)]
-    link_pairs = [
-        pair for pair in link_pairs if not check_shared_parent_link(body, *pair)]
+    # accumulate robot links
+    if excluded_pairs is None:
+        excluded_pairs = []
+    b1_movable_links = get_movable_links(body1)
+    b1_fixed_links = get_fixed_links(body1)
+    b2_movable_links = get_movable_links(body2)
+    b2_fixed_links = get_fixed_links(body2)
+    link_pairs = list(product(b1_movable_links, b2_movable_links))
+    link_pairs.extend(list(product(b1_movable_links, b2_fixed_links)))
+    link_pairs.extend(list(product(b1_fixed_links, b2_movable_links)))
+    link_pairs.extend(list(product(b1_fixed_links, b2_fixed_links)))
     link_pairs = [
         pair for pair in link_pairs if pair not in excluded_pairs and pair[::-1] not in excluded_pairs]
     link_pairs = filter_equivalent_pairs(link_pairs)
