@@ -101,7 +101,7 @@ if __name__ == "__main__":
             T0_w = xyzrpy2trans([.7, 0, 0, 0, 0, 0], degrees=False)
 
             # Utilizes RPY convention
-            Tw_e = xyzrpy2trans([-.2, 0, 1.0, np.pi/2.8, np.pi, 0], degrees=False)
+            Tw_e = xyzrpy2trans([-.2, 0, 1.0, np.pi/2, np.pi, 0], degrees=False)
 
             if constraint_transition_count == 0:
                 Bw = bounds_matrix([(-100, 100), (-100, 100), (-100, 100)],  # No positional constraint bounds.
@@ -110,7 +110,7 @@ if __name__ == "__main__":
             else:
                 print("using constraint bounds")
                 # Utilizes RPY convention
-                Bw = bounds_matrix([(-100, 100), (-100, 100), (5, 100)],  # No positional constraint bounds.
+                Bw = bounds_matrix([(-100, 100), (-100, 100), (0, 100)],  # No positional constraint bounds.
                                 [(-.07, .07), (-.07, .07), (-.07, .07)])  # any rotation about z, with limited rotation about x, and y.
             tsr = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw,
                     manipindex=0, bodyandlink=16)
