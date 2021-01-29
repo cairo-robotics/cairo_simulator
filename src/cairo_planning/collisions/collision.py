@@ -3,13 +3,35 @@ Classes and methods to support collision functionality withing PyBullet, and to 
 interfaces for motion planning.
 """
 import pybullet as p
+from collections import namedtuple
 
-__all__ = ['DisabledCollisionsContext', 'link_collision', 'self_collision_test']
+__all__ = ['DisabledCollisionsContext', 'get_closest_points', 'self_collision_test', 'robot_body_collision_test', 'multi_collision_test']
+
+
+CollisionInfo = namedtuple('CollisionInfo',
+                           """
+                           contactFlag
+                           bodyUniqueIdA
+                           bodyUniqueIdB
+                           linkIndexA
+                           linkIndexB
+                           positionOnA
+                           positionOnB
+                           contactNormalOnB
+                           contactDistance
+                           normalForce
+                           lateralFriction1
+                           lateralFrictionDir1
+                           lateralFriction2
+                           lateralFrictionDir2
+                           """.split())
 
 class DisabledCollisionsContext(): 
 
     """
-    Python Context Manager that disables collisions. Includes all self collisions, and collisions between SimObjects and Robots.
+    Python Context Manager that disables collisions. Includes all self collisions, and collisions between SimObjects and Robots. 
+    
+    This does not disable collision checking but enables the robot to be repositioned into a configuration and then checked for collision without causing any physical simulation effects to occur.
     
     Attributes:
         simulator (simulator.Simulator): The Simulator singleton instance.
@@ -75,11 +97,12 @@ class DisabledCollisionsContext():
             p.setCollisionFilterGroupMask(sim_obj, 0, 0, 1)
 
 
-
-def link_collision(body1, link1, body2, link2, max_distance=0):
+def get_closest_points(client_id, body1, body2, link1=None, link2=None, max_distance=0.):
     """
     Test for the collision between link1 of body1 and link2 of body2. This method relies on p.GetClosestPoints.
-    Using a max_distinace of 0 will test for exact collision given overlap of bounding boxes.
+    Using a max_distinace of 0 will test for exact collision given overlap of bounding boxes. 
+    
+    Links are optional and the method will adapt to just using the entire body.
     
     Args:
         body1 (int): PyBullet body ID.
@@ -89,41 +112,93 @@ def link_collision(body1, link1, body2, link2, max_distance=0):
         max_distance (int, optional): Range within which to test for collision.
     
     Returns:
-        bool: True if in collision, else False.
+        CollisionInfo: Named Tuple of Collision information.
     """
-    return len(p.getClosestPoints(bodyA=body1, bodyB=body2, distance=max_distance,
-                              linkIndexA=link1, linkIndexB=link2,
-                              physicsClientId=0)) > 0
+    if (link1 is None) and (link2 is None):
+        results = p.getClosestPoints(bodyA=body1, bodyB=body2, distance=max_distance, physicsClientId=client_id)
+    elif link2 is None:
+        results = p.getClosestPoints(bodyA=body1, bodyB=body2, linkIndexA=link1,
+                                     distance=max_distance, physicsClientId=client_id)
+    elif link1 is None:
+        results = p.getClosestPoints(bodyA=body1, bodyB=body2, linkIndexB=link2,
+                                     distance=max_distance, physicsClientId=client_id)
+    else:
+        results = p.getClosestPoints(bodyA=body1, bodyB=body2, linkIndexA=link1, linkIndexB=link2,
+                                     distance=max_distance, physicsClientId=client_id)
+    return [CollisionInfo(*info) for info in results]
 
 
-def self_collision_test(joint_configuration, robot, link_pairs):
+def self_collision_test(joint_configuration, robot, link_pairs, client_id=0):
     """
-    Tests whether a give joint configuration will result in self collision. 
+    Tests whether a given joint configuration will result in self collision. 
 
     It sets the robot state to the test configuration. Every link pair of the robot is checked for collision.
     If every link pair is collision free, the function returns true, else if there is a single collision, the function returns false.
     
     Args:
         joint_configuration (list): The joint configuration to test for self-collision
-        robot (int): PyBullet body ID.
+        robot (cairo_simulator Robot): The robot tested for self-collision.
+        link_pairs (list): 2D pairs of pybullet body links, in this case the pairs of potential in-self-collision pairs. Assumes the first element is a robot link and second element is another robot link.
+    
     
     Returns:
         bool: True if no self-collision, else False.
     """
     robot_id = robot.get_simulator_id()
 
-    # Set new configuration and get link states
+    # Set new configuration
     for i, idx in enumerate(robot._arm_dof_indices):
-        p.resetJointState(robot._simulator_id, idx, targetValue=joint_configuration[i], targetVelocity=0, physicsClientId=0)
+        p.resetJointState(robot_id, idx, targetValue=joint_configuration[i], targetVelocity=0, physicsClientId=0)
+
 
     self_collisions = []
     for link1, link2 in link_pairs:
         if link1 != link2:
-            if link_collision(body1=robot_id, body2=robot_id, max_distance=0,
-                          link1=link1, link2=link2):
+            if len(get_closest_points(client_id=client_id, body1=robot_id, body2=robot_id, max_distance=0,
+                          link1=link1, link2=link2)) == 0:
                 self_collisions.append(True)
-
-    if any(self_collisions):
-        return False
-    else:
+            else:
+                self_collisions.append(False)
+    if all(self_collisions):
         return True
+    else:
+        return False
+
+
+def robot_body_collision_test(joint_configuration, robot, object_body_id, client_id=0):
+    """
+    Tests whether a given joint configuration will result in collision with an object. 
+
+    It sets the robot state to the test configuration. Every link pair of the robot is checked for collision.
+    If every link pair is collision free, the function returns true, else if there is a single collision, the function returns false. Assumes the first element is a robot link and second element is a link on the object.
+
+    Args:
+        joint_configuration (list): The joint configuration to test for self-collision
+        robot (int): PyBullet body ID.
+        # link_pairs: 2D pairs of pybullet body links, in this case the pairs of potential in-self-collision pairs. 
+        cliend_id (int): the physics server client ID.
+    Returns:
+        bool: True if no self-collision, else False.
+    """
+    robot_id = robot.get_simulator_id()
+     # Set new configuration and get link states
+    for i, idx in enumerate(robot._arm_dof_indices):
+        p.resetJointState(robot._simulator_id, idx, targetValue=joint_configuration[i], targetVelocity=0, physicsClientId=client_id)
+    if len(get_closest_points(client_id=client_id, body1=robot_id, body2=object_body_id, max_distance=0.)) == 0:
+        return True
+    else:
+        return False
+
+def multi_collision_test(joint_configuration, robot_object_collision_fns):
+    """Runs a set of collision functions 
+
+    Args:
+        robot_object_collision_fns (list of functions): list of functions to run that tests for collisions between a robot and a collision object.
+
+    Returns:
+        bool: True if no self-collision, else False.
+    """
+    for robot_object_collision_fn in robot_object_collision_fns:
+        if not robot_object_collision_fn(joint_configuration):
+            return False
+    return True

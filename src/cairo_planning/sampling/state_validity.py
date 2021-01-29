@@ -40,11 +40,12 @@ class StateValidityChecker():
         Returns:
             bool: Whether or not the sample is valid.
         """
+        validity_checks = []
         if self.validity_funcs is not None:
-            if not all([func(sample) for func in self.validity_funcs]):
-                return False
-        if self.self_col_func is not None and not self.self_col_func(sample):
-            return False
-        if self.col_func is not None and not self.col_func(sample):
-            return False
-        return True
+            validity_checks = validity_checks + [func(sample) for func in self.validity_funcs]
+        if self.self_col_func is not None:
+            validity_checks.append(self.self_col_func(sample))
+        if self.col_func is not None:
+            validity_checks.append(self.col_func(sample))
+        if all(validity_checks): return True
+        return False

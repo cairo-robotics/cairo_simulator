@@ -336,12 +336,13 @@ class Simulator:
 
     def remove_object(self, simobj_id):
         """
-        Removes a SimObject to the Simulator via a dictionary whos keys are the PyBullet body ID.
+        Removes a SimObject from the Simulator via a dictionary whos keys are the PyBullet body ID.
 
         Args:
             simobj_id (int): PyBullet body ID.
         """
         if simobj_id in self._objects:
+            p.removeBody(simobj_id)
             del self._objects[simobj_id]
         else:
             self.logger.err(
@@ -405,6 +406,13 @@ class Simulator:
         sim_id_array = p.loadSDF(sdf_file)
         for i, id_ in enumerate(sim_id_array):
             obj = SimObject(obj_name_prefix + str(i), id_)
+        
+    def get_collision_bodies(self):
+        collision_bodies = []
+        for simobj_id, simobj in self._objects.items():
+            if simobj.collision_body:
+                collision_bodies.append(simobj_id)
+        return collision_bodies
 
 
 class SimObject():
@@ -413,7 +421,7 @@ class SimObject():
     A Simulation Object within the PyBullet physics simulation environment.
     """
 
-    def __init__(self, object_name, model_file_or_sim_id, position=(0, 0, 0), orientation=(0, 0, 0, 1), fixed_base=0):
+    def __init__(self, object_name, model_file_or_sim_id, position=(0, 0, 0), orientation=(0, 0, 0, 1), fixed_base=0, include_in_collision=True):
         """
         Args:
             object_name (str): Name of the sim object.
@@ -425,6 +433,7 @@ class SimObject():
             Exception: Raises an Exception if either Simulator not instantiated or loading from file/if fails.
         """
         self._name = object_name
+        self.collision_body = include_in_collision
         if Simulator.is_instantiated():
             self.logger = Simulator.get_logger()
             if isinstance(model_file_or_sim_id, int):
