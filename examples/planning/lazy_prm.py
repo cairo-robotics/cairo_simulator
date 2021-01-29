@@ -26,7 +26,12 @@ def main():
     _ = sawyer_robot.get_simulator_id()
     _ = sim_context.get_sim_objects(['Ground'])[0]
 
-    sawyer_robot.move_to_joint_pos([0, 0, 0, 0, 0, 0, 0])
+
+    start = [0, 0, 0, 0, 0, 0, 0]
+   
+    goal = [1.5262755737449423, -0.1698540226273928, .7788151824762055, 2.4546623466066135, 0.7146948867821279, 2.7671787952787184, 2.606128412644311]
+
+    sawyer_robot.move_to_joint_pos(start)
     time.sleep(1)
  
     with DisabledCollisionsContext(sim, [], []):
@@ -37,17 +42,16 @@ def main():
         interp = partial(parametric_lerp, steps=10)
         # See params for PRM specific parameters
         prm = LazyPRM(state_space, svc, interp, params={
-                  'n_samples': 6000, 'k': 8, 'ball_radius': 2.5})
+                  'n_samples': 6000, 'k': 30, 'ball_radius': 2.0})
         logger.info("Planning....")
-        plan = prm.plan(np.array([0, 0, 0, 0, 0, 0, 0]), np.array([1.5262755737449423, -0.1698540226273928,
-                                                                   2.7788151824762055, 2.4546623466066135, 0.7146948867821279, 2.7671787952787184, 2.606128412644311]))
+        plan = prm.plan(np.array(start), np.array(goal))
         # get_path() reuses the interp function to get the path between vertices of a successful plan
         path = prm.get_path(plan)
     if len(path) == 0:
         logger.info("Planning failed....")
         sys.exit(1)
     logger.info("Plan found....")
-
+    input("Press any key to continue...")
     # splinging uses numpy so needs to be converted
     path = [np.array(p) for p in path]
     # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
