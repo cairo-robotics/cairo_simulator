@@ -119,6 +119,19 @@ class SawyerTSRConstrainedSpace():
                 return None
 
 
+class ParallelSawyerTSRConstrainedSpace():
+
+    def __init__(self, sampling_fn):
+        self.sampling_fn = sampling_fn
+    
+    
+    def sample(self, n_samples, joint_names=None):
+        with mp.get_context("spawn").Pool(mp.cpu_count()) as p:
+            tasks = [int(n_samples/mp.cpu_count()) for n in range(0, mp.cpu_count())]
+            results = p.map(self.sampling_fn, tasks)
+            samples = list(itertools.chain.from_iterable(results))
+            return samples
+
 
 class SawyerConfigurationSpace():
     """
