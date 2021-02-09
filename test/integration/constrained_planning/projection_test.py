@@ -86,7 +86,7 @@ def main():
     _ = sim_context.get_sim_objects(['Ground'])[0]
 
 
-    n_samples = 4
+    n_samples = 100
     valid_samples = []
     starttime = timeit.default_timer()
 
@@ -102,14 +102,15 @@ def main():
     tsr = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw,
               manipindex=0, bodyandlink=16)
 
+
     # Disabled collisions during planning with certain eclusions in place.
     with DisabledCollisionsContext(sim, [], []):
         print("Sampling start time is :", starttime)
         while len(valid_samples) < n_samples:
             sample = scs.sample()
             if svc.validate(sample):
-                q_constrained = project_config(sawyer_robot, np.array(
-                    sample), np.array(sample), tsr, .1, .01)
+                q_constrained = project_config(sawyer_robot, tsr, np.array(
+                sample), np.array(sample), epsilon=.1, e_step=.25)
                 normalized_q_constrained = []
                 if q_constrained is not None:
                     for value in q_constrained:
@@ -119,6 +120,7 @@ def main():
                     continue
                 if svc.validate(normalized_q_constrained):
                     print(normalized_q_constrained)
+                    print()
                     valid_samples.append(normalized_q_constrained)
         print("The time difference is :", timeit.default_timer() - starttime)
         print("{} valid of {}".format(len(valid_samples), n_samples))

@@ -1,4 +1,9 @@
+import itertools
+import multiprocessing as mp
+from functools import partial
+
 import numpy as np
+
 
 from cairo_planning.sampling.samplers import UniformSampler
 from cairo_planning.constraints.projection import project_config
@@ -104,8 +109,8 @@ class SawyerTSRConstrainedSpace():
 
     def _project(self, sample):
         if self.svc.validate(sample):
-            q_constrained = project_config(self.robot, np.array(
-                sample), np.array(sample), self.TSR, .1, .01)
+            q_constrained = project_config(self.robot, self.TSR, np.array(
+                sample), np.array(sample), epsilon=.1, e_step=.25)
             normalized_q_constrained = []
             if q_constrained is not None:
                 for value in q_constrained:
