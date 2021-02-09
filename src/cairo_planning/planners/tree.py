@@ -1,0 +1,195 @@
+from math import inf
+import itertools
+from functools import partial
+import multiprocessing as mp
+import random
+from timeit import default_timer as timer
+
+import numpy as np
+import igraph as ig
+
+from cairo_planning.local.evaluation import subdivision_evaluate
+from cairo_planning.local.interpolation import cumulative_distance
+from cairo_planning.local.neighbors import NearestNeighbors
+from cairo_planning.constraints.projection import project_config
+
+
+class CBiRRT2():
+
+
+    def __init__(self, robot, state_space, state_validity_checker, interpolation_fn, params):
+        self.forwards_tree = ig.Graph()
+        self.backwards_tree = ig.Graph()
+        self.state_space = state_space
+        self.svc = state_validity_checker
+        self.interp_fn = interpolation_fn
+        self.n_samples = params.get('n_samples', 4000)
+        self.k = params.get('k', 5)
+        self.ball_radius = params.get('ball_radius', .55)
+        print("N: {}, k: {}, r: {}".format(
+            self.n_samples, self.k, self.ball_radius))
+    
+    def plan(self, robot, tsr, start_q, goal_q):
+        """ Top level plan function for CBiRRT2. Trees are first initialized with start and end points, constrained birrt is executed, and the path is smoothed.
+
+        Args:
+            robot (Cairo Planning Manipulator): Need to for embedded IK/FK functionality.
+            tsr (TSR): Task Chain Region for the constraints to plan against.
+            start_q (array-like): Starting configuration.
+            goal_q (array-like): Ending configuration.
+        """
+        self._initialize_trees(start_q, goal_q)
+        path = self.birrt(robot, tsr)
+        self._smooth(path)
+
+    def birrt(self, robot, tsr):
+        iters=0
+        continue_to_plan = True
+        tree_swp = self._tree_swap_gen()
+        a_tree, b_tree = next(tree_swp)
+        while continue_to_plan:
+            iters += 1
+            q_rand = self._random_config()
+            qa_near = self._neighbors(a_tree, q_rand)
+            qa_reach = self._constrained_extend(a_tree, tsr, qa_near, q_rand)
+            qb_near = self._neighbors(b_tree, qa_reach)
+            qb_reach = self._constrained_extend(b_tree, tsr, qb_near, qa_reach)
+            if self._equal(qa_reach, qb_reach):
+                return self._extract_path(a_tree, qa_reach, b_tree, qb_reach)
+            else:
+                 a_tree, b_tree = next(tree_swp)
+    
+    def _constrained_extend(self, tree, tsr, q_near, q_target, q_step):
+        q_s = q_near
+        qs_old = q_near
+        if self._equal(q_target, q_s):
+            return q_s
+        # we dont bother to keep a new qs that has traversed further away from the target.
+        elif self._distance(q_target, q_s) > self._distance(q_target, qs_old):
+            return qs_old
+        # What this step does is it moves qs off the manifold towards q_target. And then this is projected back down onto the manifold.
+        q_s = q_s + min([q_step, self._distance(q_target, q_s)]) * (q_target - q_s) / self._distance(q_target - q_s)
+        # More problem sepcific versions of constrained_extend use constraint value information 
+        # constraints = self._get_constraint_values(tree, qs_old) 
+        q_s = self._constrain_config(qs_old, qs, tsr)
+        if q_s is not None:
+            self._add_vertex(tree, q_s)
+            self._add_edge(tree, qs_old, q_s, self._distance(qs_old, q_s))
+        else:
+            return qs_old
+
+    def _constrain_config(self, qs_old, qs, tsr):
+        # these functions can be very problem specific. For now we'll just assume the most very basic form.
+        # futre implementations might favor injecting the constrain_config function 
+        return project_config(robot, tsr, q_s, q_old, epsilon, q_step=100, e_step=1, iter_count=10000)
+
+    def _extract_path(self, a_tree, qa_reach, b_tree, qb_reach):
+
+        self.graph.get_shortest_paths('start', 'goal', weights='weight', mode='ALL')[0]
+        # path from start to qa_reach
+
+        # path from qb_reach to goal
+
+        # combine path.
+
+    def _join_trees(self, a_tree, qa_reach, b_tree, qb_reach):
+        if a_tree['name'] == 'forwards':
+            F = a_tree.copy()
+            qf = qa_reach
+            B = b_tree.copy()
+            qb = qb_reach
+        else:
+            F = b_tree.copy()
+            qf = qb_reach
+            B = a_tree.copy()
+            qb = qa_reach
+
+        
+        # get all vertices and edges of B and add them to F
+        # B_idxs = [vertex.index for vertex in B.vs]
+        B_names = [vertex['name'] for vertex in B.vs]
+        B_values = [list(vertex['value']) for vertex in B.vs]
+        F.add_vertices(len(B_values))
+        F.vs["name"] = [vertex['name'] for vertex in A.vs] + B_names
+        F.vs["value"] = [list(vertex['value']) for vertex in A.vs] +  B_values
+           
+        # add all the edges of B into the tree of F. 
+        F_edges = []
+        F_weights = []
+        for e in B.es:
+            B_idxs = e.tuple
+            F_edges.append((self._name2idx(A, self._val2str(B.vs[b_idxs[0]]['value'])), self._name2idx(A, self._val2str(B.vs[b_idxs[2]]['value']))))
+            F_weights.append(e['weight'])
+        F.add_edges(F_edges)
+        F.es['weight'] = [edge['weight'] for edge in F.es] + F_weights
+
+        # Attach qf to parents of qb, since they're equivalent.
+        b_parents = B.incidence(self._name2idx(self._val2str(qb)), mode='IN')
+        # parent_values = [list(vertex['value']) for vertex in b_parents]
+        # parent_names = [vertex['value'] for vertex in b_parents]
+
+        # collect theweights of B to parents and generate edges from qf to parents
+        connection_edges = []
+        connection_weights = []
+        qb_idx = self._name2idx(B, self._val2str(qb))
+        qf_idx = self._name2idx(F, self._val2str(qf))
+        for parent in b_parents:
+            connection_edges.append((qf_idx, self._name2idx(F, parent['name'])))
+            connection_weights.append(g.es[g.get_eid(qb_idx, parent.index)]['weight'])
+        F.add_edges(connection_edges)
+        F.es['weight'] = [edge['weight'] for edge in F.es] + connection_weights
+
+        return F
+
+    def _neighbors(self, tree, q_s):
+        leaves = tree.vs.select(lambda vertex: vertex.outdegree == 0)
+        if len(leaves) > 0:
+            return sorted([v for v in leaves], key= lambda vertex: self._distance(vertex['value'], q_s))
+        else:
+            None
+
+    def _random_config(self):
+        # generate a random config to extend towards. This can be biased by whichever StateSpace and/or sampler we'd like to use.
+        return np.array(self.state_space.sample())
+    
+    def _initialize_trees(self, start_q, goal_q):
+        self.forwards_tree.add_vertex(self._val2str(start_q))
+        self.forwards_tree['name'] = 'forwards'
+        self.backwards_tree.add_vertex(self._val2str(goal_q))
+        self.backwards_tree['name'] = 'backwards'
+
+    def _equal(self, q1, q2):
+        if self._distance(q1, q2) <= .01:
+            return True
+        return False
+
+    def _validate(self, sample):
+        return self.svc.validate(sample)
+    
+    def _tree_swap_gen(self):
+        trees = [self.forwards_tree, self.backwards_tree]
+        i = 1
+        while True:
+            idx_1, idx_2 = i%2, (i+1)%2
+            yield trees[idx_1], trees[idx_2]
+            i += 1
+
+    def _add_vertex(self, tree, q):
+        # TODO: Add value
+        tree.add_vertex(self._val2str(start_q), **{'value': q})
+
+
+    def _add_edge(self, tree, q1, q2, weight):
+        q1_idx = self._name2idx(tree, self._val2str(q1))
+        q2_idx = self._name2idx(tree, self._val2str(q2))
+        if tuple(sorted([q1_idx, q2_idx])) not in set([tuple(sorted(edge.tuple)) for edge in self.graph.es]):
+            tree.add_edge(q1_idx, q2_idx, **{'weight': weight})
+
+    def  _name2idx(self, tree, name):
+        return tree.vs.find(name).index
+    
+    def _val2str(self, value):
+        return str(["{:.4f}".format(val) for val in value])
+    
+    def _distance(self, q1, q2):
+        return np.linalg.norm(q1 - q2)
