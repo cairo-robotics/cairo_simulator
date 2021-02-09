@@ -148,14 +148,14 @@ class PRM():
         end = self.graph.vs[1]['value']
         start_added = False
         end_added = False
-        for q_near in self._neighbors(start, k_override=20, within_ball=False):
+        for q_near in self._neighbors(start, k_override=30, within_ball=True):
             if self._idx_of_point(q_near) != 0:
                 successful, local_path = self._extend(start, q_near)
                 if successful:
                     start_added = True
                     self._add_edge_to_graph(
                         start, q_near, self._weight(local_path))
-        for q_near in self._neighbors(end, k_override=20, within_ball=False):
+        for q_near in self._neighbors(end, k_override=30, within_ball=True):
             if self._idx_of_point(q_near) != 1:
                 successful, local_path = self._extend(q_near, end)
                 if successful:
@@ -534,14 +534,14 @@ class LazyPRM():
         end_value = self.graph.vs.find(self.goal_name)['value']
         start_added = False
         end_added = False
-        for q_near in self._neighbors(start_value, within_ball=False):
+        for q_near in self._neighbors(start_value, k_override=30, within_ball=True):
             if self._idx_of_point(self._value_to_name(q_near)) != 0:
                 successful, local_path = self._extend(start_value, q_near)
                 if successful:
                     start_added = True
                     self._add_edge_to_graph(
                         start_value, q_near, self._weight(local_path))
-        for q_near in self._neighbors(end_value, within_ball=False):
+        for q_near in self._neighbors(end_value, k_override=30, within_ball=True):
             if self._idx_of_point(self._value_to_name(q_near)) != 1:
                 successful, local_path = self._extend(q_near, end_value)
                 if successful:
@@ -720,7 +720,7 @@ class PRMParallel():
         end = self.graph.vs[self.goal_name]['value']
         start_added = False
         end_added = False
-        for q_near in self._neighbors(start, within_ball=False):
+        for q_near in self._neighbors(start, k_override=30, within_ball=True):
             if self._idx_of_point(q_near) != 0:
                 successful, local_path = self._extend(start, q_near)
                 if successful:
@@ -728,7 +728,7 @@ class PRMParallel():
                     self._add_edge_to_graph(
                         str(start), str(q_near), self._weight(local_path))
                     break
-        for q_near in self._neighbors(end, within_ball=False):
+        for q_near in self._neighbors(end, k_override=30, within_ball=True):
             if self._idx_of_point(q_near) != 1:
                 successful, local_path = self._extend(q_near, end)
                 if successful:
