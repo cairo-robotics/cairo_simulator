@@ -73,8 +73,8 @@ def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=100, e_step=1, 
         T0_s = pose2trans(np.hstack([trans + quat]))
         # generates the task space distance and error/displacement vector
         min_distance_new, x_err = distance_from_TSR(T0_s, tsr)
-        print(min_distance_new)
-        print(x_err)
+        # print(min_distance_new)
+        # print(x_err)
         if min_distance_new < epsilon:
             return q_s  # we've reached the manifold within epsilon error
         elif count > iter_count:
@@ -89,6 +89,7 @@ def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=100, e_step=1, 
         q_error = np.dot(J_cross, x_err)
         q_s = q_s - e_step * q_error
         # if the displacement of the current projected configuration relative to q_old (could be q_near etc)
+        # is any larger than twice the step size q_step, we discard the projection. 
         if np.linalg.norm(q_s - q_old) > 2 * q_step or not within_joint_limits(manipulator, q_s):
             return None
         # if not within_joint_limits(manipulator, q_s):
