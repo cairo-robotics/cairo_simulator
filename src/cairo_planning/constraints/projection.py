@@ -90,10 +90,10 @@ def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=100, e_step=1, 
         q_s = q_s - e_step * q_error
         # if the displacement of the current projected configuration relative to q_old (could be q_near etc)
         # is any larger than twice the step size q_step, we discard the projection. 
-        if np.linalg.norm(q_s - q_old) > 2 * q_step or not within_joint_limits(manipulator, q_s):
-            return None
-        # if not within_joint_limits(manipulator, q_s):
+        # if np.linalg.norm(q_s - q_old) > 2 * q_step or not within_joint_limits(manipulator, q_s):
         #     return None
+        if not within_joint_limits(manipulator, q_s):
+            return None
 
 def within_joint_limits(manipulator, q_s):
     """
