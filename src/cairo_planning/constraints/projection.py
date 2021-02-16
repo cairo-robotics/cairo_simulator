@@ -1,3 +1,42 @@
+"""
+Certain poritions of this module are derived from the PrPy repository of the
+Personal Robotics laboratory at CMU: https://github.com/personalrobotics/prpy
+
+This especially pertains to the usage of Task Space Region representative code.
+
+------------------------------------------------------------------------------
+
+Copyright (c) 2016, Carnegie Mellon University
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+- Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+- Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+- Neither the name of Carnegie Mellon University nor the names of its
+  contributors may be used to endorse or promote products derived from this
+  software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+------------------------------------------------------------------------------
+"""
+
+
 from itertools import product
 
 import numpy as np
@@ -5,7 +44,7 @@ import numpy as np
 from cairo_planning.geometric.transformation import pose2trans, pseudoinverse, analytic_xyz_jacobian, quat2rpy, rot2rpy
 
 
-def project_config(manipulator, q_old, q_s, tsr, epsilon, q_step, iter_count=10000, e_step=.25):
+def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=100, e_step=1, iter_count=10000):
     """
     This function projects a sampled configuration point down to a constraint manifold defined implicitly by a 
     Task Space Region representation. http://cs.brown.edu/courses/csci2951-k/papers/berenson12.pdf
@@ -14,11 +53,11 @@ def project_config(manipulator, q_old, q_s, tsr, epsilon, q_step, iter_count=100
 
     Args:
         manipulator (Manipulator): Cairo Simulator Manipulator object. 
-        q_old (ndarray): Old/prior configuration. TODO: Incorporate q_old and q_step which are utilized by the EXTEND function.
-        q_s (ndarray): Current configuration.
+        q_old (ndarray): Old/prior/near configuration. 
+        q_s (ndarray): Current sampled configuration.
         tsr (TSR): Task Space Region object that implicitly defines a constraint manifold.
         epsilon (float): Threshold distance within which the project sample is deemed close enough to manifold.
-        q_step (float): Size of step size used for EXTEND of RRT planner. TODO: Incorporate q_old and q_step which are utilized by the EXTEND function.
+        q_step (float): Size of step size used for EXTEND of RRT planner.
         iter_count (int): Max number of projection iterations to try for a given sample before giving up.
         e_step (float): The fractional step size of the configuration error q_error to use during the update step.
 
@@ -32,14 +71,16 @@ def project_config(manipulator, q_old, q_s, tsr, epsilon, q_step, iter_count=100
         world_pose, _ = manipulator.solve_forward_kinematics(q_s)
         trans, quat = world_pose[0], world_pose[1]
         T0_s = pose2trans(np.hstack([trans + quat]))
-        min_distance, x_err = distance_from_TSR(T0_s, tsr)
+        # generates the task space distance and error/displacement vector
+        min_distance_new, x_err = distance_from_TSR(T0_s, tsr)
+        # print(min_distance_new)
         # print(x_err)
-        # print(min_distance)
-        if min_distance < epsilon:
-            return q_s
+        if min_distance_new < epsilon:
+            return q_s  # we've reached the manifold within epsilon error
         elif count > iter_count:
+            print("max iters")
             return None
-        J = manipulator.get_jacobian(q_s)
+        J = manipulator.get_jacobian(q_s) 
         J_t = J[0:3, :]
         # obtain the analytic jacobian
         J_rpy = analytic_xyz_jacobian(J[3:6, :], quat2rpy(quat))
@@ -47,11 +88,12 @@ def project_config(manipulator, q_old, q_s, tsr, epsilon, q_step, iter_count=100
         J_cross = pseudoinverse(Ja)
         q_error = np.dot(J_cross, x_err)
         q_s = q_s - e_step * q_error
+        # if the displacement of the current projected configuration relative to q_old (could be q_near etc)
+        # is any larger than twice the step size q_step, we discard the projection. 
         # if np.linalg.norm(q_s - q_old) > 2 * q_step or not within_joint_limits(manipulator, q_s):
-        #     return
+        #     return None
         if not within_joint_limits(manipulator, q_s):
             return None
-
 
 def within_joint_limits(manipulator, q_s):
     """

@@ -86,7 +86,7 @@ def main():
     _ = sim_context.get_sim_objects(['Ground'])[0]
 
 
-    n_samples = 4
+    n_samples = 5
     valid_samples = []
     starttime = timeit.default_timer()
 
@@ -94,7 +94,7 @@ def main():
     T0_w = xyzrpy2trans([.7, 0, 0, 0, 0, 0], degrees=False)
 
     # Utilizes RPY convention
-    Tw_e = xyzrpy2trans([-.2, 0, 1.0, np.pi/2, np.pi, 0], degrees=False)
+    Tw_e = xyzrpy2trans([-.2, 0, 1.0, np.pi/2, 3*np.pi/2, np.pi/2], degrees=False)
     
     # Utilizes RPY convention
     Bw = bounds_matrix([(0, 100), (-100, 100), (-100, 100)],  # allow some tolerance in the z and y and only positve in x
@@ -102,14 +102,15 @@ def main():
     tsr = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw,
               manipindex=0, bodyandlink=16)
 
+
     # Disabled collisions during planning with certain eclusions in place.
     with DisabledCollisionsContext(sim, [], []):
         print("Sampling start time is :", starttime)
         while len(valid_samples) < n_samples:
             sample = scs.sample()
             if svc.validate(sample):
-                q_constrained = project_config(sawyer_robot, np.array(
-                    sample), np.array(sample), tsr, .1, .01)
+                q_constrained = project_config(sawyer_robot, tsr, np.array(
+                sample), np.array(sample), epsilon=.1, e_step=.25)
                 normalized_q_constrained = []
                 if q_constrained is not None:
                     for value in q_constrained:
@@ -119,6 +120,7 @@ def main():
                     continue
                 if svc.validate(normalized_q_constrained):
                     print(normalized_q_constrained)
+                    print()
                     valid_samples.append(normalized_q_constrained)
         print("The time difference is :", timeit.default_timer() - starttime)
         print("{} valid of {}".format(len(valid_samples), n_samples))
