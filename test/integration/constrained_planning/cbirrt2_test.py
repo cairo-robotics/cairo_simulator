@@ -47,7 +47,7 @@ def main():
         {
             "object_name": "Table",
             "model_file_or_sim_id": ASSETS_PATH + 'table.sdf',
-            "position": [.6, -.8, 1.0],
+            "position": [.8, -.6, .6],
             "orientation":  [0, 0, 1.5708],
             "fixed_base": 1
         }
@@ -69,17 +69,16 @@ def main():
     # sawyer_robot.move_to_joint_pos(goal)
     # time.sleep(5)
     sawyer_robot.move_to_joint_pos(start)
-    time.sleep(5)
+    time.sleep(1.0)
     # Utilizes RPY convention
     T0_w = xyzrpy2trans([.7, 0, 0, 0, 0, 0], degrees=False)
 
     # Utilizes RPY convention
-    Tw_e = xyzrpy2trans([0, 0, 0, -1.68041388837, -0.0201485728854, -0.295201834171], degrees=False)
-
-
-        # Utilizes RPY convention
-    Bw = bounds_matrix([(-100, 100), (-100, 100), (-100, 100)],  # No positional constraint bounds.
-                        [(-1.5, 1.5), (-1.5, 1.5), (-1.5, 1.5)])  # any rotation about z, with limited rotation about x, and y.
+    Tw_e = xyzrpy2trans([-.2, 0, 1.0, np.pi/2, 3*np.pi/2, np.pi/2], degrees=False)
+    
+    # Utilizes RPY convention
+    Bw = bounds_matrix([(0, 100), (-100, 100), (-100, .3)],  # allow some tolerance in the z and y and only positve in x
+                       [(-.07, .07), (-.07, .07), (-.07, .07)])  # any rotation about z, with limited rotation about x, and y.
     tsr = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw,
             manipindex=0, bodyandlink=16)
 
@@ -89,10 +88,10 @@ def main():
         #######
         # LazyPRM #
         #######
-        # Use parametric linear interpolation with 10 steps between points.
-        # interp = partial(parametric_lerp, steps=10)
+        # Use parametric linear interpolation with 5 steps between points.
+        interp = partial(parametric_lerp, steps=20)
         # See params for PRM specific parameters
-        cbirrt = CBiRRT2(sawyer_robot, planning_space, svc, params={})
+        cbirrt = CBiRRT2(sawyer_robot, planning_space, svc, interp, params={})
         logger.info("Planning....")
         path = cbirrt.plan(tsr, np.array(start), np.array(goal))
  
@@ -106,7 +105,7 @@ def main():
     path = [np.array(p) for p in path]
     # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
     jtc = JointTrajectoryCurve()
-    traj = jtc.generate_trajectory(path, move_time=5)
+    traj = jtc.generate_trajectory(path, move_time=10)
     sawyer_robot.execute_trajectory(traj)
     try:
         while True:

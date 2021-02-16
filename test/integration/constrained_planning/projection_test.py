@@ -86,7 +86,7 @@ def main():
     _ = sim_context.get_sim_objects(['Ground'])[0]
 
 
-    n_samples = 100
+    n_samples = 5
     valid_samples = []
     starttime = timeit.default_timer()
 
@@ -94,7 +94,7 @@ def main():
     T0_w = xyzrpy2trans([.7, 0, 0, 0, 0, 0], degrees=False)
 
     # Utilizes RPY convention
-    Tw_e = xyzrpy2trans([-.2, 0, 1.0, np.pi/2, np.pi, 0], degrees=False)
+    Tw_e = xyzrpy2trans([-.2, 0, 1.0, np.pi/2, 3*np.pi/2, np.pi/2], degrees=False)
     
     # Utilizes RPY convention
     Bw = bounds_matrix([(0, 100), (-100, 100), (-100, 100)],  # allow some tolerance in the z and y and only positve in x
