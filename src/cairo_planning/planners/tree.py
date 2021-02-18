@@ -88,7 +88,8 @@ class CBiRRT2():
             # we dont bother to keep a new qs that has traversed further away from the target.
             elif self._distance(q_target, q_s) > self._distance(q_target, qs_old):
                 return qs_old
-
+            # set the qs_old to the current value then update
+            qs_old = q_s
             # What this update step does is it moves qs off the manifold towards q_target. And then this is projected back down onto the manifold.
             q_s = q_s + min([self.q_step, self._distance(q_target, q_s)]) * (q_target - q_s) / self._distance(q_target, q_s)
             # More problem sepcific versions of constrained_extend use constraint value information 
@@ -108,8 +109,6 @@ class CBiRRT2():
                     self._add_edge(tree, qs_old, q_s, self._distance(qs_old, q_s))
                 else:
                     self._add_edge(tree, q_s, qs_old, self._distance(q_s, qs_old))
-                # set the qs_old to the current value then update
-                qs_old = q_s
             else:
                 return qs_old
 
@@ -140,7 +139,7 @@ class CBiRRT2():
 
     def _join_trees(self, a_tree, qa_reach, b_tree, qb_reach):
         
-        tree = ig.Graph(directed=True) # a new undirected graph
+        tree = ig.Graph(directed=True) # a new directed graph
         if a_tree['name'] == 'forwards':
             F = a_tree.copy()
             qf = qa_reach
@@ -164,13 +163,14 @@ class CBiRRT2():
         tree.es['weight'] = F.es['weight']
 
         # Attach qf to parents/in neighbors of qb, since those parents should be parents to qf
-        # Since we built the B graph backwards, the incidence mode should be OUT directed
-        b_parents = B.incident(self._name2idx(B, self._val2str(qb)), mode='OUT')
+        # Since we built the B graph backwards, we get B's successors
+        b_parents = B.successors(self._name2idx(B, self._val2str(qb)))
 
-        # collect the edges and weifhts of qb to parents in B. We collect by names 
+        # collect the edges and weights of qb to parents in B. We collect by names 
         connection_edges_by_name = []
         connection_edge_weights = []
-        qb_idx = self._val2str(qb)
+        qb_name = self._val2str(qb)
+        qb_idx = self._name2idx(B, qb_name)
         qf_tree_name = self._val2str(qf)
         for parent in b_parents:
             connection_edges_by_name.append((qf_tree_name, B.vs[parent]['name']))
@@ -231,7 +231,7 @@ class CBiRRT2():
         self.backwards_tree['name'] = 'backwards'
 
     def _equal(self, q1, q2):
-        if self._distance(q1, q2) <= .1:
+        if self._distance(q1, q2) <= .05:
             return True
         return False
 
@@ -250,11 +250,11 @@ class CBiRRT2():
         tree.add_vertex(self._val2str(q), **{'value': q})
 
 
-    def _add_edge(self, tree, q1, q2, weight):
-        q1_idx = self._name2idx(tree, self._val2str(q1))
-        q2_idx = self._name2idx(tree, self._val2str(q2))
-        if tuple(sorted([q1_idx, q2_idx])) not in set([tuple(sorted(edge.tuple)) for edge in tree.es]):
-            tree.add_edge(q1_idx, q2_idx, **{'weight': weight})
+    def _add_edge(self, tree, q_from, q_to, weight):
+        q_from_idx = self._name2idx(tree, self._val2str(q_from))
+        q_to_idx = self._name2idx(tree, self._val2str(q_to))
+        if tuple(sorted([q_from_idx, q_to_idx])) not in set([tuple(sorted(edge.tuple)) for edge in tree.es]):
+            tree.add_edge(q_from_idx, q_to_idx, **{'weight': weight})
 
     def  _name2idx(self, tree, name):
         return tree.vs.find(name).index
