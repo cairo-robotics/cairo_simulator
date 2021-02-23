@@ -1,3 +1,7 @@
+"""
+DEPRECATED: I can't figure the need for this anymore.
+"""
+
 from abc import ABC, abstractmethod
 
 from cairo_planning.geometric.state_space import SawyerConfigurationSpace
