@@ -93,7 +93,8 @@ def main():
         # See params for PRM specific parameters
         cbirrt = CBiRRT2(sawyer_robot, planning_space, svc, interp, params={'q_step': .48, 'e_step': .25})
         logger.info("Planning....")
-        path = cbirrt.plan(tsr, np.array(start), np.array(goal))
+        plan = cbirrt.plan(tsr, np.array(start), np.array(goal))
+        path = cbirrt.get_path(plan)
  
     
     if len(path) == 0:
