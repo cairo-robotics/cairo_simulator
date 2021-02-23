@@ -29,7 +29,8 @@ class CBiRRT2():
         self.q_step = params.get('q_step', .12)
         self.epsilon = params.get('epsilon', .1)
         self.e_step = params.get('e_step', .25)
-        print("q_step: {}, epsilon: {}, e_step: {}".format(self.q_step, self.epsilon, self.e_step))
+        self.iters = params.get('iters', 1000)
+       # print("q_step: {}, epsilon: {}, e_step: {}, BiRRT Iters {}".format(self.q_step, self.epsilon, self.e_step, self.iters))
     
     def plan(self, tsr, start_q, goal_q):
         """ Top level plan function for CBiRRT2. Trees are first initialized with start and end points, constrained birrt is executed, and the path is smoothed.
@@ -40,16 +41,21 @@ class CBiRRT2():
             start_q (array-like): Starting configuration.
             goal_q (array-like): Ending configuration.
         """
-        print("Initializing trees...")
+       # print("Initializing trees...")
         self._initialize_trees(start_q, goal_q)
-        print("Running Constrained Bidirectional RRT...")
+        #print("Running Constrained Bidirectional RRT...")
         self.tree = self.cbirrt(self.robot, tsr)
-        print("Extracting path through graph...")
-        graph_path = self._extract_graph_path()
-        print("Graph path found: {}".format(graph_path))
-        plan = self._get_plan(graph_path)
-        #self._smooth(path)
-        return plan
+        if self.tree is not None:
+            #print("Extracting path through graph...")
+            graph_path = self._extract_graph_path()
+            if len(graph_path) == 1:
+                return None
+            else:
+                #print("Graph path found: {}".format(graph_path))
+                return graph_path
+        # plan = self.get_plan(graph_path)
+        # #self._smooth(path)
+        # return plan
 
     def cbirrt(self, robot, tsr):
         iters=0
@@ -58,6 +64,8 @@ class CBiRRT2():
         a_tree, b_tree = next(tree_swp)
         while continue_to_plan:
             iters += 1
+            if iters > self.iters:
+                return None
             q_rand = self._random_config()
             qa_near = self._neighbors(a_tree, q_rand)  # closest leaf value to q_rand
             # extend tree at as far as possible to generate qa_reach
@@ -68,21 +76,22 @@ class CBiRRT2():
             qb_reach = self._constrained_extend(b_tree, tsr, qb_near, qa_reach)
             # if the qa_reach and qb_reach are equivalent, the trees are connectable. 
             if self._equal(qa_reach, qb_reach):
-                print("Connecting trees...")
-                connected_tree = self._join_trees(a_tree, qa_reach, b_tree, qb_reach)
-                return connected_tree
+                # print("Connecting trees...")
+                self.connected_tree = self._join_trees(a_tree, qa_reach, b_tree, qb_reach)
+                return self.connected_tree
             # otherwise we swap trees and repeat.
             else:
                  a_tree, b_tree = next(tree_swp)
     
     def _constrained_extend(self, tree, tsr, q_near, q_target):
-        q_s = q_near
-        qs_old = q_near
+        q_s = np.array(q_near)
+        qs_old = np.array(q_near)
         iters = 1
         prior_distance = self._distance(q_target, q_s)
         while True:
             iters += 1
-
+            if iters >= 1000:
+                return q_s
             if self._equal(q_target, q_s):
                 return q_s
             # we dont bother to keep a new qs that has traversed further away from the target.
@@ -126,7 +135,7 @@ class CBiRRT2():
     def _extract_graph_path(self,):
         return self.tree.get_shortest_paths(self._name2idx(self.tree, self.start_name), self._name2idx(self.tree, self.goal_name), weights='weight', mode='OUT')[0]
 
-    def _get_plan(self, plan):
+    def get_path(self, plan):
         points = [self.tree.vs[idx]['value'] for idx in plan]
         pairs = list(zip(points, points[1:]))
         segments = [self.interp_fn(np.array(p[0]), np.array(p[1]))
@@ -160,7 +169,8 @@ class CBiRRT2():
             F_idxs = e.tuple
             F_tree_edges.append((self._name2idx(tree, self._val2str(F.vs[F_idxs[0]]['value'])), self._name2idx(tree, self._val2str(F.vs[F_idxs[1]]['value']))))
         tree.add_edges(F_tree_edges)
-        tree.es['weight'] = F.es['weight']
+        if len(F.es) > 0:
+            tree.es['weight'] = F.es['weight']
 
         # Attach qf to parents/in neighbors of qb, since those parents should be parents to qf
         # Since we built the B graph backwards, we get B's successors
@@ -177,20 +187,25 @@ class CBiRRT2():
             connection_edge_weights.append(B.es[B.get_eid(qb_idx,  parent)]['weight'])
         B.delete_vertices(qb_idx)
     
-    
-        # add all the verticies and edges of the backwards tree ot the undirected graph
-        curr_names = tree.vs['name'] # we have to snag the current names and values before adding vertices
-        curr_values = tree.vs['value']
-        tree.add_vertices(len(B.vs))
-        tree.vs["name"] = curr_names + list(B.vs['name'])
-        tree.vs["value"] = curr_values + list(B.vs['value'])
-        B_tree_edges = []
-        for e in B.es:
-            B_idxs = e.tuple
-            B_tree_edges.append((self._name2idx(tree, B.vs[B_idxs[0]]['name']), self._name2idx(tree, self._val2str(B.vs[B_idxs[1]]['value']))))
-        curr_edge_weights = tree.es['weight'] 
-        tree.add_edges(B_tree_edges)
-        tree.es['weight'] = curr_edge_weights + B.es['weight']
+        if len(B.vs) > 0:
+            # add all the verticies and edges of the backwards tree ot the undirected graph
+            curr_names = tree.vs['name'] # we have to snag the current names and values before adding vertices
+            curr_values = tree.vs['value']
+            tree.add_vertices(len(B.vs))
+            tree.vs["name"] = curr_names + list(B.vs['name'])
+            tree.vs["value"] = curr_values + list(B.vs['value'])
+            B_tree_edges = []
+            for e in B.es:
+                B_idxs = e.tuple
+                B_tree_edges.append((self._name2idx(tree, B.vs[B_idxs[0]]['name']), self._name2idx(tree, self._val2str(B.vs[B_idxs[1]]['value']))))
+            if len(B.es) > 0:
+                if len(tree.es) > 0:
+                    curr_edge_weights = tree.es['weight'] 
+                    tree.add_edges(B_tree_edges)
+                    tree.es['weight'] = curr_edge_weights + B.es['weight']
+                else:
+                    tree.add_edges(B_tree_edges)
+                    tree.es['weight'] = B.es['weight'] 
 
         # now add back in the edges from qf to parents of qb in the undirected grepah/tree
         connection_edges = []
@@ -201,12 +216,12 @@ class CBiRRT2():
         tree.add_edges(connection_edges)
         tree.es['weight'] = curr_edge_weights + connection_edge_weights
        
-        visual_style = {}
-        visual_style["vertex_color"] =  ["blue" if v['name'] in [self.start_name, self.goal_name] else "white" for v in tree.vs]
-        visual_style["bbox"] = (1200, 1200)
+        # visual_style = {}
+        # visual_style["vertex_color"] =  ["blue" if v['name'] in [self.start_name, self.goal_name] else "white" for v in tree.vs]
+        # visual_style["bbox"] = (1200, 1200)
 
-        visual_style['layout'] = 'tree'
-        ig.plot(tree, **visual_style)
+        # visual_style['layout'] = 'tree'
+        # ig.plot(tree, **visual_style)
         return tree
 
     def _neighbors(self, tree, q_s):
@@ -257,10 +272,13 @@ class CBiRRT2():
             tree.add_edge(q_from_idx, q_to_idx, **{'weight': weight})
 
     def  _name2idx(self, tree, name):
-        return tree.vs.find(name).index
+        try:
+            return tree.vs.find(name).index
+        except Exception as e:
+            print(e)
     
     def _val2str(self, value):
         return str(["{:.4f}".format(val) for val in value])
     
     def _distance(self, q1, q2):
-        return np.linalg.norm(q1 - q2)
+        return np.linalg.norm(np.array(q1) - np.array(q2))
