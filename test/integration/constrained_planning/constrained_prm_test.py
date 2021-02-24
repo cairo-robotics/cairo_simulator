@@ -90,12 +90,12 @@ def main():
         #########################
         # The specific space we sample from is the Hyberball centered at the midpoint between two candidate points. 
         # This is used to bias tree grwoth between two points when using CBiRRT2 as our local planner for a constrained PRM.
-        tree_state_space = SawyerConfigurationSpace(sampler=UniformSampler())
+        tree_state_space = SawyerConfigurationSpace(sampler=HyperballSampler())
         # Use parametric linear interpolation with 10 steps between points.
         interp = partial(parametric_lerp, steps=10)
         # See params for PRM specific parameters robot, tsr, state_space, state_validity_checker, interpolation_fn, params
         prm = CPRM(SawyerCPRMSimContext, config, sawyer_robot, tsr, planning_space, tree_state_space, svc, interp, params={
-            'n_samples': 500, 'k': 8, 'planning_attempts': 5, 'ball_radius': 2.0}, tree_params={'iters': 50})
+            'n_samples': 200, 'k': 8, 'planning_attempts': 5, 'ball_radius': 3.0}, tree_params={'iters': 50})
         logger.info("Planning....")
         plan = prm.plan(np.array(start), np.array(goal))
         # get_path() reuses the interp function to get the path between vertices of a successful plan
