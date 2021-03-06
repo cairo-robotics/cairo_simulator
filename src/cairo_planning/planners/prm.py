@@ -11,7 +11,7 @@ import igraph as ig
 from cairo_planning.local.evaluation import subdivision_evaluate
 from cairo_planning.local.interpolation import cumulative_distance
 from cairo_planning.local.neighbors import NearestNeighbors
-from cairo_planning.planners.parallel_workers import parallel_connect_worker, parallel_sample_worker, parallel_projection_worker
+from cairo_planning.planners.parallel_workers import parallel_connect_worker, parallel_sample_worker, parallel_projection_worker, parallel_cbirrt_worker
 from cairo_planning.planners.tree import CBiRRT2
 
 __all__ = ['PRM', 'PRMParallel', 'CPRM']
@@ -408,14 +408,16 @@ class CPRM():
         if self.n_samples <= 100:
             samples = self._generate_samples()
         else:
-            samples = self._generate_parallel_samples()
+            samples = self._generate_samples_parallel()
         # Create NN datastructure
         print("Creating NN datastructure...")
         self.nn = NearestNeighbors(X=np.array(
             samples), model_kwargs={"leaf_size": 100})
         # Generate NN connectivity.
         print("Generating nearest neighbor connectivity...")
-        self._generate_connections(samples=samples)
+        connections = self._generate_connections_parallel(samples=samples)
+        print("Adding connections")
+
         print("Attaching start and end to graph...")
         self._attach_start_and_end()
         print("Finding feasible best path in graph if available...")
@@ -488,7 +490,7 @@ class CPRM():
             # print(sum(sampling_times) / len(sampling_times))
         return valid_samples
 
-    def _generate_parallel_samples(self):
+    def _generate_samples_parallel(self):
         num_workers = mp.cpu_count()
         samples_per_worker = int(self.n_samples / num_workers)
         worker_fn = partial(
@@ -497,17 +499,29 @@ class CPRM():
             results = p.map(worker_fn, [samples_per_worker] * num_workers)
             return list(itertools.chain.from_iterable(results))
 
-    def _generate_connections(self, samples):
-        evaluated_edges = []
+    def _generate_connections_parallel(self, samples):
+        evaluated_name_pairs = []
+        point_pairs = []
         for q_rand in samples:
             for q_neighbor in self._neighbors(q_rand):
-                if (self._val2name(q_rand), self._val2name(q_neighbor)) not in evaluated_edges and (self._val2name(q_neighbor), self._val2name(q_rand)) not in evaluated_edges:
-                    _ = self._cbirrt2_connect(q_rand, q_neighbor)
-                    evaluated_edges.append(
+                if (self._val2name(q_rand), self._val2name(q_neighbor)) not in evaluated_name_pairs and (self._val2name(q_neighbor), self._val2name(q_rand)) not in evaluated_name_pairs:
+                    point_pairs.append((q_rand, q_neighbor))
+                    evaluated_name_pairs.append(
                         (self._val2name(q_rand), self._val2name(q_neighbor)))
-                    evaluated_edges.append(
+                    evaluated_name_pairs.append(
                         (self._val2name(q_neighbor), self._val2name(q_rand)))
-                    print(len(evaluated_edges)/2)
+        num_workers = mp.cpu_count()
+        batches = np.array_split(point_pairs, mp.cpu_count())
+        worker_fn = partial(
+            parallel_cbirrt_worker, sim_context_cls=self.sim_context, sim_config=self.sim_config, tsr=self.tsr, tree_state_space=self.tree_state_space, interp_fn=self.interp_fn, tree_params=self.tree_params)
+        with mp.get_context("spawn").Pool(num_workers) as p:
+            results = p.map(worker_fn, batches)
+            # for each set of result, we have a dictionary indexed by the evaluated_name_pairs.
+            # the value of each dictionary is a dictionary with keys 'points' and 'edges'
+            # the points are the actual points and the edges are the edges between points needed between points. 
+            # we have to add the points to the graphs, then created edges betweenthem.
+            print(results)
+            return list(itertools.chain.from_iterable(results))
 
     def _cbirrt2_connect(self, q_near, q_target):
         centroid = (np.array(q_near) + np.array(q_target)) / 2

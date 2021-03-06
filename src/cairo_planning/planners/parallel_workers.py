@@ -5,7 +5,7 @@ from cairo_planning.local.evaluation import subdivision_evaluate
 from cairo_planning.constraints.projection import project_config
 from cairo_planning.geometric.tsr import TSR
 from cairo_planning.geometric.utils import geodesic_distance, wrap_to_interval
-
+from cairo_planning.planners.tree import CBiRRT2
 
 def parallel_sample_worker(num_samples, sim_context_cls, sim_config):
     sim_context = sim_context_cls(sim_config, setup=False)
@@ -82,3 +82,39 @@ def parallel_projection_worker(num_samples, sim_context_cls, sim_config, tsr):
                     # sampling_times.append(timer() - start_time)
             # print(sum(sampling_times) / len(sampling_times))
         return valid_samples
+
+def parallel_cbirrt_worker(point_pairs, sim_context_cls, sim_config, tsr, tree_state_space, interp_fn, tree_params):
+    sim_context = sim_context_cls(sim_config, setup=False)
+    sim_context.setup(sim_overrides={"run_parallel": True, "use_gui": False})
+    sawyer_robot = sim_context.get_robot()
+    svc = sim_context.get_state_validity()
+
+    paths = {}
+
+    for pair in point_pairs:
+        q_near = pair[0]
+        q_target = pair[1]
+        centroid = (np.array(q_near) + np.array(q_target)) / 2
+        radius = np.linalg.norm(np.array(q_near) - np.array(q_target)) / 2
+
+        def _random_config(self):
+            return self.state_space.sample(centroid=centroid, radius=radius)
+
+        # monkey-patch goodness to allow for a special type of sampling via hyperball between, and containing q_near and q_target:
+        CBiRRT2._random_config = _random_config
+
+        cbirrt2 = CBiRRT2(sawyer_robot, tree_state_space,
+                            svc, interp_fn, params=tree_params)
+
+        graph_plan = cbirrt2.plan(tsr, q_near, q_target)
+        if graph_plan is not None:
+            points = [cbirrt2.connected_tree.vs[idx]['value']
+                        for idx in graph_plan]
+            edges = list(zip(points, points[1:]))
+            named_pair_tuple = (str(["{:.4f}".format(val) for val in q_near]), str(["{:.4f}".format(val) for val in q_target]))
+            paths[named_pair_tuple] = {
+                "points": points,
+                "edges": edges
+            }
+    return paths
+   
