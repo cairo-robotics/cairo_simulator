@@ -502,6 +502,11 @@ class CPRM():
             results = p.map(worker_fn, [samples_per_worker] * num_workers)
             return list(itertools.chain.from_iterable(results))
 
+    def _generate_connections(self, samples):
+        for q_rand in samples:
+            for q_near in self._neighbors(q_rand):
+                _ = self._cbirrt2_connect(q_rand, q_near)
+
     def _generate_connections_parallel(self, samples):
         evaluated_name_pairs = []
         point_pairs = []
