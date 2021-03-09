@@ -70,8 +70,6 @@ def main():
     svc = sim_context.get_state_validity()
     sawyer_robot = sim_context.get_robot()
     tsr = sim_context.get_tsr()
-    _ = sawyer_robot.get_simulator_id()
-    _ = sim_context.get_sim_objects(['Ground'])[0]
 
     start = [0, 0, 0, 0, 0, 0, 0]
 
@@ -95,7 +93,7 @@ def main():
         interp = partial(parametric_lerp, steps=10)
         # See params for PRM specific parameters robot, tsr, state_space, state_validity_checker, interpolation_fn, params
         prm = CPRM(SawyerCPRMSimContext, config, sawyer_robot, tsr, planning_space, tree_state_space, svc, interp, params={
-            'n_samples': 200, 'k': 8, 'planning_attempts': 5, 'ball_radius': 3.0}, tree_params={'iters': 50})
+            'n_samples': 500, 'k': 6, 'planning_attempts': 5, 'ball_radius': 2.0}, tree_params={'iters': 50, 'q_step': .5})
         logger.info("Planning....")
         plan = prm.plan(np.array(start), np.array(goal))
         # get_path() reuses the interp function to get the path between vertices of a successful plan
@@ -114,7 +112,7 @@ def main():
     path = [np.array(p) for p in path]
     # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
     jtc = JointTrajectoryCurve()
-    traj = jtc.generate_trajectory(path, move_time=5)
+    traj = jtc.generate_trajectory(path, move_time=20)
     sawyer_robot.execute_trajectory(traj)
     try:
         while True:
