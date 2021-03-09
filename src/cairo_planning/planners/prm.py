@@ -415,7 +415,10 @@ class CPRM():
             samples), model_kwargs={"leaf_size": 100})
         # Generate NN connectivity.
         print("Generating nearest neighbor connectivity...")
-        connections = self._generate_connections_parallel(samples=samples)
+        if self.n_samples <= 100:
+            self._generate_connections(samples=samples)
+        else:
+            self._generate_connections_parallel(samples=samples)
         print("Adding connections")
 
         print("Attaching start and end to graph...")
@@ -511,17 +514,28 @@ class CPRM():
                     evaluated_name_pairs.append(
                         (self._val2name(q_neighbor), self._val2name(q_rand)))
         num_workers = mp.cpu_count()
-        batches = np.array_split(point_pairs, mp.cpu_count())
+        batches = np.array_split(point_pairs, num_workers)
         worker_fn = partial(
             parallel_cbirrt_worker, sim_context_cls=self.sim_context, sim_config=self.sim_config, tsr=self.tsr, tree_state_space=self.tree_state_space, interp_fn=self.interp_fn, tree_params=self.tree_params)
         with mp.get_context("spawn").Pool(num_workers) as p:
-            results = p.map(worker_fn, batches)
+            batch_results = p.map(worker_fn, batches)
             # for each set of result, we have a dictionary indexed by the evaluated_name_pairs.
             # the value of each dictionary is a dictionary with keys 'points' and 'edges'
-            # the points are the actual points and the edges are the edges between points needed between points. 
+            # the points are the actual points and the edges are the edges between points needed between points.
             # we have to add the points to the graphs, then created edges betweenthem.
-            print(results)
-            return list(itertools.chain.from_iterable(results))
+            results = {}
+            for result in batch_results:
+                for named_value_tuple, value in result.items():
+                    results[named_value_tuple] = value
+
+            for named_tuple in evaluated_name_pairs:
+                connection = results.get(named_tuple, None)
+                if connection is not None:
+                    for point in connection['points']:
+                        self._add_vertex(self.graph, point)
+                    for edge in connection['edges']:
+                        self._add_edge(
+                            self.graph, edge[0], edge[1], self._distance(edge[0], edge[1]))
 
     def _cbirrt2_connect(self, q_near, q_target):
         centroid = (np.array(q_near) + np.array(q_target)) / 2
