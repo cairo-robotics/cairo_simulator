@@ -584,12 +584,27 @@ class CPRM():
                 list(zip(distances, neighbors)), key=lambda x: x[0]) if distance > 0]
 
     def _add_vertex(self, graph, q):
+        start_val2name = self._val2name(self.graph.vs[self._name2idx(graph, 'start')]['value'])
+        goal_val2name = self._val2name(self.graph.vs[self._name2idx(graph, 'goal')]['value'])
         if not self._val2name(q) in graph.vs['name']:
-            graph.add_vertex(self._val2name(q), **{'value': q})
+            if self._val2name(q) != start_val2name and self._val2name(q) != goal_val2name:
+                graph.add_vertex(self._val2name(q), **{'value': q})
 
     def _add_edge(self, tree, q_from, q_to, weight):
-        q_from_idx = self._val2idx(tree, q_from)
-        q_to_idx = self._val2idx(tree, q_to)
+        start_val2name = self._val2name(self.graph.vs[self._name2idx(tree, 'start')]['value'])
+        goal_val2name = self._val2name(self.graph.vs[self._name2idx(tree, 'goal')]['value'])
+        if self._val2name(q_from) == start_val2name:
+            q_from_idx = self._name2idx(tree, 'start')
+        elif self._val2name(q_from) == goal_val2name:
+            q_from_idx = self._name2idx(tree, 'goal')
+        else:
+            q_from_idx = self._val2idx(tree, q_from)
+        if self._val2name(q_to) == start_val2name:
+            q_to_idx = self._name2idx(tree, 'start')
+        elif self._val2name(q_to) == goal_val2name:
+            q_to_idx = self._name2idx(tree, 'goal')
+        else:
+            q_to_idx = self._val2idx(tree, q_to)
         if tuple(sorted([q_from_idx, q_to_idx])) not in set([tuple(sorted(edge.tuple)) for edge in tree.es]):
             tree.add_edge(q_from_idx, q_to_idx, **{'weight': weight})
 
