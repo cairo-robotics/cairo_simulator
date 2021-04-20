@@ -87,34 +87,36 @@ def parallel_cbirrt_worker(point_pairs, sim_context_cls, sim_config, tsr, tree_s
     sim_context = sim_context_cls(sim_config, setup=False)
     sim_context.setup(sim_overrides={"run_parallel": True, "use_gui": False})
     sawyer_robot = sim_context.get_robot()
+    sim = sim_context.get_sim_instance()
     svc = sim_context.get_state_validity()
 
     paths = {}
+    # Disabled collisions during planning with certain eclusions in place.
+    with DisabledCollisionsContext(sim, [], []):
+        for pair in point_pairs:
+            q_near = pair[0]
+            q_target = pair[1]
+            centroid = (np.array(q_near) + np.array(q_target)) / 2
+            radius = np.linalg.norm(np.array(q_near) - np.array(q_target)) / 2
 
-    for pair in point_pairs:
-        q_near = pair[0]
-        q_target = pair[1]
-        centroid = (np.array(q_near) + np.array(q_target)) / 2
-        radius = np.linalg.norm(np.array(q_near) - np.array(q_target)) / 2
+            def _random_config(self):
+                return self.state_space.sample(centroid=centroid, radius=radius)
 
-        def _random_config(self):
-            return self.state_space.sample(centroid=centroid, radius=radius)
+            # monkey-patch goodness to allow for a special type of sampling via hyperball between, and containing q_near and q_target:
+            CBiRRT2._random_config = _random_config
 
-        # monkey-patch goodness to allow for a special type of sampling via hyperball between, and containing q_near and q_target:
-        CBiRRT2._random_config = _random_config
+            cbirrt2 = CBiRRT2(sawyer_robot, tree_state_space,
+                                svc, interp_fn, params=tree_params)
 
-        cbirrt2 = CBiRRT2(sawyer_robot, tree_state_space,
-                            svc, interp_fn, params=tree_params)
-
-        graph_plan = cbirrt2.plan(tsr, q_near, q_target)
-        if graph_plan is not None:
-            points = [cbirrt2.connected_tree.vs[idx]['value']
-                        for idx in graph_plan]
-            edges = list(zip(points, points[1:]))
-            named_pair_tuple = (str(["{:.4f}".format(val) for val in q_near]), str(["{:.4f}".format(val) for val in q_target]))
-            paths[named_pair_tuple] = {
-                "points": points,
-                "edges": edges
-            }
-    return paths
+            graph_plan = cbirrt2.plan(tsr, q_near, q_target)
+            if graph_plan is not None:
+                points = [cbirrt2.connected_tree.vs[idx]['value']
+                            for idx in graph_plan]
+                edges = list(zip(points, points[1:]))
+                named_pair_tuple = (str(["{:.4f}".format(val) for val in q_near]), str(["{:.4f}".format(val) for val in q_target]))
+                paths[named_pair_tuple] = {
+                    "points": points,
+                    "edges": edges
+                }
+        return paths
    
