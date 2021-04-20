@@ -159,11 +159,44 @@ class CBiRRT2():
             qf = qb_reach
             B = a_tree.copy()
             qb = qa_reach
+
+        # In certain edge case scenarios, we have two start and goal points very close to each other
+        # What this causes is essentially one of the trees to have a length of one.
+        # Wile qa_reach and qb_reach are essentially equal according to the distance
+        # threshold, it is not necessarily equal to the added start and end nodes
+        # hence we get a no such vertex error and potentially our edges are messed up as
+        # a result.
+        # To fix this, if one of the trees is length 1, we reset the opposite reached point 
+        # as the new start/end and  viceversa. If they are both 1 it shouldn't be an issue since
+        # they are essnetially the same poitn and we don't need to create an edge between the two
+        # points. 
+        if len(F.vs) == 1 and len(B.vs) > 1:
+            qf_name = self._val2str(qf)
+            qf_idx = self._name2idx(F, qf_name)
+            qf_value = F.vs[qf_idx]['value']
+
+            qb_name = self._val2str(qb)
+            qb_idx = self._name2idx(B, qb_name)
+            B.vs[qb_idx]['name'] = qf_name
+            B.vs[qb_idx]['value'] = qf_value
         
-        # add all the verticies and edges of the forward tree ot the undirected graph
+        if len(F.vs) > 1 and len(B.vs) == 1:
+            qb_name = self._val2str(qb)
+            qb_idx = self._name2idx(B, qb_name)
+            qb_value = F.vs[qb_idx]['value']
+
+            qf_name = self._val2str(qf)
+            qf_idx = self._name2idx(F, qf_name)
+            F.vs[qf_idx]['name'] = qb_name
+            F.vs[qf_idx]['value'] = qb_value
+            
+
+
+        # add all the verticies and edges of the forward tree ot the directed graph
         tree.add_vertices(len(F.vs))
         tree.vs["name"] = F.vs['name']
         tree.vs["value"] = F.vs['value']
+    
         F_tree_edges = []
         for e in F.es:
             F_idxs = e.tuple
