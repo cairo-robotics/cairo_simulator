@@ -165,7 +165,7 @@ def self_collision_test(joint_configuration, robot, link_pairs, client_id=0):
         return False
 
 
-def robot_body_collision_test(joint_configuration, robot, object_body_id, client_id=0):
+def robot_body_collision_test(joint_configuration, robot, object_body_id, client_id=0, max_distance=0.025):
     """
     Tests whether a given joint configuration will result in collision with an object. 
 
@@ -176,7 +176,7 @@ def robot_body_collision_test(joint_configuration, robot, object_body_id, client
         joint_configuration (list): The joint configuration to test for self-collision
         robot (int): PyBullet body ID.
         # link_pairs: 2D pairs of pybullet body links, in this case the pairs of potential in-self-collision pairs. 
-        cliend_id (int): the physics server client ID.
+        client_id (int): the physics server client ID.
     Returns:
         bool: True if no self-collision, else False.
     """
@@ -184,7 +184,7 @@ def robot_body_collision_test(joint_configuration, robot, object_body_id, client
      # Set new configuration and get link states
     for i, idx in enumerate(robot._arm_dof_indices):
         p.resetJointState(robot._simulator_id, idx, targetValue=joint_configuration[i], targetVelocity=0, physicsClientId=client_id)
-    if len(get_closest_points(client_id=client_id, body1=robot_id, body2=object_body_id, max_distance=0.)) == 0:
+    if len(get_closest_points(client_id=client_id, body1=robot_id, body2=object_body_id, max_distance=max_distance)) == 0:
         return True
     else:
         return False
