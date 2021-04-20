@@ -131,14 +131,14 @@ class SawyerSimContext(AbstractSimContext):
         excluded_pairs = [(get_joint_info_by_name(sawyer_id, 'right_l6').idx,
                            get_joint_info_by_name(sawyer_id, 'right_connector_plate_base').idx)]
         link_pairs = get_link_pairs(sawyer_id, excluded_pairs=excluded_pairs)
-        return partial(self_collision_test, robot=sawyer_robot, link_pairs=link_pairs)
+        return partial(self_collision_test, robot=sawyer_robot, link_pairs=link_pairs, client_id=self.sim.get_client_id())
     
     def _setup_collision_fn(self, sawyer_robot):
         collision_body_ids = self.sim.get_collision_bodies()
         if len(collision_body_ids) == 0: return None
         collision_fns = []
         for col_body_id in collision_body_ids:
-            collision_fns.append(partial(robot_body_collision_test, robot=sawyer_robot, object_body_id=col_body_id))
+            collision_fns.append(partial(robot_body_collision_test, robot=sawyer_robot, object_body_id=col_body_id, client_id=self.sim.get_client_id()))
         return partial(multi_collision_test, robot_object_collision_fns=collision_fns)
 
 
@@ -261,14 +261,14 @@ class SawyerCPRMSimContext(AbstractSimContext):
         excluded_pairs = [(get_joint_info_by_name(sawyer_id, 'right_l6').idx,
                            get_joint_info_by_name(sawyer_id, 'right_connector_plate_base').idx)]
         link_pairs = get_link_pairs(sawyer_id, excluded_pairs=excluded_pairs)
-        return partial(self_collision_test, robot=sawyer_robot, link_pairs=link_pairs)
+        return partial(self_collision_test, robot=sawyer_robot, link_pairs=link_pairs, client_id=self.sim.get_client_id())
     
     def _setup_collision_fn(self, sawyer_robot):
         collision_body_ids = self.sim.get_collision_bodies()
         if len(collision_body_ids) == 0: return None
         collision_fns = []
         for col_body_id in collision_body_ids:
-            collision_fns.append(partial(robot_body_collision_test, robot=sawyer_robot, object_body_id=col_body_id))
+            collision_fns.append(partial(robot_body_collision_test, robot=sawyer_robot, object_body_id=col_body_id, client_id=self.sim.get_client_id()))
         return partial(multi_collision_test, robot_object_collision_fns=collision_fns)
 
 
