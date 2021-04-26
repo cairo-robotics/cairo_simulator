@@ -536,11 +536,14 @@ class CPRM():
             for named_tuple in evaluated_name_pairs:
                 connection = results.get(named_tuple, None)
                 if connection is not None:
-                    for point in connection['points']:
-                        self._add_vertex(self.graph, point)
-                    for edge in connection['edges']:
-                        self._add_edge(
-                            self.graph, edge[0], edge[1], self._distance(edge[0], edge[1]))
+                    # TODO: Should this be necessary?
+                    valid = subdivision_evaluate(self.svc.validate, connection['points'])
+                    if valid:
+                        for point in connection['points']:
+                            self._add_vertex(self.graph, point)
+                        for edge in connection['edges']:
+                            self._add_edge(
+                                self.graph, edge[0], edge[1], self._distance(edge[0], edge[1]))
 
     def _cbirrt2_connect(self, q_near, q_target):
         centroid = (np.array(q_near) + np.array(q_target)) / 2
