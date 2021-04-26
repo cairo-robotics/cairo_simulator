@@ -314,7 +314,7 @@ class CBiRRT2():
             print(e)
     
     def _val2str(self, value):
-        return str(["{:.4f}".format(val) for val in value])
+        return str(["{:.8f}".format(val) for val in value])
     
     def _distance(self, q1, q2):
         return np.linalg.norm(np.array(q1) - np.array(q2))
