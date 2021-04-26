@@ -10,20 +10,16 @@ import numpy as np
 import igraph as ig
 
 from cairo_simulator.core.sim_context import SawyerCPRMSimContext
-
+from cairo_simulator.core.simulator import SimObject
+from cairo_simulator.core.primitives import create_box
 from cairo_simulator.core.utils import ASSETS_PATH
+
 from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.local.interpolation import parametric_lerp
 from cairo_planning.local.curve import JointTrajectoryCurve
 from cairo_planning.planners import CPRM
-from cairo_planning.sampling.samplers import UniformSampler, HyperballSampler
+from cairo_planning.sampling.samplers import HyperballSampler
 from cairo_planning.geometric.state_space import SawyerTSRConstrainedSpace, SawyerConfigurationSpace
-from cairo_planning.geometric.distribution import KernelDensityDistribution
-from cairo_planning.sampling.samplers import DistributionSampler
-from cairo_planning.geometric.transformation import xyzrpy2trans, bounds_matrix, quat2rpy
-from cairo_planning.geometric.tsr import TSR
-from cairo_planning.geometric.utils import geodesic_distance, wrap_to_interval
-
 
 def main():
 
@@ -46,13 +42,13 @@ def main():
             "model_file_or_sim_id": "plane.urdf",
             "position": [0, 0, 0]
         },
-        {
-            "object_name": "Table",
-            "model_file_or_sim_id": ASSETS_PATH + 'table.sdf',
-            "position": [.6, -.8, 1.0],
-            "orientation":  [0, 0, 1.5708],
-            "fixed_base": 1
-        }
+        # {
+        #     "object_name": "Table",
+        #     "model_file_or_sim_id": ASSETS_PATH + 'table.sdf',
+        #     "position": [.6, -.8, 1.0],
+        #     "orientation":  [0, 0, 1.5708],
+        #     "fixed_base": 1
+        # }
     ]
 
     config["tsr"] = {
@@ -67,9 +63,10 @@ def main():
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
     planning_space = sim_context.get_state_space()
-    svc = sim_context.get_state_validity()
     sawyer_robot = sim_context.get_robot()
     tsr = sim_context.get_tsr()
+    box = SimObject('box', create_box(w=.5, l=.5, h=.5), (.7, -0.25, .45), fixed_base=1)
+    svc = sim_context.get_state_validity()
 
     start = [0, 0, 0, 0, 0, 0, -np.pi/2]
 

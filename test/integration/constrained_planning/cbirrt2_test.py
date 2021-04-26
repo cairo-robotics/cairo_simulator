@@ -9,8 +9,10 @@ if os.environ.get('ROS_DISTRO'):
 import numpy as np
 
 from cairo_simulator.core.sim_context import SawyerSimContext
-
+from cairo_simulator.core.simulator import SimObject
+from cairo_simulator.core.primitives import create_box
 from cairo_simulator.core.utils import ASSETS_PATH
+
 from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.local.interpolation import parametric_lerp
 from cairo_planning.local.curve import JointTrajectoryCurve
@@ -44,22 +46,24 @@ def main():
             "model_file_or_sim_id": "plane.urdf",
             "position": [0, 0, 0]
         },
-        {
-            "object_name": "Table",
-            "model_file_or_sim_id": ASSETS_PATH + 'table.sdf',
-            "position": [.8, -.6, .6],
-            "orientation":  [0, 0, 1.5708],
-            "fixed_base": 1
-        }
+        # {
+        #     "object_name": "Table",
+        #     "model_file_or_sim_id": ASSETS_PATH + 'table.sdf',
+        #     "position": [.8, -.6, .6],
+        #     "orientation":  [0, 0, 1.5708],
+        #     "fixed_base": 1
+        # }
     ]
     sim_context = SawyerSimContext(config)
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
     _ = sim_context.get_state_space()
-    svc = sim_context.get_state_validity()
     sawyer_robot = sim_context.get_robot()
     _ = sawyer_robot.get_simulator_id()
     _ = sim_context.get_sim_objects(['Ground'])[0]
+    box = SimObject('box', create_box(w=.5, l=.5, h=.5), (.7, -0.25, .45), fixed_base=1)
+
+    svc = sim_context.get_state_validity()
 
 
     start = [0, 0, 0, 0, 0, 0, -np.pi/2]
@@ -89,7 +93,7 @@ def main():
         # LazyPRM #
         #######
         # Use parametric linear interpolation with 5 steps between points.
-        interp = partial(parametric_lerp, steps=20)
+        interp = partial(parametric_lerp, steps=10)
         # See params for PRM specific parameters
         cbirrt = CBiRRT2(sawyer_robot, planning_space, svc, interp, params={'q_step': .48, 'e_step': .25})
         logger.info("Planning....")
@@ -106,7 +110,7 @@ def main():
     path = [np.array(p) for p in path]
     # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
     jtc = JointTrajectoryCurve()
-    traj = jtc.generate_trajectory(path, move_time=10)
+    traj = jtc.generate_trajectory(path, move_time=6)
     sawyer_robot.execute_trajectory(traj)
     try:
         while True:
