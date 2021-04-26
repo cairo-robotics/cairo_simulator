@@ -438,7 +438,7 @@ class LazyCPRM():
             path = path + seg
         return path
     
-     def get_lazy_path(self):
+    def get_lazy_path(self):
 
         success = False
         # The successful path we will build by iteratively moving through the best current path and redirecting it as needed according
@@ -467,7 +467,7 @@ class LazyCPRM():
                             'validity'] = True
                     else:
                         # if the point is invalid, then we remove it and associated edges from the graph
-                         self.graph.delete_vertices(point_id)
+                        self.graph.delete_vertices(point_id)
                         invalid_node = True
                 if invalid_node:  # if there was an invalid node, we find a new path and keep the loop going.
                     current_best_plan = self._get_best_path(
