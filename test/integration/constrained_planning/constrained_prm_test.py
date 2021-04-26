@@ -71,7 +71,7 @@ def main():
     sawyer_robot = sim_context.get_robot()
     tsr = sim_context.get_tsr()
 
-    start = [0, 0, 0, 0, 0, 0, 0]
+    start = [0, 0, 0, 0, 0, 0, -np.pi/2]
 
     goal = [-1.9622245072067646, 0.8439858364277937, 1.3628459180018329, -
             0.2383928041974519, -2.7327884695211555, -2.2177502341009134, -0.08992133311928363]
@@ -93,11 +93,14 @@ def main():
         interp = partial(parametric_lerp, steps=10)
         # See params for PRM specific parameters robot, tsr, state_space, state_validity_checker, interpolation_fn, params
         prm = CPRM(SawyerCPRMSimContext, config, sawyer_robot, tsr, planning_space, tree_state_space, svc, interp, params={
-            'n_samples': 500, 'k': 6, 'planning_attempts': 5, 'ball_radius': 2.0}, tree_params={'iters': 50, 'q_step': .5})
+            'n_samples': 1200, 'k': 6, 'planning_attempts': 5, 'ball_radius': 2.0}, tree_params={'iters': 50, 'q_step': .5})
         logger.info("Planning....")
         plan = prm.plan(np.array(start), np.array(goal))
         # get_path() reuses the interp function to get the path between vertices of a successful plan
-        path = prm.get_path(plan)
+        if plan is not None:
+            path = prm.get_path(plan)
+        else:
+            path = []
     if len(path) == 0:
         visual_style = {}
         visual_style["vertex_color"] = ["blue" if v['name'] in [
@@ -112,7 +115,7 @@ def main():
     path = [np.array(p) for p in path]
     # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
     jtc = JointTrajectoryCurve()
-    traj = jtc.generate_trajectory(path, move_time=20)
+    traj = jtc.generate_trajectory(path, move_time=5)
     sawyer_robot.execute_trajectory(traj)
     try:
         while True:
