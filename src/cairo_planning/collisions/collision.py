@@ -76,9 +76,10 @@ class DisabledCollisionsContext():
         """
         Disables all collisions between simobjects and robots.
         """
-        for sim_obj in self.simulator._objects.keys():
-            if sim_obj not in self.excluded_bodies:
-                p.setCollisionFilterGroupMask(sim_obj, 0, 0, 0)
+        for robot in self.simulator._robots.keys():
+            for sim_obj in self.simulator._objects.keys():
+                if sim_obj not in self.excluded_bodies:
+                    p.setCollisionFilterGroupMask(robot, sim_obj, 0, 0)
 
     def _enable_robot_collisions(self):
         """
@@ -93,8 +94,10 @@ class DisabledCollisionsContext():
         """
         Enables all collisions between simobjects and robots.
         """
-        for sim_obj in self.simulator._objects.keys():
-            p.setCollisionFilterGroupMask(sim_obj, 0, 0, 1)
+        for robot in self.simulator._robots.keys():
+            for sim_obj in self.simulator._objects.keys():
+                if sim_obj not in self.excluded_bodies:
+                    p.setCollisionFilterGroupMask(robot, sim_obj, 0, 1)
 
 
 def get_closest_points(client_id, body1, body2, link1=None, link2=None, max_distance=0.):
@@ -169,9 +172,8 @@ def robot_body_collision_test(joint_configuration, robot, object_body_id, client
     """
     Tests whether a given joint configuration will result in collision with an object. 
 
-    It sets the robot state to the test configuration. Every link pair of the robot is checked for collision.
-    If every link pair is collision free, the function returns true, else if there is a single collision, the function returns false. Assumes the first element is a robot link and second element is a link on the object.
-
+    It sets the robot state to the test configuration. There are no links test, we're testing whole body ids.
+    
     Args:
         joint_configuration (list): The joint configuration to test for self-collision
         robot (int): PyBullet body ID.
