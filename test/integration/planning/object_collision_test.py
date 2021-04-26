@@ -57,7 +57,7 @@ if __name__ == "__main__":
             "orientation":  [0, 0, 1.5708]
         }
     ]
-    sim_context = SawyerSimContext(config, setup=True, planning_context=None)
+    sim_context = SawyerSimContext(config, setup=True)
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
     sawyer_robot = sim_context.get_robot()
