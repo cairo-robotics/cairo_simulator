@@ -103,7 +103,7 @@ class SawyerSimContext(AbstractSimContext):
                             for config in sim_obj_configs]
         # Turn rendering back on
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
-        self._setup_state_validity(self.sawyer_robot)
+        # self._setup_state_validity(self.sawyer_robot)
         # self._setup_collision_exclusions()
 
     def _setup_state_validity(self, sawyer_robot):
@@ -158,6 +158,7 @@ class SawyerSimContext(AbstractSimContext):
         return self.sawyer_robot
 
     def get_state_validity(self):
+        self._setup_state_validity(self.sawyer_robot)
         return self.svc
 
     def get_state_space(self):
