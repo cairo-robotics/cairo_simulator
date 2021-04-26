@@ -302,7 +302,9 @@ class CBiRRT2():
     def _add_edge(self, tree, q_from, q_to, weight):
         q_from_idx = self._name2idx(tree, self._val2str(q_from))
         q_to_idx = self._name2idx(tree, self._val2str(q_to))
-        if tuple(sorted([q_from_idx, q_to_idx])) not in set([tuple(sorted(edge.tuple)) for edge in tree.es]):
+        if self._val2str(q_from) == self.start_name and self._val2str(q_to) == self.goal_name:
+            tree.add_edge(q_from_idx, q_to_idx, **{'weight': weight})
+        elif tuple(sorted([q_from_idx, q_to_idx])) not in set([tuple(sorted(edge.tuple)) for edge in tree.es]):
             tree.add_edge(q_from_idx, q_to_idx, **{'weight': weight})
 
     def  _name2idx(self, tree, name):
