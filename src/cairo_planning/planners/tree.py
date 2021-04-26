@@ -44,7 +44,7 @@ class CBiRRT2():
        # print("Initializing trees...")
         self._initialize_trees(start_q, goal_q)
         #print("Running Constrained Bidirectional RRT...")
-        self.tree = self.cbirrt(self.robot, tsr)
+        self.tree = self.cbirrt(tsr)
         if self.tree is not None:
             #print("Extracting path through graph...")
             graph_path = self._extract_graph_path()
@@ -57,7 +57,7 @@ class CBiRRT2():
         # #self._smooth(path)
         # return plan
 
-    def cbirrt(self, robot, tsr):
+    def cbirrt(self, tsr):
         iters=0
         continue_to_plan = True
         tree_swp = self._tree_swap_gen()
@@ -147,7 +147,7 @@ class CBiRRT2():
         return path
 
     def _join_trees(self, a_tree, qa_reach, b_tree, qb_reach):
-        
+
         tree = ig.Graph(directed=True) # a new directed graph
         if a_tree['name'] == 'forwards':
             F = a_tree.copy()
@@ -208,20 +208,19 @@ class CBiRRT2():
         # Attach qf to parents/in neighbors of qb, since those parents should be parents to qf
         # Since we built the B graph backwards, we get B's successors
         b_parents = B.successors(self._name2idx(B, self._val2str(qb)))
-
-        # collect the edges and weights of qb to parents in B. We collect by names 
+        # collect the edges and weights of qb to parents in B. We collect by name.
         connection_edges_by_name = []
         connection_edge_weights = []
         qb_name = self._val2str(qb)
         qb_idx = self._name2idx(B, qb_name)
-        qf_tree_name = self._val2str(qf)
+        qf_name = self._val2str(qf)
         for parent in b_parents:
-            connection_edges_by_name.append((qf_tree_name, B.vs[parent]['name']))
+            connection_edges_by_name.append((qf_name, B.vs[parent]['name']))
             connection_edge_weights.append(B.es[B.get_eid(qb_idx,  parent)]['weight'])
         B.delete_vertices(qb_idx)
-    
+
         if len(B.vs) > 0:
-            # add all the verticies and edges of the backwards tree ot the undirected graph
+            # add all the verticies and edges of the backwards tree to the directed graph
             curr_names = tree.vs['name'] # we have to snag the current names and values before adding vertices
             curr_values = tree.vs['value']
             tree.add_vertices(len(B.vs))
