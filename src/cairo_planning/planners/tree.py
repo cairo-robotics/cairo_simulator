@@ -239,15 +239,16 @@ class CBiRRT2():
                 else:
                     tree.add_edges(B_tree_edges)
                     tree.es['weight'] = B.es['weight'] 
-
-        # now add back in the edges from qf to parents of qb in the undirected grepah/tree
+        # now add back in the edges from qf to parents of qb in the directed graph/tree
         connection_edges = []
         for edge_name_pair in connection_edges_by_name:
             # get the idx in the tree
             connection_edges.append((self._name2idx(tree, edge_name_pair[0]), self._name2idx(tree, edge_name_pair[1])))
-        curr_edge_weights = tree.es['weight'] 
-        tree.add_edges(connection_edges)
-        tree.es['weight'] = curr_edge_weights + connection_edge_weights
+        
+        if 'weight' in tree.es.attributes():
+            curr_edge_weights = tree.es['weight']
+            tree.add_edges(connection_edges)
+            tree.es['weight'] = curr_edge_weights + connection_edge_weights
        
         # visual_style = {}
         # visual_style["vertex_color"] =  ["blue" if v['name'] in [self.start_name, self.goal_name] else "white" for v in tree.vs]
