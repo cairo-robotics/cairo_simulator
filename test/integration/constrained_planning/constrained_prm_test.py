@@ -10,8 +10,6 @@ import numpy as np
 import igraph as ig
 
 from cairo_simulator.core.sim_context import SawyerCPRMSimContext
-from cairo_simulator.core.simulator import SimObject
-from cairo_simulator.core.primitives import create_box
 from cairo_simulator.core.utils import ASSETS_PATH
 
 from cairo_planning.collisions import DisabledCollisionsContext
@@ -42,13 +40,13 @@ def main():
             "model_file_or_sim_id": "plane.urdf",
             "position": [0, 0, 0]
         },
-        # {
-        #     "object_name": "Table",
-        #     "model_file_or_sim_id": ASSETS_PATH + 'table.sdf',
-        #     "position": [.6, -.8, 1.0],
-        #     "orientation":  [0, 0, 1.5708],
-        #     "fixed_base": 1
-        # }
+        {
+            "object_name": "sphere",
+            "model_file_or_sim_id": 'sphere2.urdf',
+            "position": [1.0, -.3, .6],
+            "orientation":  [0, 0, 1.5708],
+            "fixed_base": 1    
+        }
     ]
 
     config["tsr"] = {
@@ -65,7 +63,6 @@ def main():
     planning_space = sim_context.get_state_space()
     sawyer_robot = sim_context.get_robot()
     tsr = sim_context.get_tsr()
-    box = SimObject('box', create_box(w=.5, l=.5, h=.5), (.7, -0.25, .45), fixed_base=1)
     svc = sim_context.get_state_validity()
 
     start = [0, 0, 0, 0, 0, 0, -np.pi/2]
@@ -90,7 +87,7 @@ def main():
         interp = partial(parametric_lerp, steps=10)
         # See params for PRM specific parameters robot, tsr, state_space, state_validity_checker, interpolation_fn, params
         prm = CPRM(SawyerCPRMSimContext, config, sawyer_robot, tsr, planning_space, tree_state_space, svc, interp, params={
-            'n_samples': 1200, 'k': 6, 'planning_attempts': 5, 'ball_radius': 2.0}, tree_params={'iters': 50, 'q_step': .5})
+            'n_samples': 600, 'k': 8, 'planning_attempts': 5, 'ball_radius': 2.0}, tree_params={'iters': 50, 'q_step': .5})
         logger.info("Planning....")
         plan = prm.plan(np.array(start), np.array(goal))
         # get_path() reuses the interp function to get the path between vertices of a successful plan

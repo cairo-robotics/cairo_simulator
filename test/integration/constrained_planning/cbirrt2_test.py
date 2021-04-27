@@ -25,6 +25,8 @@ from cairo_planning.geometric.transformation import xyzrpy2trans, bounds_matrix,
 from cairo_planning.geometric.tsr import TSR
 from cairo_planning.geometric.utils import geodesic_distance, wrap_to_interval
 
+
+
 def main():
 
     limits = [['right_j0', (-3.0503, 3.0503)],
@@ -46,6 +48,13 @@ def main():
             "model_file_or_sim_id": "plane.urdf",
             "position": [0, 0, 0]
         },
+        {
+            "object_name": "sphere",
+            "model_file_or_sim_id": 'sphere2.urdf',
+            "position": [1.0, -.3, .6],
+            "orientation":  [0, 0, 1.5708],
+            "fixed_base": 1    
+        }
         # {
         #     "object_name": "Table",
         #     "model_file_or_sim_id": ASSETS_PATH + 'table.sdf',
@@ -61,7 +70,7 @@ def main():
     sawyer_robot = sim_context.get_robot()
     _ = sawyer_robot.get_simulator_id()
     _ = sim_context.get_sim_objects(['Ground'])[0]
-    box = SimObject('box', create_box(w=.5, l=.5, h=.5), (.7, -0.25, .45), fixed_base=1)
+    # box = SimObject('box', create_box(w=.5, l=.5, h=.5), (.7, -0.25, .45), fixed_base=1)
 
     svc = sim_context.get_state_validity()
 
@@ -110,7 +119,7 @@ def main():
     path = [np.array(p) for p in path]
     # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
     jtc = JointTrajectoryCurve()
-    traj = jtc.generate_trajectory(path, move_time=6)
+    traj = jtc.generate_trajectory(path, move_time=10)
     sawyer_robot.execute_trajectory(traj)
     try:
         while True:
