@@ -17,7 +17,7 @@ from cairo_simulator.core.link import get_link_pairs, get_between_body_link_pair
 from cairo_simulator.core.log import Logger
 from cairo_simulator.devices.manipulators import Sawyer
 from cairo_simulator.core.simulator import Simulator, SimObject
-
+from cairo_simulator.core.primitives import PrimitiveBuilder
 
 if os.environ.get('ROS_DISTRO'):
     import rospy
@@ -88,6 +88,8 @@ class SawyerSimContext(AbstractSimContext):
              "position": [0, 0, 0]
              }])
 
+        primitive_configs = self.config.get("primitives", [])
+
         if os.environ.get('ROS_DISTRO'):
             rospy.init_node("CAIRO_Sawyer_Simulator")
             use_ros = True
@@ -101,6 +103,8 @@ class SawyerSimContext(AbstractSimContext):
         self.sawyer_robot = Sawyer(**sawyer_config)
         self.sim_objects = [SimObject(**config)
                             for config in sim_obj_configs]
+        primitive_builder = PrimitiveBuilder()
+        self.sim_ojebcts = self.sim_objects + [primitive_builder.build(config) for config in primitive_configs]
         # Turn rendering back on
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
         # self._setup_state_validity(self.sawyer_robot)
@@ -202,6 +206,8 @@ class SawyerCPRMSimContext(AbstractSimContext):
              "position": [0, 0, 0]
              }])
             
+        primitive_configs = self.config.get("primitives", [])
+            
         tsr_config = self.config.get("tsr", {
             'degrees': False,
             "T0_w": [.7, 0, 0, 0, 0, 0],
@@ -209,6 +215,7 @@ class SawyerCPRMSimContext(AbstractSimContext):
             "Bw": [[[0, 100], [-100, 100], [-100, .3]],  # allow some tolerance in the z and y and only positve in x
                   [[-.07, .07], [-.07, .07], [-.07, .07]]]
         })
+        
 
         if os.environ.get('ROS_DISTRO'):
             rospy.init_node("CAIRO_Sawyer_Simulator")
@@ -223,6 +230,8 @@ class SawyerCPRMSimContext(AbstractSimContext):
         self.sawyer_robot = Sawyer(**sawyer_config)
         self.sim_objects = [SimObject(**config)
                             for config in sim_obj_configs]
+        primitive_builder = PrimitiveBuilder()
+        self.sim_ojebcts = self.sim_objects + [primitive_builder.build(config) for config in primitive_configs]
         # Turn rendering back on
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
         self._setup_state_validity(self.sawyer_robot)

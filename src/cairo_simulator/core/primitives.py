@@ -4,6 +4,8 @@ from scipy.spatial.transform import Rotation as R
 
 from collections import namedtuple
 
+from cairo_simulator.core.simulator import SimObject
+
 RGBA = namedtuple('RGBA', ['red', 'green', 'blue', 'alpha'])
 BLUE = RGBA(0, 0, 1, 1)
 
@@ -35,6 +37,26 @@ def get_box_geometry(width, length, height):
     return {
         'shapeType': p.GEOM_BOX,
         'halfExtents': [width/2., length/2., height/2.]
+    }
+
+def get_cylinder_geometry(radius, height):
+    return {
+        'shapeType': p.GEOM_CYLINDER,
+        'radius': radius,
+        'length': height,
+    }
+
+def get_sphere_geometry(radius):
+    return {
+        'shapeType': p.GEOM_SPHERE,
+        'radius': radius,
+    }
+
+def get_capsule_geometry(radius, height):
+    return {
+        'shapeType': p.GEOM_CAPSULE,
+        'radius': radius,
+        'length': height,
     }
 
 def create_collision_shape(geometry, pose=unit_pose(), client=0):
@@ -82,3 +104,33 @@ def create_shape(geometry, pose=unit_pose(), collision=True, **kwargs):
 def create_box(w, l, h, mass=0, color=BLUE, **kwargs):
     collision_id, visual_id = create_shape(get_box_geometry(w, l, h), color=color, **kwargs)
     return create_body(collision_id, visual_id, mass=mass)
+
+def create_cylinder(radius, height, mass=0, color=BLUE, **kwargs):
+    collision_id, visual_id = create_shape(get_cylinder_geometry(radius, height), color=color, **kwargs)
+    return create_body(collision_id, visual_id, mass=mass)
+
+def create_capsule(radius, height, mass=0, color=BLUE, **kwargs):
+    collision_id, visual_id = create_shape(get_capsule_geometry(radius, height), color=color, **kwargs)
+    return create_body(collision_id, visual_id, mass=mass)
+
+def create_sphere(radius, mass=0, color=BLUE, **kwargs):
+    collision_id, visual_id = create_shape(get_sphere_geometry(radius), color=color, **kwargs)
+    return create_body(collision_id, visual_id, mass=mass)
+
+class PrimitiveBuilder():
+
+    def __init__(self):
+
+        self.primitive_type_fn_map = {
+            'box': create_box,
+            'cylinder': create_cylinder,
+            'capsule': create_capsule,
+            'sphere': create_sphere
+        }
+    
+    def build(self, configs):
+        primitive_fn = self.primitive_type_fn_map[configs['type']]
+        body_id = primitive_fn(**configs['primitive_configs'])
+        return SimObject(**configs['sim_object_configs'], model_file_or_sim_id=body_id)
+
+    
