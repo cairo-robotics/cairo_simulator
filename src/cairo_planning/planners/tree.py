@@ -133,7 +133,10 @@ class CBiRRT2():
             return None
 
     def _extract_graph_path(self,):
-        return self.tree.get_shortest_paths(self._name2idx(self.tree, self.start_name), self._name2idx(self.tree, self.goal_name), weights='weight', mode='OUT')[0]
+        if 'weight' in self.tree.es.attributes():
+            return self.tree.get_shortest_paths(self._name2idx(self.tree, self.start_name), self._name2idx(self.tree, self.goal_name), weights='weight', mode='OUT')[0]
+        else:
+            return self.tree.get_shortest_paths(self._name2idx(self.tree, self.start_name), self._name2idx(self.tree, self.goal_name), mode='OUT')[0]
 
     def get_path(self, plan):
         points = [self.tree.vs[idx]['value'] for idx in plan]
