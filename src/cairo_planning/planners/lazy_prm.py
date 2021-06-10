@@ -28,6 +28,7 @@ class LazyPRM():
         self.k = params.get('k', 5)
         self.attempts = params.get('planning_attempts', 5)
         self.ball_radius = params.get('ball_radius', .55)
+        self.samples = []
         print("N: {}, k: {}, r: {}".format(
             self.n_samples, self.k, self.ball_radius))
 
@@ -35,8 +36,11 @@ class LazyPRM():
         # Initial sampling of roadmap and NN data structure.
         print("Initializing roadmap...")
         self._init_roadmap(q_start, q_goal)
-        print("Generating valid random samples...")
-        self.samples = self._generate_samples()
+        if len(self.samples) > 0:
+            print("Using provided samples...")
+        else:
+            print("Generating valid random samples...")
+            self.samples = self._generate_samples()
         # Create NN datastructure
         print("Creating NN datastructure...")
         self.nn = NearestNeighbors(X=np.array(
