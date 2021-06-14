@@ -181,7 +181,7 @@ class LazyPRM():
                         current_best_plan = self._get_best_path(
                             self.start_name, self.goal_name)
                     else:
-                        self._remove_edge(from_id, to_id)
+                        self._remove_edge(self.graph, from_id, to_id)
                         current_best_plan = self._get_best_path(
                             self.start_name, self.goal_name)
                         successful_vertex_sequence = []
@@ -403,6 +403,7 @@ class LazyCPRM():
         self.ball_radius = params.get('ball_radius', .55)
         self.tree_params = tree_params
         self.graph = ig.Graph()
+        self.samples = []
         print("PRM Params: N: {}, k: {}, r: {}".format(
             self.n_samples, self.k, self.ball_radius))
 
@@ -411,22 +412,26 @@ class LazyCPRM():
         print("Initializing roadmap...")
         self._init_roadmap(q_start, q_goal)
         print("Generating valid random samples...")
-        if self.n_samples <= 100:
-            samples = self._generate_samples()
+        if len(self.samples) > 0:
+            print("Using provided samples...")
         else:
-            samples = self._generate_samples_parallel()
+            print("Generating valid random samples...")
+            if self.n_samples <= 100:
+                self.samples = self._generate_samples()
+            else:
+                self.samples = self._generate_samples_parallel()
+        print("Attaching start and end to graph...")
+        self._attach_start_and_end()
         # Create NN datastructure
         print("Creating NN datastructure...")
         self.nn = NearestNeighbors(X=np.array(
-            samples), model_kwargs={"leaf_size": 100})
+            self.samples), model_kwargs={"leaf_size": 100})
         # Generate NN connectivity.
         print("Generating nearest neighbor connectivity...")
-        connections = self._generate_connections(samples=samples)
+        connections = self._generate_connections(samples=self.samples)
         # Build the graph structure...
         print("Building graph")
-        self._build_graph(samples, connections)
-        print("Attaching start and end to graph...")
-        self._attach_start_and_end()
+        self._build_graph(self.samples, connections)
         print("Finding feasible best path in graph if available...")
         vertex_sequence, path = self.get_lazy_path()
         print(vertex_sequence)
@@ -506,6 +511,7 @@ class LazyCPRM():
                     success, segment = self._cbirrt2_connect(
                         np.array(from_value), np.array(to_value))
                     # perform segment evaluation for state validity etc
+                    valid = False
                     if success and self.graph.es[self.graph.get_eid(self.graph.vs['id'].index(from_id), self.graph.vs['id'].index(to_id))].attributes().get('validity', False):
                         valid = True
                     elif success:
@@ -524,7 +530,7 @@ class LazyCPRM():
                         current_best_plan = self._get_best_path(
                             self.start_name, self.goal_name)
                     else:
-                        self._remove_edge(from_id, to_id)
+                        self._remove_edge(self.graph, from_id, to_id)
                         current_best_plan = self._get_best_path(
                             self.start_name, self.goal_name)
                         successful_vertex_sequence = []
@@ -572,25 +578,8 @@ class LazyCPRM():
     def _attach_start_and_end(self):
         start = self.graph.vs[self._name2idx(self.graph, self.start_name)]['value']
         end = self.graph.vs[self._name2idx(self.graph, self.goal_name)]['value']
-        start_added = False
-        end_added = False
-        for q_near in self._neighbors(start, k_override=15, within_ball=False):
-            if self._val2name(q_near) in self.graph.vs['name']:
-                if self._val2idx(self.graph, q_near) != 0:
-                    successful, points = self._cbirrt2_connect(start, q_near)
-                    if successful:
-                        self._add_edge(self.graph, start, q_near, self._weight(points))
-                        start_added = True
-        for q_near in self._neighbors(end, k_override=15, within_ball=False):
-            if self._val2name(q_near) in self.graph.vs['name']:
-                if self._val2idx(self.graph, q_near) != 1:
-                    successful, points = self._cbirrt2_connect(q_near, end)
-                    if successful:
-                        self._add_edge(self.graph, q_near, end, self._weight(points))
-                        end_added = True
-        if not start_added or not end_added:
-            raise Exception("Planning failure! Could not add either start {} and end {} successfully to graph.".format(
-                {start_added}, {end_added}))
+        self.samples = self.samples + [start, end]
+        
 
     def _generate_samples(self):
         # sampling_times = [0]
@@ -754,8 +743,8 @@ class LazyCPRM():
     def _remove_edge(self, graph, q1, q2):
         start_val2name = self._val2name(self.graph.vs[self._name2idx(graph, self.start_name)]['value'])
         goal_val2name = self._val2name(self.graph.vs[self._name2idx(graph, self.goal_name)]['value'])
-        graph_idx1 = self.graph.vs['id'].index(vid1)
-        graph_idx2 = self.graph.vs['id'].index(vid2)
+        graph_idx1 = self.graph.vs['id'].index(q1)
+        graph_idx2 = self.graph.vs['id'].index(q2)
         self.graph.delete_edges(self.graph.get_eid(
             graph_idx1, graph_idx2, directed=False, error=True))
 
