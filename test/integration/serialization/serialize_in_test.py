@@ -45,7 +45,7 @@ def main():
         prm = LazyPRM(state_space, svc, interp, params={
                   'n_samples': 4000, 'k': 8, 'ball_radius': 2.5})
         
-        prm.samples = np.array(prm_data["samples"])
+        prm.samples = prm_data["samples"]
 
         logger.info("Planning....")
         plan = prm.plan(np.array([0, 0, 0, 0, 0, 0, 0]), np.array([1.5262755737449423, -0.1698540226273928,
