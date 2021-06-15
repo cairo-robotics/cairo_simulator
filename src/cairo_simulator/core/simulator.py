@@ -438,7 +438,8 @@ class SimObject():
             self.logger = Simulator.get_logger()
             if isinstance(model_file_or_sim_id, int):
                 self._simulator_id = model_file_or_sim_id
-                self.logger.info()
+                self.logger.info("Creating Cairo sim SimObject for PyBullet body ID {}".format(model_file_or_sim_id))
+                self.move_to_pose(position, orientation)
             else:
                 self._simulator_id = self._load_model_file_into_sim(
                     model_file_or_sim_id, fixed_base)

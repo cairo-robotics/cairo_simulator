@@ -172,9 +172,9 @@ class SawyerConfigurationSpace():
         """
         return [limits[1] for limits in self.limits if limits[0] in joint_names]
 
-    def sample(self, joint_names=None):
+    def sample(self, joint_names=None, **kwargs):
         if joint_names == None:
             joint_names = ['right_j0', 'right_j1', 'right_j2',
                            'right_j3', 'right_j4', 'right_j5', 'right_j6']
         selected_limits = self._get_limits(joint_names)
-        return self.sampler.sample(selected_limits)
+        return self.sampler.sample(selected_limits, **kwargs)

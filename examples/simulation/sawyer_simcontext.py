@@ -8,7 +8,7 @@ if os.environ.get('ROS_DISTRO'):
 import pybullet as p
 
 from cairo_simulator.core.utils import ASSETS_PATH
-from cairo_simulator.core.context import SawyerSimContext
+from cairo_simulator.core.sim_context import SawyerSimContext
 
 
 def main():

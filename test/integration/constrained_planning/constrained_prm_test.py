@@ -15,9 +15,9 @@ from cairo_simulator.core.utils import ASSETS_PATH
 from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.local.interpolation import parametric_lerp
 from cairo_planning.local.curve import JointTrajectoryCurve
-from cairo_planning.planners import LazyCPRM
+from cairo_planning.planners import CPRM
 from cairo_planning.sampling.samplers import HyperballSampler
-from cairo_planning.geometric.state_space import SawyerConfigurationSpace
+from cairo_planning.geometric.state_space import SawyerTSRConstrainedSpace, SawyerConfigurationSpace
 
 def main():
 
@@ -78,7 +78,7 @@ def main():
 
     with DisabledCollisionsContext(sim, [], []):
         #########################
-        # Lazy Contrained PRM (LazyCPRM) #
+        # Contrained PRM (CPRM) #
         #########################
         # The specific space we sample from is the Hyberball centered at the midpoint between two candidate points. 
         # This is used to bias tree grwoth between two points when using CBiRRT2 as our local planner for a constrained PRM.
@@ -86,17 +86,15 @@ def main():
         # Use parametric linear interpolation with 10 steps between points.
         interp = partial(parametric_lerp, steps=10)
         # See params for PRM specific parameters robot, tsr, state_space, state_validity_checker, interpolation_fn, params
-        prm = LazyCPRM(SawyerCPRMSimContext, config, sawyer_robot, tsr, planning_space, tree_state_space, svc, interp, params={
-            'n_samples': 2000, 'k': 8, 'planning_attempts': 5, 'ball_radius': 2.0}, tree_params={'iters': 50, 'q_step': .5})
+        prm = CPRM(SawyerCPRMSimContext, config, sawyer_robot, tsr, planning_space, tree_state_space, svc, interp, params={
+            'n_samples': 600, 'k': 8, 'planning_attempts': 5, 'ball_radius': 2.0}, tree_params={'iters': 50, 'q_step': .5})
         logger.info("Planning....")
-        path = prm.plan(np.array(start), np.array(goal))
-        # plan = prm.plan(np.array(start), np.array(goal))
-        # # get_path() reuses the interp function to get the path between vertices of a successful plan
-        # if plan is not None:
-        #     path = prm.get_path(plan)
-        # else:
-        #     path = []
-
+        plan = prm.plan(np.array(start), np.array(goal))
+        # get_path() reuses the interp function to get the path between vertices of a successful plan
+        if plan is not None:
+            path = prm.get_path(plan)
+        else:
+            path = []
     if len(path) == 0:
         visual_style = {}
         visual_style["vertex_color"] = ["blue" if v['name'] in [
@@ -111,7 +109,7 @@ def main():
     path = [np.array(p) for p in path]
     # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
     jtc = JointTrajectoryCurve()
-    traj = jtc.generate_trajectory(path, move_time=20)
+    traj = jtc.generate_trajectory(path, move_time=5)
     sawyer_robot.execute_trajectory(traj)
     try:
         while True:

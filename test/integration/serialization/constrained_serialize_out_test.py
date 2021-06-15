@@ -1,7 +1,7 @@
 import os
-import sys
 from functools import partial
 import time
+import sys 
 
 import pybullet as p
 if os.environ.get('ROS_DISTRO'):
@@ -10,7 +10,6 @@ import numpy as np
 import igraph as ig
 
 from cairo_simulator.core.sim_context import SawyerCPRMSimContext
-from cairo_simulator.core.utils import ASSETS_PATH
 
 from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.local.interpolation import parametric_lerp
@@ -19,45 +18,14 @@ from cairo_planning.planners import LazyCPRM
 from cairo_planning.sampling.samplers import HyperballSampler
 from cairo_planning.geometric.state_space import SawyerConfigurationSpace
 
+from cairo_planning.core.serialization import load_PRM
+
 def main():
 
-    limits = [['right_j0', (-3.0503, 3.0503)],
-              ['right_j1', (-3.8095, 2.2736)],
-              ['right_j2', (-3.0426, 3.0426)],
-              ['right_j3', (-3.0439, 3.0439)],
-              ['right_j4', (-2.9761, 2.9761)],
-              ['right_j5', (-2.9761, 2.9761)],
-              ['right_j6', (-4.7124, 4.7124)],
-              ['right_gripper_l_finger_joint', (0.0, 0.020833)],
-              ['right_gripper_r_finger_joint',
-               (-0.020833, 0.0)],
-              ['head_pan', (-5.0952, 0.9064)]]
+    prm_data = load_PRM(os.path.dirname(os.path.abspath(__file__)))
 
-    config = {}
-    config["sim_objects"] = [
-        {
-            "object_name": "Ground",
-            "model_file_or_sim_id": "plane.urdf",
-            "position": [0, 0, 0]
-        },
-        {
-            "object_name": "sphere",
-            "model_file_or_sim_id": 'sphere2.urdf',
-            "position": [1.0, -.3, .6],
-            "orientation":  [0, 0, 1.5708],
-            "fixed_base": 1    
-        }
-    ]
-
-    config["tsr"] = {
-        'degrees': False,
-        "T0_w": [.7, 0, 0, 0, 0, 0],
-        "Tw_e": [-.2, 0, 1.0, np.pi/2, 3*np.pi/2, np.pi/2], # level end-effector pointing away from sawyer's "front"
-        "Bw": [[[0, 100], [-100, 100], [-100, .3]],  # Cannot go above 1.3 m
-              [[-.07, .07], [-.07, .07], [-.07, .07]]]
-    }
-
-    sim_context = SawyerCPRMSimContext(config)
+    config = prm_data["config"]
+    sim_context = SawyerCPRMSimContext(configuration=config)
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
     planning_space = sim_context.get_state_space()
@@ -75,27 +43,23 @@ def main():
     sawyer_robot.move_to_joint_pos(start)
     time.sleep(5)
     # Utilizes RPY convention
-
+ 
     with DisabledCollisionsContext(sim, [], []):
-        #########################
-        # Lazy Contrained PRM (LazyCPRM) #
-        #########################
+        ###########
+        # LazyPRM #
+        ###########
         # The specific space we sample from is the Hyberball centered at the midpoint between two candidate points. 
         # This is used to bias tree grwoth between two points when using CBiRRT2 as our local planner for a constrained PRM.
         tree_state_space = SawyerConfigurationSpace(sampler=HyperballSampler())
         # Use parametric linear interpolation with 10 steps between points.
         interp = partial(parametric_lerp, steps=10)
-        # See params for PRM specific parameters robot, tsr, state_space, state_validity_checker, interpolation_fn, params
+        # See params for PRM specific parameters
         prm = LazyCPRM(SawyerCPRMSimContext, config, sawyer_robot, tsr, planning_space, tree_state_space, svc, interp, params={
-            'n_samples': 2000, 'k': 8, 'planning_attempts': 5, 'ball_radius': 2.0}, tree_params={'iters': 50, 'q_step': .5})
+            'n_samples': 3000, 'k': 8, 'planning_attempts': 5, 'ball_radius': 2.0}, tree_params={'iters': 50, 'q_step': .5})
         logger.info("Planning....")
+        prm.samples = prm_data["samples"]
         path = prm.plan(np.array(start), np.array(goal))
-        # plan = prm.plan(np.array(start), np.array(goal))
-        # # get_path() reuses the interp function to get the path between vertices of a successful plan
-        # if plan is not None:
-        #     path = prm.get_path(plan)
-        # else:
-        #     path = []
+
 
     if len(path) == 0:
         visual_style = {}
@@ -123,3 +87,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
