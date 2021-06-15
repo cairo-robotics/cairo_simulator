@@ -67,6 +67,8 @@ class SawyerSimContext(AbstractSimContext):
             "use_real_time": True,
             "use_gui": True
         })
+        self.config["sim"] = sim_config
+
         if sim_overrides is not None:
             for key, value in sim_overrides.items():
                 sim_config[key] = value
@@ -75,18 +77,21 @@ class SawyerSimContext(AbstractSimContext):
             "handlers": ['logging'],
             "level": "debug"
         })
+        self.config['logger'] = logger_config
 
         sawyer_config = self.config.get("sawyer", {
             "robot_name": "sawyer0",
             "position": [0, 0, 0.9],
             "fixed_base": True
         })
+        self.config["sawyer"] = sawyer_config
 
         sim_obj_configs = self.config.get("sim_objects", [
             {"object_name": "Ground",
              "model_file_or_sim_id": "plane.urdf",
              "position": [0, 0, 0]
              }])
+        self.config["sim_objects"] = sim_obj_configs
 
         primitive_configs = self.config.get("primitives", [])
 
@@ -96,7 +101,10 @@ class SawyerSimContext(AbstractSimContext):
         else:
             use_ros = False
         self.logger = Logger(**logger_config)
-        self.sim = Simulator(logger=self.logger, use_ros=use_ros, **sim_config)
+        if not Simulator.is_instantiated():
+            self.sim = Simulator(logger=self.logger, use_ros=use_ros, **sim_config)
+        else:
+            self.sim = Simulator.get_instance()
         self.logger.info("Simulator {} instantiated with config {}".format(self.sim, sim_config))
         # Disable rendering while models load
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 0)
