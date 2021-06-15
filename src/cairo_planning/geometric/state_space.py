@@ -1,4 +1,9 @@
+import itertools
+import multiprocessing as mp
+from functools import partial
+
 import numpy as np
+
 
 from cairo_planning.sampling.samplers import UniformSampler
 from cairo_planning.constraints.projection import project_config
@@ -104,8 +109,8 @@ class SawyerTSRConstrainedSpace():
 
     def _project(self, sample):
         if self.svc.validate(sample):
-            q_constrained = project_config(self.robot, np.array(
-                sample), np.array(sample), self.TSR, .1, .01)
+            q_constrained = project_config(self.robot, self.TSR, np.array(
+                sample), np.array(sample), epsilon=.1, e_step=.25)
             normalized_q_constrained = []
             if q_constrained is not None:
                 for value in q_constrained:
@@ -118,6 +123,19 @@ class SawyerTSRConstrainedSpace():
             else:
                 return None
 
+
+class ParallelSawyerTSRConstrainedSpace():
+
+    def __init__(self, sampling_fn):
+        self.sampling_fn = sampling_fn
+    
+    
+    def sample(self, n_samples, joint_names=None):
+        with mp.get_context("spawn").Pool(mp.cpu_count()) as p:
+            tasks = [int(n_samples/mp.cpu_count()) for n in range(0, mp.cpu_count())]
+            results = p.map(self.sampling_fn, tasks)
+            samples = list(itertools.chain.from_iterable(results))
+            return samples
 
 
 class SawyerConfigurationSpace():
@@ -154,9 +172,9 @@ class SawyerConfigurationSpace():
         """
         return [limits[1] for limits in self.limits if limits[0] in joint_names]
 
-    def sample(self, joint_names=None):
+    def sample(self, joint_names=None, **kwargs):
         if joint_names == None:
             joint_names = ['right_j0', 'right_j1', 'right_j2',
                            'right_j3', 'right_j4', 'right_j5', 'right_j6']
         selected_limits = self._get_limits(joint_names)
-        return self.sampler.sample(selected_limits)
+        return self.sampler.sample(selected_limits, **kwargs)

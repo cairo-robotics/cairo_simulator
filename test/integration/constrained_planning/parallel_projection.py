@@ -25,7 +25,7 @@ from cairo_planning.geometric.tsr import TSR
 from cairo_planning.geometric.utils import geodesic_distance, wrap_to_interval
 
 
-def parallel_projection_worker(num_samples, sim_context_cls, sim_config):
+def parallel_projection_worker(num_samples, sim_context_cls, sim_config, tsr):
     sim_context = sim_context_cls(sim_config)
     sim = sim_context.get_sim_instance()
     _ = sim_context.get_logger()
@@ -37,25 +37,13 @@ def parallel_projection_worker(num_samples, sim_context_cls, sim_config):
 
     valid_samples = []
 
-    # Utilizes RPY convention
-    T0_w = xyzrpy2trans([.7, 0, 0, 0, 0, 0], degrees=False)
-
-    # Utilizes RPY convention
-    Tw_e = xyzrpy2trans([-.2, 0, 1.0, np.pi/2, np.pi, 0], degrees=False)
-    
-    # Utilizes RPY convention
-    Bw = bounds_matrix([(0, 100), (-100, 100), (-100, 100)],  # allow some tolerance in the z and y and only positve in x
-                       [(-.07, .07), (-.07, .07), (-.07, .07)])  # any rotation about z, with limited rotation about x, and y.
-    tsr = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw,
-              manipindex=0, bodyandlink=16)
-
     # Disabled collisions during planning with certain eclusions in place.
     with DisabledCollisionsContext(sim, [], []):
         while len(valid_samples) < num_samples:
             sample = scs.sample()
             if svc.validate(sample):
                 q_constrained = project_config(sawyer_robot, np.array(
-                    sample), np.array(sample), tsr, .1, .01)
+                    sample), np.array(sample), tsr, q_step=.1, epsilon=.1, e_step=.1)
                 normalized_q_constrained = []
                 if q_constrained is not None:
                     for value in q_constrained:
@@ -64,6 +52,7 @@ def parallel_projection_worker(num_samples, sim_context_cls, sim_config):
                 else:
                     continue
                 if svc.validate(normalized_q_constrained):
+                    print(normalized_q_constrained)
                     valid_samples.append(normalized_q_constrained)
     return valid_samples
 
@@ -125,9 +114,21 @@ def main():
         }
     ]
 
+     # Utilizes RPY convention
+    T0_w = xyzrpy2trans([.7, 0, 0, 0, 0, 0], degrees=False)
+
+    # Utilizes RPY convention
+    Tw_e = xyzrpy2trans([-.2, 0, 1.0, np.pi/2, np.pi, 0], degrees=False)
+    
+    # Utilizes RPY convention
+    Bw = bounds_matrix([(0, 100), (-100, 100), (-100, 100)],  # allow some tolerance in the z and y and only positve in x
+                       [(-.07, .07), (-.07, .07), (-.07, .07)])  # any rotation about z, with limited rotation about x, and y.
+    tsr = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw,
+              manipindex=0, bodyandlink=16)
+
     num_workers = 8
     worker_fn = partial(
-            parallel_projection_worker, sim_context_cls=SawyerSimContext, sim_config=configuration)
+            parallel_projection_worker, sim_context_cls=SawyerSimContext, sim_config=configuration, tsr=tsr)
     with Pool(num_workers) as p:
         multi_s = timer()
         results = p.map(worker_fn, [

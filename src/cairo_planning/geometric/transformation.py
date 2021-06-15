@@ -33,15 +33,23 @@ def analytic_xyz_jacobian(J_r, rpy):
     Returns:
         ndarry: The analytic Jacobian for XYZ / RPY extrinsic rotations.
     """
-    # XYZ
-    E = np.zeros([3, 3])
-    E[0, 0] = 1 
-    E[0, 2] = np.sin(rpy[1])
-    E[1, 1] = np.cos(rpy[0])
-    E[1, 2] = -np.cos(rpy[1]) * np.sin(rpy[0])
-    E[2, 1] = np.sin(rpy[0]) 
-    E[2, 2] = np.cos(rpy[0]) * np.cos(rpy[1])
-    return np.dot(np.linalg.inv(E), J_r)
+    TOLERANCE = 1e-9
+    if np.cos(rpy[1]) < TOLERANCE:
+        print("Close to singularity!")
+
+    # E matrixx for XYZ / RPY
+    Ei = np.zeros([3, 3])
+
+    Ei[0, 0] = 1
+    Ei[0, 1] = (np.sin(rpy[0]) * np.sin(rpy[1])) / np.cos(rpy[1])
+    Ei[0, 2] = (-np.cos(rpy[0]) * np.sin(rpy[1])) / np.cos(rpy[1])
+    Ei[1, 1] = np.cos(rpy[0])
+    Ei[1, 2] = np.sin(rpy[0])
+    Ei[2, 1] = -np.sin(rpy[0]) / np.cos(rpy[1])
+    Ei[2, 2] = np.cos(rpy[0]) / np.cos(rpy[1])
+
+
+    return np.dot(Ei, J_r)
 
 
 def quat2rpy(wxyz, degrees=False):

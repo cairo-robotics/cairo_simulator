@@ -1,188 +1,125 @@
-from collections import OrderedDict
-import json
-import pprint
 import os
 import sys
 from functools import partial
 import time
 
+import pybullet as p
 if os.environ.get('ROS_DISTRO'):
     import rospy
 import numpy as np
-import networkx as nx
+import igraph as ig
 
-from cairo_simulator.core.sim_context import SawyerSimContext
-from cairo_planning.core.planning_context import SawyerPlanningContext
+from cairo_simulator.core.sim_context import SawyerCPRMSimContext
+from cairo_simulator.core.utils import ASSETS_PATH
+
 from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.local.interpolation import parametric_lerp
 from cairo_planning.local.curve import JointTrajectoryCurve
-from cairo_planning.planners import LazyPRM
-from cairo_planning.geometric.state_space import SawyerTSRConstrainedSpace
-from cairo_planning.geometric.distribution import KernelDensityDistribution
-from cairo_planning.sampling.samplers import DistributionSampler
-from cairo_planning.geometric.transformation import xyzrpy2trans, bounds_matrix, quat2rpy
-from cairo_planning.geometric.tsr import TSR
-from cairo_planning.geometric.utils import geodesic_distance, wrap_to_interval
+from cairo_planning.planners import LazyCPRM
+from cairo_planning.sampling.samplers import HyperballSampler
+from cairo_planning.geometric.state_space import SawyerConfigurationSpace
 
-if __name__ == "__main__":
-    #############################################
-    #       Important Limits for Samplers       #
-    #############################################
+def main():
+
     limits = [['right_j0', (-3.0503, 3.0503)],
-            ['right_j1', (-3.8095, 2.2736)],
-            ['right_j2', (-3.0426, 3.0426)],
-            ['right_j3', (-3.0439, 3.0439)],
-            ['right_j4', (-2.9761, 2.9761)],
-            ['right_j5', (-2.9761, 2.9761)],
-            ['right_j6', (-4.7124, 4.7124)],
-            ['right_gripper_l_finger_joint', (0.0, 0.020833)],
-            ['right_gripper_r_finger_joint',
-            (-0.020833, 0.0)],
-            ['head_pan', (-5.0952, 0.9064)]]
-    #############################################
-    #         Import Serialized LfD Graph       #
-    #############################################
-    with open(os.path.dirname(os.path.abspath(__file__)) + "/serialization_test.json", "r") as f:
-        serialized_data = json.load(f)
-    config = serialized_data["config"]
-    intermediate_trajectories = serialized_data["intermediate_trajectories"]
-    keyframes = OrderedDict(sorted(serialized_data["keyframes"].items(), key=lambda t: int(t[0])))
+              ['right_j1', (-3.8095, 2.2736)],
+              ['right_j2', (-3.0426, 3.0426)],
+              ['right_j3', (-3.0439, 3.0439)],
+              ['right_j4', (-2.9761, 2.9761)],
+              ['right_j5', (-2.9761, 2.9761)],
+              ['right_j6', (-4.7124, 4.7124)],
+              ['right_gripper_l_finger_joint', (0.0, 0.020833)],
+              ['right_gripper_r_finger_joint',
+               (-0.020833, 0.0)],
+              ['head_pan', (-5.0952, 0.9064)]]
 
+    config = {}
+    config["sim_objects"] = [
+        {
+            "object_name": "Ground",
+            "model_file_or_sim_id": "plane.urdf",
+            "position": [0, 0, 0]
+        },
+        {
+            "object_name": "sphere",
+            "model_file_or_sim_id": 'sphere2.urdf',
+            "position": [1.0, -.3, .6],
+            "orientation":  [0, 0, 1.5708],
+            "fixed_base": 1    
+        }
+    ]
 
-    sim_context = SawyerSimContext(None, setup=False, planning_context=None)
-    sim_context.setup(sim_overrides={"run_parallel": False})
+    config["tsr"] = {
+        'degrees': False,
+        "T0_w": [.7, 0, 0, 0, 0, 0],
+        "Tw_e": [-.2, 0, 1.0, np.pi/2, 3*np.pi/2, np.pi/2], # level end-effector pointing away from sawyer's "front"
+        "Bw": [[[0, 100], [-100, 100], [-100, .3]],  # Cannot go above 1.3 m
+              [[-.07, .07], [-.07, .07], [-.07, .07]]]
+    }
+
+    sim_context = SawyerCPRMSimContext(config)
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
+    planning_space = sim_context.get_state_space()
     sawyer_robot = sim_context.get_robot()
+    tsr = sim_context.get_tsr()
     svc = sim_context.get_state_validity()
-    interp_fn = partial(parametric_lerp, steps=5)
 
-    #############################################
-    #          CREATE A PLANNING GRAPH          #
-    #############################################
-    # This will be used to generate a sequence  #
-    # of constrained motion plans.              #
-    #############################################
-    
-    planning_G = nx.Graph()
-    # Try motion planning using samplers.
-    # Generate a set of constraint keyframe waypoints with start end end points included.
-    # Get first key
+    start = [0, 0, 0, 0, 0, 0, -np.pi/2]
 
-    start_id = next(iter(keyframes.keys()))
-    end_id = next(reversed(keyframes.keys()))
+    goal = [-1.9622245072067646, 0.8439858364277937, 1.3628459180018329, -
+            0.2383928041974519, -2.7327884695211555, -2.2177502341009134, -0.08992133311928363]
 
-    end_data = [obsv['robot']['joint_angle'] for obsv in keyframes[next(reversed(keyframes.keys()))]["observations"]]
-    start_keyframe_dist = KernelDensityDistribution()
-    start_keyframe_dist.fit(end_data)
+    # sawyer_robot.move_to_joint_pos(goal)
+    # time.sleep(5)
+    sawyer_robot.move_to_joint_pos(start)
+    time.sleep(5)
+    # Utilizes RPY convention
 
-    # Create a distribution for each intermeditate trajectory set.
-    # Build into distribution samplers.
-    constraint_transition_count = 0
-    for keyframe_id, keyframe_data in keyframes.items():
-        print(keyframe_id)
-        if keyframe_data["keyframe_type"] == "constraint_transition" or keyframe_id == end_id:
-            # Create keyframe distrubtion
-            data = [obsv['robot']['joint_angle'] for obsv in keyframe_data["observations"]]
-            keyframe_dist = KernelDensityDistribution()
-            keyframe_dist.fit(data)
-            # Let's use random keyframe observation point for planning.
-            planning_G.add_nodes_from([(keyframe_id, {"model": keyframe_dist, "point": data[0]})])
-            # Create intermediate trajectory distribution.
-            inter_trajs = intermediate_trajectories[keyframe_id]
-            inter_trajs_data = [[obsv['robot']['joint_angle'] for obsv in traj] for traj in inter_trajs]
-            inter_data = [item for sublist in inter_trajs_data for item in sublist]
-            inter_dist = KernelDensityDistribution()
-            inter_dist.fit(inter_data)
-            planning_G.add_edge(prior_id, keyframe_id)
-            planning_G[prior_id][keyframe_id].update({"model": inter_dist})
+    with DisabledCollisionsContext(sim, [], []):
+        #########################
+        # Lazy Contrained PRM (LazyCPRM) #
+        #########################
+        # The specific space we sample from is the Hyberball centered at the midpoint between two candidate points. 
+        # This is used to bias tree grwoth between two points when using CBiRRT2 as our local planner for a constrained PRM.
+        tree_state_space = SawyerConfigurationSpace(sampler=HyperballSampler())
+        # Use parametric linear interpolation with 10 steps between points.
+        interp = partial(parametric_lerp, steps=10)
+        # See params for PRM specific parameters robot, tsr, state_space, state_validity_checker, interpolation_fn, params
+        prm = LazyCPRM(SawyerCPRMSimContext, config, sawyer_robot, tsr, planning_space, tree_state_space, svc, interp, params={
+            'n_samples': 2000, 'k': 8, 'planning_attempts': 5, 'ball_radius': 2.0}, tree_params={'iters': 50, 'q_step': .5})
+        logger.info("Planning....")
+        path = prm.plan(np.array(start), np.array(goal))
+        # plan = prm.plan(np.array(start), np.array(goal))
+        # # get_path() reuses the interp function to get the path between vertices of a successful plan
+        # if plan is not None:
+        #     path = prm.get_path(plan)
+        # else:
+        #     path = []
 
-            # Utilizes RPY convention
-            T0_w = xyzrpy2trans([.7, 0, 0, 0, 0, 0], degrees=False)
-
-            # Utilizes RPY convention
-            Tw_e = xyzrpy2trans([-.2, 0, 1.0, np.pi/2.8, np.pi, 0], degrees=False)
-
-            if constraint_transition_count == 0:
-                Bw = bounds_matrix([(-100, 100), (-100, 100), (-100, 100)],  # No positional constraint bounds.
-                            [(-np.pi, np.pi), (-np.pi, np.pi), (-np.pi, np.pi)])  # any rotation about z, with limited rotation about x, and y.
-                constraint_transition_count += 1
-            else:
-                print("using constraint bounds")
-                # Utilizes RPY convention
-                Bw = bounds_matrix([(-100, 100), (-100, 100), (5, 100)],  # No positional constraint bounds.
-                                [(-.07, .07), (-.07, .07), (-.07, .07)])  # any rotation about z, with limited rotation about x, and y.
-            tsr = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw,
-                    manipindex=0, bodyandlink=16)
-
-            planning_space = SawyerTSRConstrainedSpace(sampler=DistributionSampler(inter_dist), limits=limits, svc=svc, TSR=tsr, robot=sawyer_robot)
-            planning_G[prior_id][keyframe_id].update({"planning_space": planning_space})
-            prior_id = keyframe_id
-        if keyframe_id == start_id:
-            data = [obsv['robot']['joint_angle'] for obsv in keyframe_data["observations"]]
-            keyframe_dist = KernelDensityDistribution()
-            keyframe_dist.fit(data)
-            planning_G.add_nodes_from([(keyframe_id, {"model": keyframe_dist, "point": data[0]})])
-            prior_id = keyframe_id
+    if len(path) == 0:
+        visual_style = {}
+        visual_style["vertex_color"] = ["blue" if v['name'] in [
+            'start', 'goal'] else "white" for v in prm.graph.vs]
+        visual_style["bbox"] = (1200, 1200)
+        ig.plot(prm.graph, **visual_style)
+        logger.info("Planning failed....")
+        sys.exit(1)
+    logger.info("Plan found....")
+    input("Press any key to continue...")
+    # splining uses numpy so needs to be converted
+    path = [np.array(p) for p in path]
+    # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
+    jtc = JointTrajectoryCurve()
+    traj = jtc.generate_trajectory(path, move_time=20)
+    sawyer_robot.execute_trajectory(traj)
+    try:
+        while True:
+            sim.step()
+    except KeyboardInterrupt:
+        p.disconnect()
+        sys.exit(0)
 
 
-    final_path = []
-
-    initial_start_point = planning_G.nodes[list(planning_G.nodes)[0]]['point']
-  
-    for edge in planning_G.edges():
-        valid_samples = []
-
-        
-        start_point = planning_G.nodes[edge[0]]['point']
-        end_point = planning_G.nodes[edge[1]]['point']
-        print(start_point, end_point)
-        state_space = planning_G.get_edge_data(*edge)['planning_space']
-
-        ####################################
-        # SIMULATION AND PLANNING CONTEXTS #
-        ####################################
-        with DisabledCollisionsContext(sim, [], []):
-            #######
-            # PRM #
-            #######
-            # Use parametric linear interpolation with 10 steps between points.
-            interp = partial(parametric_lerp, steps=10)
-            # See params for PRM specific parameters
-            prm = LazyPRM(state_space, svc, interp_fn, params={
-                    'n_samples': 50, 'k': 8, 'ball_radius': 2.00})
-            logger.info("Planning....")
-            plan = prm.plan(np.array(start_point), np.array(end_point))
-            # get_path() reuses the interp function to get the path between vertices of a successful plan
-            path = prm.get_path(plan)
-        if len(path) == 0:
-            logger.info("Planning failed....")
-            sys.exit(1)
-        logger.info("Plan found....")
-
-        # splinging uses numpy so needs to be converted
-        path = [np.array(p) for p in path]
-        logger.info("Length of path: {}".format(len(path)))
-        final_path = final_path + path
-
-    sawyer_robot.move_to_joint_pos(initial_start_point)
-    time.sleep(3)
-    while sawyer_robot.check_if_at_position(initial_start_point, 0.5) is False:
-        time.sleep(0.1)
-        sim.step()
-
-    key = input("Press any key to excute plan.")
-
-    if len(path) > 0:
-        # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
-        jtc = JointTrajectoryCurve()
-        traj = jtc.generate_trajectory(final_path, move_time=10)
-        sawyer_robot.execute_trajectory(traj)
-        try:
-            while True:
-                sim.step()
-        except KeyboardInterrupt:
-            sys.exit(0)
-    else:
-        logger.err("No path found.")
-
+if __name__ == "__main__":
+    main()
