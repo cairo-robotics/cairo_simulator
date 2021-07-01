@@ -3,7 +3,7 @@ import json
 
 
 
-def dump_PRM(context_config, model, directory_path="./"):
+def dump_PRM(context_config, model, directory_path="./", filename="data.json"):
     """
     """
     # Create a directory if it does not exist
@@ -16,12 +16,12 @@ def dump_PRM(context_config, model, directory_path="./"):
 
     if not os.path.exists(directory_path):
         os.makedirs(directory_path)
-    file_path = os.path.join(directory_path, "data.json")
+    file_path = os.path.join(directory_path, filename)
     with open(file_path, "w") as file:
         json.dump(data, file)
 
-def load_PRM(directory_path):
-    file_path = os.path.join(directory_path, "data.json")
+def load_PRM(directory_path, filename="data.json"):
+    file_path = os.path.join(directory_path, filename)
     with open(file_path, "r") as file:
         return json.load(file)
 

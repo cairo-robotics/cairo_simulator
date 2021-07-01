@@ -1,13 +1,11 @@
 import os
 from functools import partial
 import time
-import sys 
 
 import pybullet as p
 if os.environ.get('ROS_DISTRO'):
     import rospy
 import numpy as np
-import igraph as ig
 
 from cairo_simulator.core.sim_context import SawyerCPRMSimContext
 
@@ -18,14 +16,35 @@ from cairo_planning.planners import LazyCPRM
 from cairo_planning.sampling.samplers import HyperballSampler
 from cairo_planning.geometric.state_space import SawyerConfigurationSpace
 
-from cairo_planning.core.serialization import load_PRM
+from cairo_planning.core.serialization import dump_PRM
 
 def main():
 
-    prm_data = load_PRM(os.path.dirname(os.path.abspath(__file__)))
+    config = {}
+    config["sim_objects"] = [
+        {
+            "object_name": "Ground",
+            "model_file_or_sim_id": "plane.urdf",
+            "position": [0, 0, 0]
+        },
+        # {
+        #     "object_name": "sphere",
+        #     "model_file_or_sim_id": 'sphere2.urdf',
+        #     "position": [1.0, -.3, .6],
+        #     "orientation":  [0, 0, 1.5708],
+        #     "fixed_base": 1    
+        # }
+    ]
 
-    config = prm_data["config"]
-    sim_context = SawyerCPRMSimContext(configuration=config)
+    config["tsr"] = {
+        'degrees': False,
+        "T0_w": [.7, 0, 0, 0, 0, 0],
+        "Tw_e": [-.2, 0, 1.0, np.pi/2, 3*np.pi/2, np.pi/2], # level end-effector pointing away from sawyer's "front"
+        "Bw": [[[0, 100], [-100, 100], [-100, .3]],  # Cannot go above 1.3 m
+              [[-.07, .07], [-.07, .07], [-.07, .07]]]
+    }
+
+    sim_context = SawyerCPRMSimContext(config)
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
     planning_space = sim_context.get_state_space()
@@ -38,10 +57,6 @@ def main():
     goal = [-1.9622245072067646, 0.8439858364277937, 1.3628459180018329, -
             0.2383928041974519, -2.7327884695211555, -2.2177502341009134, -0.08992133311928363]
 
-    # sawyer_robot.move_to_joint_pos(goal)
-    # time.sleep(5)
-    sawyer_robot.move_to_joint_pos(start)
-    time.sleep(5)
     # Utilizes RPY convention
  
     with DisabledCollisionsContext(sim, [], []):
@@ -57,34 +72,10 @@ def main():
         prm = LazyCPRM(SawyerCPRMSimContext, config, sawyer_robot, tsr, planning_space, tree_state_space, svc, interp, params={
             'n_samples': 3000, 'k': 8, 'planning_attempts': 5, 'ball_radius': 2.0}, tree_params={'iters': 50, 'q_step': .5})
         logger.info("Planning....")
-        prm.samples = prm_data["samples"]
         path = prm.plan(np.array(start), np.array(goal))
 
-
-    if len(path) == 0:
-        visual_style = {}
-        visual_style["vertex_color"] = ["blue" if v['name'] in [
-            'start', 'goal'] else "white" for v in prm.graph.vs]
-        visual_style["bbox"] = (1200, 1200)
-        ig.plot(prm.graph, **visual_style)
-        logger.info("Planning failed....")
-        sys.exit(1)
-    logger.info("Plan found....")
-    input("Press any key to continue...")
-    # splining uses numpy so needs to be converted
-    path = [np.array(p) for p in path]
-    # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
-    jtc = JointTrajectoryCurve()
-    traj = jtc.generate_trajectory(path, move_time=20)
-    sawyer_robot.execute_trajectory(traj)
-    try:
-        while True:
-            sim.step()
-    except KeyboardInterrupt:
-        p.disconnect()
-        sys.exit(0)
-
+    # Dump thje samples and configuration
+    dump_PRM(sim_context.config, prm, directory_path=os.path.dirname(os.path.abspath(__file__)), filename="constrained_data.json")
 
 if __name__ == "__main__":
     main()
-
