@@ -12,7 +12,7 @@ from cairo_simulator.core.sim_context import SawyerSimContext
 from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.local.interpolation import parametric_lerp
 from cairo_planning.planners import LazyPRM
-from cairo_planning.core.serialization import dump_PRM
+from cairo_planning.core.serialization import dump_PRM, dump_model
 
 
 def main():
@@ -42,7 +42,7 @@ def main():
                                                                    2.7788151824762055, 2.4546623466066135, 0.7146948867821279, 2.7671787952787184, 2.606128412644311]))
 
     # Dump thje samples and configuration
-    dump_PRM(sim_context.config, prm, os.path.dirname(os.path.abspath(__file__)))
-
+    # dump_PRM(sim_context.config, prm, os.path.dirname(os.path.abspath(__file__)))
+    dump_model(sim_context.config, prm, os.path.dirname(os.path.abspath(__file__)))
 if __name__ == "__main__":
     main()
