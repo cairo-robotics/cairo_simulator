@@ -27,7 +27,7 @@ class LazyPRM():
         self.svc = state_validity_checker
         self.interp_fn = interpolation_fn
         self.n_samples = params.get('n_samples', 4000)
-        self.k = params.get('k', 5)
+        self.k = params.get('k', 10)
         self.attempts = params.get('planning_attempts', 5)
         self.ball_radius = params.get('ball_radius', .55)
         self.samples = []
@@ -419,6 +419,7 @@ class LazyPRM():
 class LazyCPRM():
 
     def __init__(self, sim_context_cls, sim_config, robot, tsr, state_space, tree_state_space, state_validity_checker, interpolation_fn, params, tree_params):
+        self.preloaded = False
         self.sim_context = sim_context_cls
         self.sim_config = sim_config
         self.robot = robot
@@ -436,33 +437,49 @@ class LazyCPRM():
         print("PRM Params: N: {}, k: {}, r: {}".format(
             self.n_samples, self.k, self.ball_radius))
 
+    def preload(self, samples, graph):
+        self.samples = samples
+        self.graph = graph
+        for sample in self.samples:
+            self.graph.vs[self._val2idx(self.graph, sample)]['value'] = np.array(sample)
+        self.preloaded = True
+
     def plan(self, q_start, q_goal):
         # Initial sampling of roadmap and NN data structure.
-        print("Initializing roadmap...")
-        self._init_roadmap(q_start, q_goal)
-        print("Generating valid random samples...")
-        if len(self.samples) > 0:
-            print("Using provided samples...")
-        else:
+        print(len(self.graph.vs))
+        if self.preloaded is False:
             print("Generating valid random samples...")
             if self.n_samples <= 100:
                 self.samples = self._generate_samples()
             else:
                 self.samples = self._generate_samples_parallel()
-        print("Attaching start and end to graph...")
-        self._attach_start_and_end()
+            print("Initializing roadmap with start and goal...")
+            self._init_roadmap(q_start, q_goal)
+            print(len(self.graph.vs))
+        else:
+            print("Using provided samples...")
+            print("Initializing roadmap with start and goal...")
+            self._init_roadmap(q_start, q_goal)
+        # print("Attaching start and end to graph...")
+        # # self._attach_start_and_end()
         # Create NN datastructure
         print("Creating NN datastructure...")
         self.nn = NearestNeighbors(X=np.array(
             self.samples), model_kwargs={"leaf_size": 100})
         # Generate NN connectivity.
-        print("Generating nearest neighbor connectivity...")
-        connections = self._generate_connections(samples=self.samples)
-        # Build the graph structure...
-        print("Building graph")
-        self._build_graph(self.samples, connections)
+        if self.preloaded is False:
+            print("Generating nearest neighbor connectivity...")
+            connections = self._generate_connections(samples=self.samples)
+            print(len(self.graph.vs))
+            # Build the graph structure...
+            print("Building graph")
+            self._build_graph(self.samples, connections)
+            print(len(self.graph.vs))
+        else:
+            print("Using provided graph...")
         print("Finding feasible best path in graph if available...")
         vertex_sequence, path = self.get_lazy_path()
+        print(len(self.graph.vs))
         print(vertex_sequence)
         return path
 
@@ -551,8 +568,7 @@ class LazyCPRM():
                     if valid:
                         # if valid, we add the 'to' vertex id since we know we can reach it
                         successful_vertex_sequence.append(to_id)
-                        self.graph.es[self.graph.get_eid(self.graph.vs['id'].index(
-                            from_id), self.graph.vs['id'].index(to_id))]['validity'] = True
+                        self.graph.es[self.graph.get_eid(self.graph.vs['id'].index(from_id), self.graph.vs['id'].index(to_id))]['validity'] = True
                         goal_idx = self.graph.vs.find(self.goal_name).index
                         path = path + segment
                         if to_id == goal_idx:
