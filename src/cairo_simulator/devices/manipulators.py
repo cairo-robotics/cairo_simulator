@@ -301,7 +301,7 @@ class Manipulator(Robot):
         sim.set_robot_trajectory(
             self._simulator_id, joint_positions, joint_velocities)
 
-    def check_if_at_position(self, pos, epsilon=0.001):
+    def check_if_at_position(self, pos, epsilon=0.2):
         '''
         Returns True if the robot's joints are within epsilon of pos, false otherwisen
 
