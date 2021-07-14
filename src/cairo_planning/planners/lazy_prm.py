@@ -597,12 +597,18 @@ class LazyCPRM():
             q_start (array-like): The starting configuration.
             q_goal (array-like): The goal configuration.
         """
+        self.samples = [q_start, q_goal] + self.samples
         self.start_name = self._val2name(q_start)
         self.goal_name = self._val2name(q_goal)
-        self.graph.add_vertex(self.start_name)
-        self.graph.vs[self._name2idx(self.graph, self.start_name)]["value"] = q_start
-        self.graph.add_vertex(self._val2name(q_goal))
-        self.graph.vs[self._name2idx(self.graph, self.goal_name)]["value"] = q_goal
+        if 'name' not in self.graph.vs.attributes() or self.start_name not in self.graph.vs['name']:
+            self.graph.add_vertex(self.start_name)
+            self.graph.vs[self._name2idx(self.graph, self.start_name)]["value"] = q_start
+            self.graph.vs.find(self.start_name)['id'] = self.graph.vs.find(self.start_name).index
+        if 'name' not in self.graph.vs.attributes() or self.goal_name not in self.graph.vs['name']:
+            self.graph.add_vertex(self._val2name(q_goal))
+            self.graph.vs[self._name2idx(self.graph, self.goal_name)]["value"] = q_goal
+            self.graph.vs.find(self.goal_name)['id'] = self.graph.vs.find(self.goal_name).index
+
 
     def _attach_start_and_end(self):
         start = self.graph.vs[self._name2idx(self.graph, self.start_name)]['value']
@@ -634,7 +640,7 @@ class LazyCPRM():
             parallel_projection_worker, sim_context_cls=self.sim_context, sim_config=self.sim_config, tsr=self.tsr)
         with mp.get_context("spawn").Pool(num_workers) as p:
             results = p.map(worker_fn, [samples_per_worker] * num_workers)
-            return list(itertools.chain.from_iterable(results))
+            return list(itertools.chain.from_iterable(results))[0:self.n_samples]
 
     def _generate_connections(self, samples):
         connections = []
@@ -650,14 +656,13 @@ class LazyCPRM():
         return connections
 
     def _build_graph(self, samples, connections):
-        values = [self.graph.vs.find(self.start_name)["value"],
-                  self.graph.vs.find(self.goal_name)["value"]] + samples
-        str_values = [self._val2name(list(value)) for value in values]
-        values = [list(value) for value in values]
-        self.graph.add_vertices(len(values))
+        str_values = [self._val2name(list(value)) for value in samples]
+        values = [list(value) for value in samples]
+        # we add a bunch of new vertices for the sampled points, but we already have the graph initialized with two points (start and goal)
+        self.graph.add_vertices(len(values)-2)
         self.graph.vs["name"] = str_values
         self.graph.vs["value"] = values
-        self.graph.vs['id'] = list(range(0, self.graph.vcount()))
+        self.graph.vs['id'] = [v.index for v in self.graph.vs]
         edges = [(self._val2idx(self.graph, c[0]), self._val2idx(self.graph, c[1]))
                  for c in connections]
         weights = [c[2] for c in connections]
@@ -680,41 +685,6 @@ class LazyCPRM():
         local_path = self.interp_fn(np.array(q_near), np.array(q_rand))
         return True, local_path
 
-    
-    # def _generate_connections_parallel(self, samples):
-    #     evaluated_name_pairs = []
-    #     point_pairs = []
-    #     for q_rand in samples:
-    #         for q_neighbor in self._neighbors(q_rand):
-    #             if (self._val2name(q_rand), self._val2name(q_neighbor)) not in evaluated_name_pairs and (self._val2name(q_neighbor), self._val2name(q_rand)) not in evaluated_name_pairs:
-    #                 point_pairs.append((q_rand, q_neighbor))
-    #                 evaluated_name_pairs.append(
-    #                     (self._val2name(q_rand), self._val2name(q_neighbor)))
-    #                 evaluated_name_pairs.append(
-    #                     (self._val2name(q_neighbor), self._val2name(q_rand)))
-    #     num_workers = mp.cpu_count()
-    #     batches = np.array_split(point_pairs, num_workers)
-    #     worker_fn = partial(
-    #         parallel_cbirrt_worker, sim_context_cls=self.sim_context, sim_config=self.sim_config, tsr=self.tsr, tree_state_space=self.tree_state_space, interp_fn=self.interp_fn, tree_params=self.tree_params)
-    #     with mp.get_context("spawn").Pool(num_workers) as p:
-    #         batch_results = p.map(worker_fn, batches)
-    #         # for each set of result, we have a dictionary indexed by the evaluated_name_pairs.
-    #         # the value of each dictionary is a dictionary with keys 'points' and 'edges'
-    #         # the points are the actual points and the edges are the edges between points needed between points.
-    #         # we have to add the points to the graphs, then created edges betweenthem.
-    #         results = {}
-    #         for result in batch_results:
-    #             for named_value_tuple, value in result.items():
-    #                 results[named_value_tuple] = value
-
-    #         for named_tuple in evaluated_name_pairs:
-    #             connection = results.get(named_tuple, None)
-    #             if connection is not None:
-    #                 for point in connection['points']:
-    #                     self._add_vertex(self.graph, point)
-    #                 for edge in connection['edges']:
-    #                     self._add_edge(
-    #                         self.graph, edge[0], edge[1], self._distance(edge[0], edge[1]))
 
     def _cbirrt2_connect(self, q_near, q_target):
         centroid = (np.array(q_near) + np.array(q_target)) / 2
@@ -733,12 +703,6 @@ class LazyCPRM():
         if graph_plan is not None:
             points = [cbirrt2.connected_tree.vs[idx]['value']
                       for idx in graph_plan]
-            edges = list(zip(points, points[1:]))
-            for point in points:
-                self._add_vertex(self.graph, point)
-            for e in edges:
-                self._add_edge(self.graph, e[0],
-                               e[1], self._distance(e[0], e[1]))
             return True, points
         else:
             return False, []
