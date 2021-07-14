@@ -380,12 +380,25 @@ class LazyPRM():
     def _weight(self, local_path):
         return cumulative_distance(local_path)
 
-    def _idx_of_point(self, name):
-        return self.graph.vs.find(name).index
+    def _val2idx(self, graph, value):
+        return self._name2idx(graph, self._val2name(value))
 
-    def _value_to_name(self, value):
-        return str(["{:.4f}".format(val) for val in value])
+    def _name2idx(self, graph, name):
+        return graph.vs.find(name).index
 
+    def _val2name(self, value, places=4):
+        def trunc(number, places=4):
+            if not isinstance(places, int):
+                raise ValueError("Decimal places must be an integer.")
+            if places < 1:
+                raise ValueError("Decimal places must be at least 1.")
+            # If you want to truncate to 0 decimal places, just do int(number).
+
+            with localcontext() as context:
+                context.rounding = ROUND_DOWN
+                exponent = Decimal(str(10 ** - places))
+                return Decimal(str(number)).quantize(exponent).to_eng_string()
+        return str([trunc(num, places) for num in value])
 
 class LazyCPRM():
 
@@ -775,8 +788,19 @@ class LazyCPRM():
     def _name2idx(self, graph, name):
         return graph.vs.find(name).index
 
-    def _val2name(self, value):
-        return str(["{:.4f}".format(val) for val in value])
+    def _val2name(self, value, places=4):
+        def trunc(number, places=4):
+            if not isinstance(places, int):
+                raise ValueError("Decimal places must be an integer.")
+            if places < 1:
+                raise ValueError("Decimal places must be at least 1.")
+            # If you want to truncate to 0 decimal places, just do int(number).
+
+            with localcontext() as context:
+                context.rounding = ROUND_DOWN
+                exponent = Decimal(str(10 ** - places))
+                return Decimal(str(number)).quantize(exponent).to_eng_string()
+        return str([trunc(num, places) for num in value])
 
     def _weight(self, local_path):
         return cumulative_distance(local_path)
