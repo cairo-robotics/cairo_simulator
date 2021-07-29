@@ -7,7 +7,7 @@ class JointTrajectoryCurve():
     def __init__(self, interpolation='minjerk'):
         self.interpolation = interpolation
         
-    def generate_trajectory(self, points, move_time=1, num_intervals=20):
+    def generate_trajectory(self, points, move_time=1, num_intervals=3):
         if self.interpolation == 'minjerk':
             m_coeff = minjerk_coefficients(points)
             minjerk_traj = minjerk_trajectory(m_coeff, num_intervals=num_intervals)
