@@ -2,6 +2,7 @@ import os
 from functools import partial
 import time
 import sys 
+import json
 
 import pybullet as p
 if os.environ.get('ROS_DISTRO'):
@@ -76,13 +77,16 @@ def main():
     # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
     jtc = JointTrajectoryCurve()
     traj = jtc.generate_trajectory(path, move_time=5)
-    sawyer_robot.execute_trajectory(traj)
-    try:
-        while True:
-            sim.step()
-    except KeyboardInterrupt:
-        p.disconnect()
-        sys.exit(0)
+    traj_data = {}
+    traj_data["trajectory"] = []
+    for point in traj:
+        traj_point = {
+            "time": point[0],
+            "point": point[1]
+        }
+        traj_data['trajectory'].append(traj_point)
+    with open('constrained_traj.json', 'w') as f:
+        json.dump(traj_data, f)
 
 
 if __name__ == "__main__":

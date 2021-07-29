@@ -53,7 +53,7 @@ def main():
     path = [np.array(p) for p in path]
     # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
     jtc = JointTrajectoryCurve()
-    traj = jtc.generate_trajectory(path, move_time=2)
+    traj = jtc.generate_trajectory(path, move_time=5)
     traj_data = {}
     traj_data["trajectory"] = []
     for point in traj:
