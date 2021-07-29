@@ -18,7 +18,7 @@ from cairo_planning.core.serialization import load_model
 
 def main():
     # Reload the samples and configuration
-    directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), "2021-07-13T18-04-32")
+    directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), "serialization_data/2021-07-29T15-13-50")
     config, samples, graph = load_model(directory)
 
 

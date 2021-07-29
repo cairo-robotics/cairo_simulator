@@ -19,13 +19,15 @@ from cairo_planning.planners import LazyCPRM
 from cairo_planning.sampling.samplers import HyperballSampler
 from cairo_planning.geometric.state_space import SawyerConfigurationSpace
 
-from cairo_planning.core.serialization import load_PRM
+from cairo_planning.core.serialization import load_model
 
 def main():
 
-    prm_data = load_PRM(directory_path=os.path.dirname(os.path.abspath(__file__)), filename="constrained_data.json")
+    # Reload the samples and configuration
+    directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), "serialization_data/2021-07-29T15-13-50")
+    config, samples, graph = load_model(directory)
 
-    config = prm_data["config"]
+
     sim_context = SawyerCPRMSimContext(configuration=config)
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
@@ -47,7 +49,7 @@ def main():
  
     with DisabledCollisionsContext(sim, [], []):
         ###########
-        # LazyCPRM #
+        # LazyPRM #
         ###########
         # The specific space we sample from is the Hyberball centered at the midpoint between two candidate points. 
         # This is used to bias tree grwoth between two points when using CBiRRT2 as our local planner for a constrained PRM.
@@ -58,7 +60,7 @@ def main():
         prm = LazyCPRM(SawyerCPRMSimContext, config, sawyer_robot, tsr, planning_space, tree_state_space, svc, interp, params={
             'n_samples': 3000, 'k': 8, 'planning_attempts': 5, 'ball_radius': 2.0}, tree_params={'iters': 50, 'q_step': .5})
         logger.info("Planning....")
-        prm.samples = prm_data["samples"]
+        prm.preload(samples, graph)
         path = prm.plan(np.array(start), np.array(goal))
 
 
@@ -71,7 +73,6 @@ def main():
         logger.info("Planning failed....")
         sys.exit(1)
     logger.info("Plan found....")
-    input("Press any key to continue...")
     # splining uses numpy so needs to be converted
     path = [np.array(p) for p in path]
     # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute

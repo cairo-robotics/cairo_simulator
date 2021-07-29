@@ -1,1 +1,0 @@
-{"config": {"sim": {"run_parallel": false, "use_real_time": true, "use_gui": true}, "logger": {"handlers": ["logging"], "level": "debug"}, "sawyer": {"robot_name": "sawyer0", "position": [0, 0, 0.9], "fixed_base": true}, "sim_objects": [{"object_name": "Ground", "model_file_or_sim_id": "plane.urdf", "position": [0, 0, 0]}]}}

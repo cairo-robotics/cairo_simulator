@@ -133,3 +133,6 @@ dmypy.json
 
 # VSCODE
 .vscode
+
+# serialization data
+serialization_data/
