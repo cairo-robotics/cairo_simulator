@@ -166,10 +166,9 @@ def minjerk_trajectory(m_coeffs, num_intervals, duration_array=None):
     assert num_intervals > 0,\
         "Invalid number of intervals chosen (must be greater than 0)"
     interval = 1.0 / num_intervals
-    (num_axes, num_mpts, _) = np.shape(m_coeffs)
-    m_curve = np.zeros((num_mpts*num_intervals+1, num_axes))
+    (_, num_mpts, _) = np.shape(m_coeffs)
+    m_curve = []
     # Copy out initial point
-    m_curve[0, :] = m_coeffs[:, 0, 0]
     if duration_array == None:
          duration_array = np.array([1.0]*num_mpts)
     assert len(duration_array) == num_mpts,\
@@ -178,9 +177,8 @@ def minjerk_trajectory(m_coeffs, num_intervals, duration_array=None):
          m_coeff_set = m_coeffs[:, current_mpt, range(7)]
          for iteration, t in enumerate(np.linspace(interval, 1,
                                                    num_intervals)):
-              m_curve[(current_mpt *
-                       num_intervals +
-                       iteration+1), :] = _minjerk_trajectory_point(m_coeff_set, t * duration_array[current_mpt])
+                x, v, a = _minjerk_trajectory_point(m_coeff_set, t * duration_array[current_mpt])
+                m_curve.append([x, v, a])
     return m_curve
     
 def _minjerk_trajectory_point(m_coeff, t):
@@ -221,7 +219,7 @@ def _minjerk_trajectory_point(m_coeff, t):
     # a=2*a2+6*a3*t+12*a4*t*t+20*a5*t*t*t;
     a=2*a2+6*a3*t+12*a4*np.power(t,2)+20*a5*np.power(t,3);
 
-    return x
+    return x, v, a
 
 def minjerk_point(m_coeffs, m_index, t):
     """
