@@ -445,8 +445,14 @@ class LazyCPRM():
         self.preloaded = True
 
     def plan(self, q_start, q_goal):
+        self.generate_roadmap(q_start, q_goal)
+        print("Finding feasible best path in graph if available...")
+        vertex_sequence, path = self.get_lazy_path()
+        print(vertex_sequence)
+        return path
+    
+    def generate_roadmap(self, q_start, q_goal):
         # Initial sampling of roadmap and NN data structure.
-        print(len(self.graph.vs))
         if self.preloaded is False:
             print("Generating valid random samples...")
             if self.n_samples <= 100:
@@ -470,18 +476,11 @@ class LazyCPRM():
         if self.preloaded is False:
             print("Generating nearest neighbor connectivity...")
             connections = self._generate_connections(samples=self.samples)
-            print(len(self.graph.vs))
             # Build the graph structure...
             print("Building graph")
             self._build_graph(self.samples, connections)
-            print(len(self.graph.vs))
         else:
             print("Using provided graph...")
-        print("Finding feasible best path in graph if available...")
-        vertex_sequence, path = self.get_lazy_path()
-        print(len(self.graph.vs))
-        print(vertex_sequence)
-        return path
 
     def get_path(self, plan):
         points = [self.graph.vs[idx]['value'] for idx in plan]
