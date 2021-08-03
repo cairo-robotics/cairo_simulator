@@ -51,9 +51,6 @@ def walk_through_trajectory(otg, inp, intermediate_targets):
     t_list, out_list = [], []
     out = OutputParameter(inp.degrees_of_freedom)
 
-    old_target = inp.target_position, inp.target_velocity, inp.target_acceleration
-    intermediate_targets.append(old_target)
-
     time_offset = 0.0
     for inp.target_position, inp.target_velocity, inp.target_acceleration in intermediate_targets:
         res = Result.Working
@@ -160,6 +157,7 @@ def main():
         jtc = JointTrajectoryCurve()
         traj = jtc.generate_trajectory(path, move_time=10)
         kinematics_traj = [point[1:4] for point in traj]
+        print(len(kinematics_traj))
         inp = InputParameter(7)
         inp.current_position = start
         inp.current_velocity = [0, 0, 0, 0, 0, 0, 0]
@@ -170,17 +168,17 @@ def main():
         # inp.max_velocity = [.1] * 7
         inp.max_velocity = [.88, .678, .996, .996, 1.776, 1.776, 2.316]
         inp.max_acceleration = [3.5, 2.5, 5, 5, 5, 5, 5]
-        inp.max_jerk = [5] * 7
+        inp.max_jerk = [10] * 7
 
         intermediate_targets = kinematics_traj[1:]
 
-        otg = Ruckig(7, .05)
+        otg = Ruckig(7, 2)
     
         t_list, out_list, duration = walk_through_trajectory(otg, inp, intermediate_targets)
         output_pos = [out_pt.new_position for out_pt in out_list]
         output_vel = [out_pt.new_velocity for out_pt in out_list]
         output_acel = [out_pt.new_acceleration for out_pt in out_list]
-        smooth_traj = list(zip([time/10 for time in t_list], output_pos, output_vel, output_acel))
+        smooth_traj = list(zip([time for time in t_list], output_pos, output_vel, output_acel))
         traj_data = {}
         traj_data["trajectory"] = []
         for point in smooth_traj:
@@ -193,7 +191,7 @@ def main():
             traj_data['trajectory'].append(traj_point)
         with open('traj_w_id.json', 'w') as f:
             json.dump(traj_data, f)
-        sawyer_robot.execute_trajectory(list(zip( [point[0] for point in traj],  [point[1] for point in traj])))
+        sawyer_robot.execute_trajectory(list(zip( [point[0] for point in smooth_traj],  [point[1] for point in smooth_traj])))
         try:
             while True:
                 sim.step()
