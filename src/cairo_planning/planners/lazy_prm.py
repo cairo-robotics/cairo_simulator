@@ -750,12 +750,11 @@ class LazyCPRM():
                 graph.add_vertex(self._val2name(q), **{'value': q})
     
     def _remove_edge(self, vidx1, vidx2):
-        print(vidx1, vidx2)
         start_val2name = self._val2name(self.graph.vs[self._name2idx(self.graph, self.start_name)]['value'])
         goal_val2name = self._val2name(self.graph.vs[self._name2idx(self.graph, self.goal_name)]['value'])
         graph_idx1 = self.graph.vs['id'].index(vidx1)
         graph_idx2 = self.graph.vs['id'].index(vidx2)
-        if self.graph.vs['name'].index(vidx1) not in [start_val2name, goal_val2name] and self.graph.vs['name'].index(vidx2) not in [start_val2name, goal_val2name]:
+        if self.graph.vs[graph_idx1]['name'] not in [start_val2name, goal_val2name] and self.graph.vs[graph_idx2]['name'] not in [start_val2name, goal_val2name]:
             self.graph.delete_edges(self.graph.get_eid(
                 graph_idx1, graph_idx2, directed=False, error=True))
 
