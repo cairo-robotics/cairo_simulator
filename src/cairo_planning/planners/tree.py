@@ -132,7 +132,17 @@ class CBiRRT2():
         else:
             return None
 
-    def _extract_graph_path(self,):
+    def _smooth_path(self, graph_path):
+        # create empty tree. 
+        # Get random index from path
+        # get random index from path not the same as the prior
+        # add points into tree
+        # constrain extended.
+        # test if path in new tree is shorter than current path between path points
+        # if it is shorter, inject the new path into the current main tree.
+        pass
+
+    def _extract_graph_path(self):
         if 'weight' in self.tree.es.attributes():
             return self.tree.get_shortest_paths(self._name2idx(self.tree, self.start_name), self._name2idx(self.tree, self.goal_name), weights='weight', mode='OUT')[0]
         else:
