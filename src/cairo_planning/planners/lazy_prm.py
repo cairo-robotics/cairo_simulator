@@ -523,7 +523,8 @@ class LazyCPRM():
                             'validity'] = True
                     else:
                         # if the point is invalid, then we remove it and associated edges from the graph
-                        self.graph.delete_vertices(point_id)
+                        self.graph.delete_vertices(self.graph.vs['id'].index(
+                        point_id))
                         invalid_node = True
                 if invalid_node:  # if there was an invalid node, we find a new path and keep the loop going.
                     current_best_plan = self._get_best_path(
