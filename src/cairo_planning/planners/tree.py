@@ -1,9 +1,8 @@
 from math import inf
-import itertools
-from functools import partial
 import multiprocessing as mp
 import random
 from timeit import default_timer as timer
+import time
 
 import numpy as np
 import igraph as ig
@@ -43,16 +42,18 @@ class CBiRRT2():
             start_q (array-like): Starting configuration.
             goal_q (array-like): Ending configuration.
         """
-       # print("Initializing trees...")
+        print("Initializing trees...")
         self._initialize_trees(start_q, goal_q)
-        #print("Running Constrained Bidirectional RRT...")
+        print("Running Constrained Bidirectional RRT...")
         self.tree = self.cbirrt(tsr)
         if self.tree is not None:
-            #print("Extracting path through graph...")
+            print("Extracting path through graph...")
             graph_path = self._extract_graph_path()
             if len(graph_path) == 1:
                 return None
             else:
+                print("Smoothing for {} seconds".format(self.smoothing_time))
+                self._smooth_path(graph_path, tsr, self.smoothing_time)
                 #print("Graph path found: {}".format(graph_path))
                 return graph_path
         # plan = self.get_plan(graph_path)
@@ -116,7 +117,7 @@ class CBiRRT2():
                     return qs_old
                 prior_distance = self._distance(q_s, q_target)
                 self._add_vertex(tree, q_s)
-                if tree['name'] == 'forwards':
+                if tree['name'] == 'forwards' or tree['name'] == 'smoothing':
                     self._add_edge(tree, qs_old, q_s, self._distance(qs_old, q_s))
                 else:
                     self._add_edge(tree, q_s, qs_old, self._distance(q_s, qs_old))
@@ -134,21 +135,60 @@ class CBiRRT2():
         else:
             return None
 
-    def _smooth_path(self, graph_path):
+    def _smooth_path(self, graph_path, tsr, smoothing_time=6):
         # create empty tree. 
-        # Get random index from path
-        # get random index from path not the same as the prior
-        # add points into tree
-        # constrain extended.
-        # test if path in new tree is shorter than current path between path points
-        # if it is shorter, inject the new path into the current main tree.
-        pass
+        smoothing_tree = ig.Graph(directed=True)
+        smoothing_tree['name'] = 'smoothing'
+        start_time = time.time()
 
-    def _extract_graph_path(self):
-        if 'weight' in self.tree.es.attributes():
-            return self.tree.get_shortest_paths(self._name2idx(self.tree, self.start_name), self._name2idx(self.tree, self.goal_name), weights='weight', mode='OUT')[0]
+
+        while True:
+            current_time = time.time()
+            elapsed_time = current_time - start_time
+
+            if elapsed_time > smoothing_time:
+                print("Finished iterating in: " + str(int(elapsed_time))  + " seconds")
+                break
+            # Get two random indeces from path
+            rand_idx1, rand_idx2 = random.sample(graph_path, 2)
+            q_old = self.tree.vs[rand_idx1]['value']
+            q_s = self.tree.vs[rand_idx2]['value']
+            # add points into tree
+            self._add_vertex(smoothing_tree, q_old)
+            self._add_vertex(smoothing_tree, q_s)
+            q_old_name = self._val2str(q_old)
+            q_old_idx = self._name2idx(smoothing_tree, q_old_name)
+            q_s_name = self._val2str(q_s)
+            q_s_idx = self._name2idx(smoothing_tree, q_s_name)
+            # constrain extended.
+            _ = self._constrained_extend(smoothing_tree, tsr, q_old, q_s)
+            smoothed_path_values = [smoothing_tree.vs[idx] for idx in self._extract_graph_path(smoothing_tree, q_old_idx, q_s_idx)]
+            curr_path_values = [self.tree.vs[idx] for idx in self._extract_graph_path(self.tree, rand_idx1, rand_idx2)]
+            smoothed_path_value_pairs = [((i), (i + 1) % len(smoothed_path_values)) for i in range(len(smoothed_path_values))][:-1]
+            curr_path_values_pairs = [((i), (i + 1) % len(curr_path_values)) for i in range(len(curr_path_values))][:-1]
+            smooth_path_distance = sum([self._distance(pair[0], pair[1]) for pair in smoothed_path_value_pairs])
+            curr_path_distance = sum([self._distance(pair[0], pair[1]) for pair in curr_path_values_pairs])
+
+            # if the newly found path between indices is shorter, lets use it and add it do the graph
+            if smooth_path_distance < curr_path_distance:
+
+                # crop off start and end since they already exist and add inbetween vertices of smoothing tree to main
+                for q in smoothed_path_values[1:-1]:
+                    self._add_vertex(self.tree, q)
+                for pair in smoothed_path_value_pairs:
+                    self._add_edge(self.tree, pair[0], pair[1], self._distance(pair[0], pair[1]))
+
+
+    def _extract_graph_path(self, tree=None, from_idx=None, to_idx=None):
+        if tree is None:
+            tree = self.tree
+        if from_idx is None or to_idx is None:
+            from_idx = self._name2idx(tree, self.start_name)
+            to_idx = self._name2idx(tree, self.goal_name)
+        if 'weight' in tree.es.attributes():
+            return tree.get_shortest_paths(from_idx, to_idx, weights='weight', mode='OUT')[0]
         else:
-            return self.tree.get_shortest_paths(self._name2idx(self.tree, self.start_name), self._name2idx(self.tree, self.goal_name), mode='OUT')[0]
+            return tree.get_shortest_paths(from_idx, to_idx, mode='OUT')[0]
 
     def get_path(self, plan):
         points = [self.tree.vs[idx]['value'] for idx in plan]
