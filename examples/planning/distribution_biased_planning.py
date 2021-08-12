@@ -95,7 +95,7 @@ if __name__ == "__main__":
 
 
     final_path = []
-    sim_context = SawyerSimContext(None, setup=False, planning_context=None)
+    sim_context = SawyerSimContext(None, setup=False)
     sim_context.setup(sim_overrides={"run_parallel": False})
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
