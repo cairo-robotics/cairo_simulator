@@ -20,16 +20,18 @@ class CBiRRT2():
 
 
     def __init__(self, robot, state_space, state_validity_checker, interpolation_fn, params):
+        self.tree = ig.Graph(directed=True)
         self.forwards_tree = ig.Graph(directed=True)
         self.backwards_tree = ig.Graph(directed=True)
         self.robot = robot
         self.state_space = state_space
         self.svc = state_validity_checker
         self.interp_fn = interpolation_fn
-        self.q_step = params.get('q_step', .12)
+        self.q_step = params.get('q_step', .05)
         self.epsilon = params.get('epsilon', .1)
         self.e_step = params.get('e_step', .25)
         self.iters = params.get('iters', 1000)
+        self.smoothing_time = params.get('smoothing_time', 5)
        # print("q_step: {}, epsilon: {}, e_step: {}, BiRRT Iters {}".format(self.q_step, self.epsilon, self.e_step, self.iters))
     
     def plan(self, tsr, start_q, goal_q):
