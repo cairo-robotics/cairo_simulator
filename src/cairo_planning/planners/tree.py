@@ -72,11 +72,11 @@ class CBiRRT2():
             q_rand = self._random_config()
             qa_near = self._neighbors(a_tree, q_rand)  # closest leaf value to q_rand
             # extend tree at as far as possible to generate qa_reach
-            qa_reach = self._constrained_extend(a_tree, tsr, qa_near, q_rand)
+            qa_reach, _ = self._constrained_extend(a_tree, tsr, qa_near, q_rand)
             # closest leaf value of B to qa_reach
             qb_near = self._neighbors(b_tree, qa_reach)  
             # now tree B is extended as far as possible to qa_reach
-            qb_reach = self._constrained_extend(b_tree, tsr, qb_near, qa_reach)
+            qb_reach, _ = self._constrained_extend(b_tree, tsr, qb_near, qa_reach)
             # if the qa_reach and qb_reach are equivalent, the trees are connectable. 
             if self._equal(qa_reach, qb_reach):
                 # print("Connecting trees...")
@@ -87,6 +87,7 @@ class CBiRRT2():
                  a_tree, b_tree = next(tree_swp)
     
     def _constrained_extend(self, tree, tsr, q_near, q_target):
+        generated_values = []
         q_s = np.array(q_near)
         qs_old = np.array(q_near)
         iters = 1
@@ -94,12 +95,12 @@ class CBiRRT2():
         while True:
             iters += 1
             if iters >= 1000:
-                return q_s
+                return q_s, generated_values
             if self._equal(q_target, q_s):
-                return q_s
+                return q_s, generated_values
             # we dont bother to keep a new qs that has traversed further away from the target.
             elif self._distance(q_target, q_s) > self._distance(q_target, qs_old):
-                return qs_old
+                return qs_old, generated_values
             # set the qs_old to the current value then update
             qs_old = q_s
             # What this update step does is it moves qs off the manifold towards q_target. And then this is projected back down onto the manifold.
@@ -111,18 +112,19 @@ class CBiRRT2():
                 # this function will occasionally osscilate between to projection values.
                 if self._val2str(q_s) in tree.vs['name']:
                     # If they've already been added, return the current projection value.
-                    return q_s
+                    return q_s, generated_values
                 elif abs(self._distance(q_s, q_target) - prior_distance) < .005:
                     # or if the projection can no longer move closer along manifold
-                    return qs_old
+                    return qs_old, generated_values
                 prior_distance = self._distance(q_s, q_target)
                 self._add_vertex(tree, q_s)
+                generated_values.append(q_s)
                 if tree['name'] == 'forwards' or tree['name'] == 'smoothing':
                     self._add_edge(tree, qs_old, q_s, self._distance(qs_old, q_s))
                 else:
                     self._add_edge(tree, q_s, qs_old, self._distance(q_s, qs_old))
             else:
-                return qs_old
+                return qs_old, generated_values
 
     def _constrain_config(self, qs_old, q_s, tsr):
         # these functions can be very problem specific. For now we'll just assume the most very basic form.
