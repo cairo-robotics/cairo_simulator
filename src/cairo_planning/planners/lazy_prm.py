@@ -5,6 +5,7 @@ import multiprocessing as mp
 import random
 from timeit import default_timer as timer
 from decimal import Decimal, localcontext, ROUND_DOWN
+import time
 
 import numpy as np
 import igraph as ig
@@ -13,7 +14,9 @@ from cairo_planning.planners.tree import CBiRRT2
 from cairo_planning.local.evaluation import subdivision_evaluate
 from cairo_planning.local.interpolation import cumulative_distance
 from cairo_planning.local.neighbors import NearestNeighbors
-from cairo_planning.planners.parallel_workers import parallel_projection_worker, parallel_cbirrt_worker
+from cairo_planning.planners.parallel_workers import parallel_projection_worker
+from cairo_simulator.core.log import Logger
+
 
 __all__ = ['LazyPRM', 'LazyCPRM']
 
@@ -214,8 +217,6 @@ class LazyPRM():
             indexed_plan = list(zip(idx_range, plan))
             for curr_idx, vid1 in indexed_plan:
                 for test_idx, vid2 in indexed_plan[::-1]:
-                    v1 = self.graph.vs[vid1]
-                    v2 = self.graph.vs[vid2]
                     p1 = self.graph.vs[vid1]["value"]
                     p2 = self.graph.vs[vid2]["value"]
                     segment = self.interp_fn(
@@ -418,7 +419,7 @@ class LazyPRM():
 
 class LazyCPRM():
 
-    def __init__(self, sim_context_cls, sim_config, robot, tsr, state_space, tree_state_space, state_validity_checker, interpolation_fn, params, tree_params):
+    def __init__(self, sim_context_cls, sim_config, robot, tsr, state_space, tree_state_space, state_validity_checker, interpolation_fn, params, tree_params, logger = None):
         self.preloaded = False
         self.sim_context = sim_context_cls
         self.sim_config = sim_config
@@ -431,10 +432,12 @@ class LazyCPRM():
         self.n_samples = params.get('n_samples', 600)
         self.k = params.get('k', 5)
         self.ball_radius = params.get('ball_radius', .55)
+        self.smooth_path = params.get('smooth_path', False)
         self.tree_params = tree_params
         self.graph = ig.Graph()
         self.samples = []
-        print("PRM Params: N: {}, k: {}, r: {}".format(
+        self.log =  logger if logger is not None else Logger(handlers=['logging'], level=params.get('log_level', 'info'))
+        self.log.debug("PRM Params: N: {}, k: {}, r: {}".format(
             self.n_samples, self.k, self.ball_radius))
 
     def preload(self, samples, graph):
@@ -446,7 +449,7 @@ class LazyCPRM():
 
     def plan(self, q_start, q_goal):
         self.generate_roadmap(q_start, q_goal)
-        print("Finding feasible best path in graph if available...")
+        self.log.debug("Finding feasible best path in graph if available...")
         vertex_sequence, path = self.get_lazy_path()
         print(vertex_sequence)
         return path
@@ -454,33 +457,33 @@ class LazyCPRM():
     def generate_roadmap(self, q_start, q_goal):
         # Initial sampling of roadmap and NN data structure.
         if self.preloaded is False:
-            print("Generating valid random samples...")
+            self.log.debug("Generating valid random samples...")
             if self.n_samples <= 100:
                 self.samples = self._generate_samples()
             else:
                 self.samples = self._generate_samples_parallel()
-            print("Initializing roadmap with start and goal...")
+            self.log.debug("Initializing roadmap with start and goal...")
             self._init_roadmap(q_start, q_goal)
-            print(len(self.graph.vs))
+            self.log.debug(len(self.graph.vs))
         else:
-            print("Using provided samples...")
-            print("Initializing roadmap with start and goal...")
+            self.log.debug("Using provided samples...")
+            self.log.debug("Initializing roadmap with start and goal...")
             self._init_roadmap(q_start, q_goal)
         # print("Attaching start and end to graph...")
         # # self._attach_start_and_end()
         # Create NN datastructure
-        print("Creating NN datastructure...")
+        self.log.debug("Creating NN datastructure...")
         self.nn = NearestNeighbors(X=np.array(
             self.samples), model_kwargs={"leaf_size": 100})
         # Generate NN connectivity.
         if self.preloaded is False:
-            print("Generating nearest neighbor connectivity...")
+            self.log.debug("Generating nearest neighbor connectivity...")
             connections = self._generate_connections(samples=self.samples)
             # Build the graph structure...
-            print("Building graph")
+            self.log.debug("Building graph")
             self._build_graph(self.samples, connections)
         else:
-            print("Using provided graph...")
+            self.log.debug("Using provided graph...")
 
     def get_path(self, plan):
         points = [self.graph.vs[idx]['value'] for idx in plan]
@@ -593,7 +596,8 @@ class LazyCPRM():
             0, self.graph.vs.find(self.start_name).index)
         return [self.graph.vs['id'].index(_id) for _id in successful_vertex_sequence], path
     
-    def _smooth_path(self, graph_path, tsr, smoothing_time=6):
+    def _smooth_path(self, graph_path, smoothing_time=6):
+        self.log.debug(graph_path)
         # create empty tree. 
         smoothing_tree = ig.Graph(directed=True)
         smoothing_tree['name'] = 'smoothing'
@@ -605,10 +609,12 @@ class LazyCPRM():
             elapsed_time = current_time - start_time
 
             if elapsed_time > smoothing_time:
-                print("Finished iterating in: " + str(int(elapsed_time))  + " seconds")
+                self.log.debug("Finished iterating in: " + str(int(elapsed_time))  + " seconds")
                 break
             # Get two random indeces from path
             rand_idx1, rand_idx2 = random.sample(graph_path, 2)
+            if graph_path.index(rand_idx1) > graph_path.index(rand_idx2):
+                continue
             q_old = self.graph.vs[rand_idx1]['value']
             q_s = self.graph.vs[rand_idx2]['value']
             # add points into tree
@@ -691,7 +697,7 @@ class LazyCPRM():
             if np.any(q_rand):
                 if self._validate(q_rand):
                     if count % 100 == 0:
-                        print("{} valid samples...".format(count))
+                        self.log.debug("{} valid samples...".format(count))
                     valid_samples.append(q_rand)
                     count += 1
                     # sampling_times.append(timer() - start_time)
@@ -716,7 +722,7 @@ class LazyCPRM():
                 if valid:
                     connections.append(
                         [q_neighbor, q_rand, self._weight(local_path)])
-        print("{} connections out of {} samples".format(
+        self.log.debug("{} connections out of {} samples".format(
             len(connections), len(samples)))
         return connections
 
