@@ -173,19 +173,19 @@ class CBiRRT2():
                 curr_path_values = [self.tree.vs[idx]['value'] for idx in self._extract_graph_path(self.tree, rand_idx1, rand_idx2)]
                 smoothed_path_value_pairs = [(smoothed_path_values[i], smoothed_path_values[(i + 1) % len(smoothed_path_values)]) for i in range(len(smoothed_path_values))][:-1]
                 curr_path_values_pairs = [(curr_path_values[i], curr_path_values[(i + 1) % len(curr_path_values)]) for i in range(len(curr_path_values))][:-1]
-            smooth_path_distance = sum([self._distance(pair[0], pair[1]) for pair in smoothed_path_value_pairs])
-            curr_path_distance = sum([self._distance(pair[0], pair[1]) for pair in curr_path_values_pairs])
+                smooth_path_distance = sum([self._distance(pair[0], pair[1]) for pair in smoothed_path_value_pairs])
                 curr_path_distance = sum([self._distance(pair[0], pair[1]) for pair in curr_path_values_pairs])
 
-            # if the newly found path between indices is shorter, lets use it and add it do the graph
-            if smooth_path_distance < curr_path_distance:
+                # if the newly found path between indices is shorter, lets use it and add it do the graph
+                if smooth_path_distance < curr_path_distance:
+                    print("Smoothing path found")
+                    # crop off start and end since they already exist and add inbetween vertices of smoothing tree to main
+                    for q in smoothed_path_values[1:-1]:
+                        self._add_vertex(self.tree, q)
+                    for pair in smoothed_path_value_pairs:
+                        self._add_edge(self.tree, pair[0], pair[1], self._distance(pair[0], pair[1]))
 
-                # crop off start and end since they already exist and add inbetween vertices of smoothing tree to main
-                for q in smoothed_path_values[1:-1]:
-                    self._add_vertex(self.tree, q)
-                for pair in smoothed_path_value_pairs:
-                    self._add_edge(self.tree, pair[0], pair[1], self._distance(pair[0], pair[1]))
-
+        return self._extract_graph_path()
 
     def _extract_graph_path(self, tree=None, from_idx=None, to_idx=None):
         if tree is None:
