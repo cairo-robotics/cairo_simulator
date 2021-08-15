@@ -7,10 +7,8 @@ import time
 import numpy as np
 import igraph as ig
 
-from cairo_planning.local.evaluation import subdivision_evaluate
-from cairo_planning.local.interpolation import cumulative_distance
-from cairo_planning.local.neighbors import NearestNeighbors
 from cairo_planning.constraints.projection import project_config
+from cairo_simulator.core.log import Logger
 
 __all__ = ['CBiRRT2']
 
@@ -18,7 +16,7 @@ __all__ = ['CBiRRT2']
 class CBiRRT2():
 
 
-    def __init__(self, robot, state_space, state_validity_checker, interpolation_fn, params):
+    def __init__(self, robot, state_space, state_validity_checker, interpolation_fn, params, logger=None):
         self.tree = ig.Graph(directed=True)
         self.forwards_tree = ig.Graph(directed=True)
         self.backwards_tree = ig.Graph(directed=True)
@@ -26,12 +24,14 @@ class CBiRRT2():
         self.state_space = state_space
         self.svc = state_validity_checker
         self.interp_fn = interpolation_fn
+        self.smooth_path = params.get('smooth_path', False)
         self.q_step = params.get('q_step', .4)
         self.epsilon = params.get('epsilon', .1)
         self.e_step = params.get('e_step', .25)
         self.iters = params.get('iters', 1000)
         self.smoothing_time = params.get('smoothing_time', 10)
-        print("q_step: {}, epsilon: {}, e_step: {}, BiRRT Iters {}".format(self.q_step, self.epsilon, self.e_step, self.iters))
+        self.log =  logger if logger is not None else Logger(handlers=['logging'], level=params.get('log_level', 'info'))
+        self.log.debug("q_step: {}, epsilon: {}, e_step: {}, BiRRT Iters {}".format(self.q_step, self.epsilon, self.e_step, self.iters))
     
     def plan(self, tsr, start_q, goal_q):
         """ Top level plan function for CBiRRT2. Trees are first initialized with start and end points, constrained birrt is executed, and the path is smoothed.
@@ -42,18 +42,19 @@ class CBiRRT2():
             start_q (array-like): Starting configuration.
             goal_q (array-like): Ending configuration.
         """
-        print("Initializing trees...")
+        self.log.debug("Initializing trees...")
         self._initialize_trees(start_q, goal_q)
-        print("Running Constrained Bidirectional RRT...")
+        self.log.debug("Running Constrained Bidirectional RRT...")
         self.tree = self.cbirrt(tsr)
         if self.tree is not None:
-            print("Extracting path through graph...")
+            self.log.debug("Extracting path through graph...")
             graph_path = self._extract_graph_path()
             if len(graph_path) == 1:
                 return None
             else:
-                print("Smoothing for {} seconds".format(self.smoothing_time))
-                self._smooth_path(graph_path, tsr, self.smoothing_time)
+                if self.smooth_path:
+                    self.log.debug("Smoothing for {} seconds".format(self.smoothing_time))
+                    self._smooth_path(graph_path, tsr, self.smoothing_time)
                 #print("Graph path found: {}".format(graph_path))
                 return graph_path
         # plan = self.get_plan(graph_path)
@@ -149,7 +150,7 @@ class CBiRRT2():
             elapsed_time = current_time - start_time
 
             if elapsed_time > smoothing_time:
-                print("Finished iterating in: " + str(int(elapsed_time))  + " seconds")
+                self.log.debug("Finished iterating in: " + str(int(elapsed_time))  + " seconds")
                 break
             # Get two random indeces from path
             rand_idx1, rand_idx2 = random.sample(graph_path, 2)
@@ -178,7 +179,6 @@ class CBiRRT2():
 
                 # if the newly found path between indices is shorter, lets use it and add it do the graph
                 if smooth_path_distance < curr_path_distance:
-                    print("Smoothing path found")
                     # crop off start and end since they already exist and add inbetween vertices of smoothing tree to main
                     for q in smoothed_path_values[1:-1]:
                         self._add_vertex(self.tree, q)
@@ -373,7 +373,7 @@ class CBiRRT2():
         try:
             return tree.vs.find(name).index
         except Exception as e:
-            print(e)
+            self.log.warn(e)
     
     def _val2str(self, value):
         return str(["{:.8f}".format(val) for val in value])
