@@ -592,6 +592,49 @@ class LazyCPRM():
         successful_vertex_sequence.insert(
             0, self.graph.vs.find(self.start_name).index)
         return [self.graph.vs['id'].index(_id) for _id in successful_vertex_sequence], path
+    
+    def _smooth_path(self, graph_path, tsr, smoothing_time=6):
+        # create empty tree. 
+        smoothing_tree = ig.Graph(directed=True)
+        smoothing_tree['name'] = 'smoothing'
+        start_time = time.time()
+
+
+        while True:
+            current_time = time.time()
+            elapsed_time = current_time - start_time
+
+            if elapsed_time > smoothing_time:
+                print("Finished iterating in: " + str(int(elapsed_time))  + " seconds")
+                break
+            # Get two random indeces from path
+            rand_idx1, rand_idx2 = random.sample(graph_path, 2)
+            q_old = self.graph.vs[rand_idx1]['value']
+            q_s = self.graph.vs[rand_idx2]['value']
+            # add points into tree
+            # self._add_vertex(smoothing_tree, q_old)
+            # self._add_vertex(smoothing_tree, q_s)
+            # q_old_name = self._val2str(q_old)
+            # q_old_idx = self._name2idx(smoothing_tree, q_old_name)
+            # q_s_name = self._val2str(q_s)
+            # q_s_idx = self._name2idx(smoothing_tree, q_s_name)
+            # constrain extended.
+            smoothed_path_values = self._cbirrt2_connect(q_old, q_s)
+            # smoothed_path_values = [smoothing_tree.vs[idx] for idx in self._extract_graph_path(smoothing_tree, q_old_idx, q_s_idx)]
+            curr_path_values = [self._get_graph_path.vs[idx] for idx in self._get_graph_path(rand_idx1, rand_idx2)]
+            smoothed_path_value_pairs = [((i), (i + 1) % len(smoothed_path_values)) for i in range(len(smoothed_path_values))][:-1]
+            curr_path_values_pairs = [((i), (i + 1) % len(curr_path_values)) for i in range(len(curr_path_values))][:-1]
+            smooth_path_distance = sum([self._distance(pair[0], pair[1]) for pair in smoothed_path_value_pairs])
+            curr_path_distance = sum([self._distance(pair[0], pair[1]) for pair in curr_path_values_pairs])
+
+            # if the newly found path between indices is shorter, lets use it and add it do the graph
+            if smooth_path_distance < curr_path_distance:
+
+                # crop off start and end since they already exist and add inbetween vertices of smoothing tree to main
+                for q in smoothed_path_values[1:-1]:
+                    self._add_vertex(self.graph, q)
+                for pair in smoothed_path_value_pairs:
+                    self._add_edge(self.graph, pair[0], pair[1], self._distance(pair[0], pair[1]))
 
     def _get_best_path(self, start_name, end_name):
         graph_idxs = self.graph.get_shortest_paths(
