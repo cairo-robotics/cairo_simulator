@@ -153,6 +153,8 @@ class CBiRRT2():
                 break
             # Get two random indeces from path
             rand_idx1, rand_idx2 = random.sample(graph_path, 2)
+            if graph_path.index(rand_idx1) > graph_path.index(rand_idx2):
+                continue
             q_old = self.tree.vs[rand_idx1]['value']
             q_s = self.tree.vs[rand_idx2]['value']
             # add points into tree
