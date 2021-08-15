@@ -645,8 +645,14 @@ class LazyCPRM():
         else:
             return best_path
 
-    def _get_graph_path(self):
-        return self.graph.get_shortest_paths(self._name2idx(self.graph, self.start_name), self._name2idx(self.graph, self.goal_name), weights='weight', mode='ALL')[0]
+    def _get_graph_path(self, from_idx=None, to_idx=None):
+        if from_idx is None or to_idx is None:
+            from_idx = self._name2idx(self.graph, self.start_name)
+            to_idx = self._name2idx(self.graph, self.goal_name)
+        if 'weight' in self.graph.es.attributes():
+            return self.graph.get_shortest_paths(from_idx, to_idx, weights='weight', mode='OUT')[0]
+        else:
+            return self.graph.get_shortest_paths(from_idx, to_idx, mode='OUT')[0]
 
     def _init_roadmap(self, q_start, q_goal):
         """
