@@ -26,12 +26,12 @@ class CBiRRT2():
         self.state_space = state_space
         self.svc = state_validity_checker
         self.interp_fn = interpolation_fn
-        self.q_step = params.get('q_step', .05)
+        self.q_step = params.get('q_step', .4)
         self.epsilon = params.get('epsilon', .1)
         self.e_step = params.get('e_step', .25)
         self.iters = params.get('iters', 1000)
-        self.smoothing_time = params.get('smoothing_time', 5)
-       # print("q_step: {}, epsilon: {}, e_step: {}, BiRRT Iters {}".format(self.q_step, self.epsilon, self.e_step, self.iters))
+        self.smoothing_time = params.get('smoothing_time', 10)
+        print("q_step: {}, epsilon: {}, e_step: {}, BiRRT Iters {}".format(self.q_step, self.epsilon, self.e_step, self.iters))
     
     def plan(self, tsr, start_q, goal_q):
         """ Top level plan function for CBiRRT2. Trees are first initialized with start and end points, constrained birrt is executed, and the path is smoothed.
@@ -225,13 +225,13 @@ class CBiRRT2():
 
         # In certain edge case scenarios, we have two start and goal points very close to each other
         # What this causes is essentially one of the trees to have a length of one.
-        # Wile qa_reach and qb_reach are essentially equal according to the distance
+        # While qa_reach and qb_reach are essentially equal according to the distance
         # threshold, it is not necessarily equal to the added start and end nodes
-        # hence we get a no such vertex error and potentially our edges are messed up as
+        # hence we get a 'no such vertex error' and potentially our edges are messed up as
         # a result.
         # To fix this, if one of the trees is length 1, we reset the opposite reached point 
         # as the new start/end and  viceversa. If they are both 1 it shouldn't be an issue since
-        # they are essnetially the same poitn and we don't need to create an edge between the two
+        # they are essentially the same point and we don't need to create an edge between the two
         # points. 
         if len(F.vs) == 1 and len(B.vs) > 1:
             qf_name = self._val2str(qf)
