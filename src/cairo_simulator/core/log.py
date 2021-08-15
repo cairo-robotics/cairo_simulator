@@ -43,6 +43,7 @@ class Logger():
             self.logger.debug(msg)
 
     def info(self, msg):
+        print('called')
         if 'stdout' in self.handlers:
             print(msg)
         if 'ros' in self.handlers:

@@ -44,7 +44,7 @@ import numpy as np
 from cairo_planning.geometric.transformation import pose2trans, pseudoinverse, analytic_xyz_jacobian, quat2rpy, rot2rpy
 
 
-def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=100, e_step=1, iter_count=10000):
+def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25, iter_count=10000):
     """
     This function projects a sampled configuration point down to a constraint manifold defined implicitly by a 
     Task Space Region representation. http://cs.brown.edu/courses/csci2951-k/papers/berenson12.pdf
