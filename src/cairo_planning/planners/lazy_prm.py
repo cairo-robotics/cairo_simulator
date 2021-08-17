@@ -6,6 +6,7 @@ import random
 from timeit import default_timer as timer
 from decimal import Decimal, localcontext, ROUND_DOWN
 import time
+import types
 
 import numpy as np
 import igraph as ig
@@ -460,8 +461,7 @@ class LazyCPRM():
         self.log.debug(vertex_sequence)
         if self.smooth_path:
             self.log.debug("Smoothing path...")
-            vertex_sequence = self._smooth_path(vertex_sequence)
-            self.log.debug(vertex_sequence)
+            vertex_sequence, path = self._smooth_path(vertex_sequence, self.smoothing_time)
         return path
     
     def generate_roadmap(self, q_start, q_goal):
@@ -517,10 +517,12 @@ class LazyCPRM():
             self.start_name, self.goal_name)
         while not success:
             if current_best_plan is None or len(current_best_plan) == 1:
-                return []
+                return [], []
 
             invalid_path = True  # we assume an invalid path
             while invalid_path:
+                # FIRST: Evaluate the nodes in the sequence for state validity
+
                 # indicator that there was an invalid node. For now we say there are no invalid nodes since hope is all nodes are valid.
                 invalid_node = False
                 # first lets validate points randomly in the path random
@@ -595,6 +597,7 @@ class LazyCPRM():
                         current_best_plan = self._get_best_path(
                             self.start_name, self.goal_name)
                     else:
+                        # edge could not be made so we remove it.
                         self._remove_edge(from_id, to_id)
                         current_best_plan = self._get_best_path(
                             self.start_name, self.goal_name)
@@ -775,22 +778,20 @@ class LazyCPRM():
 
 
     def _cbirrt2_connect(self, q_near, q_target):
-        centroid = (np.array(q_near) + np.array(q_target)) / 2
-        radius = self._distance(np.array(q_near), np.array(q_target)) / 2
+        self.cbirrt2.reset_planner()
 
-        def _random_config(self):
-            return self.state_space.sample(centroid=centroid, radius=radius)
+        if self.cbirrt2_sampling_space == 'hyperball':
+            centroid = (np.array(q_near) + np.array(q_target)) / 2
+            radius = self._distance(np.array(q_near), np.array(q_target)) / 2
 
-        # monkey-patch goodness to allow for a special type of sampling via hyperball between, and containing q_near and q_target:
-        CBiRRT2._random_config = _random_config
+            def _random_config(self):
+                return self.state_space.sample(centroid=centroid, radius=radius)
 
-        self.tree_params['smooth_path'] = False
-        cbirrt2 = CBiRRT2(self.robot, self.tree_state_space,
-                          self.svc, self.interp_fn, params=self.tree_params, logger=self.log)
+            self.cbirrt2._random_config  = types.MethodType(_random_config, self.cbirrt2)
 
-        graph_plan = cbirrt2.plan(self.tsr, q_near, q_target)
+        graph_plan = self.cbirrt2.plan(self.tsr, q_near, q_target)
         if graph_plan is not None:
-            points = [cbirrt2.connected_tree.vs[idx]['value']
+            points = [self.cbirrt2.connected_tree.vs[idx]['value']
                       for idx in graph_plan]
             return True, points
         else:
