@@ -16,6 +16,7 @@ from cairo_planning.local.evaluation import subdivision_evaluate
 from cairo_planning.local.interpolation import cumulative_distance
 from cairo_planning.local.neighbors import NearestNeighbors
 from cairo_planning.planners.parallel_workers import parallel_projection_worker
+from cairo_planning.planners import utils
 from cairo_simulator.core.log import Logger
 
 
@@ -42,7 +43,7 @@ class LazyPRM():
         self.samples = samples
         self.graph = graph
         for sample in self.samples:
-            self.graph.vs[self._val2idx(self.graph, sample)]['value'] = np.array(sample)
+            self.graph.vs[utils.val2idx(self.graph, sample)]['value'] = np.array(sample)
         self.preloaded = True
 
     def plan(self, q_start, q_goal):
@@ -141,7 +142,7 @@ class LazyPRM():
                         point_id)]['value']
                     if self._validate(point_value):  # validate the point value
                         # If its valid, set the validity to true to bypass future collision/validity checks.
-                        self.graph.vs.find(self._val2name(list(point_value)))[
+                        self.graph.vs.find(utils.val2str(list(point_value)))[
                             'validity'] = True
                     else:
                         # if the point is invalid, then we remove it and associated edges from the graph
@@ -173,7 +174,7 @@ class LazyPRM():
                 # validate the 'to' point value, This is probably redundant right now.
                 if self._validate(to_value):
                     # If its valid, set the validity to true to bypass future collision/validity checks.
-                    self.graph.vs.find(self._val2name(list(to_value)))[
+                    self.graph.vs.find(utils.val2str(list(to_value)))[
                         'validity'] = True
                     # generate an interpolated path between 'from' and 'to'
                     segment = self.interp_fn(
@@ -261,15 +262,15 @@ class LazyPRM():
 
     def _init_roadmap(self, q_start, q_goal):
         self.samples = [q_start, q_goal] + self.samples
-        self.start_name = self._val2name(q_start)
-        self.goal_name = self._val2name(q_goal)
+        self.start_name = utils.val2str(q_start)
+        self.goal_name = utils.val2str(q_goal)
         if 'name' not in self.graph.vs.attributes() or self.start_name not in self.graph.vs['name']:
             self.graph.add_vertex(self.start_name)
-            self.graph.vs[self._name2idx(self.graph, self.start_name)]["value"] = q_start
+            self.graph.vs[utils.name2idx(self.graph, self.start_name)]["value"] = q_start
             self.graph.vs.find(self.start_name)['id'] = self.graph.vs.find(self.start_name).index
         if 'name' not in self.graph.vs.attributes() or self.goal_name not in self.graph.vs['name']:
-            self.graph.add_vertex(self._val2name(q_goal))
-            self.graph.vs[self._name2idx(self.graph, self.goal_name)]["value"] = q_goal
+            self.graph.add_vertex(utils.val2str(q_goal))
+            self.graph.vs[utils.name2idx(self.graph, self.goal_name)]["value"] = q_goal
             self.graph.vs.find(self.goal_name)['id'] = self.graph.vs.find(self.goal_name).index
 
 
@@ -306,14 +307,14 @@ class LazyPRM():
     def _build_graph(self, samples, connections):
         values = [self.graph.vs.find(self.start_name)["value"],
                   self.graph.vs.find(self.goal_name)["value"]] + samples
-        str_values = [self._val2name(list(value)) for value in values]
+        str_values = [utils.val2str(list(value)) for value in values]
         values = [list(value) for value in values]
         self.graph.add_vertices(len(values))
         self.graph.vs["name"] = str_values
         self.graph.vs["value"] = values
         self.graph.vs['id'] = list(range(0, self.graph.vcount()))
         # This below step is BY FAR the slowest part of the the graph building since it has to do lookups by attribute which is quite slow for python igrpah.
-        edges = [(self._name2idx(self.graph, self._val2name(c[0])), self._name2idx(self.graph, self._val2name(c[1])))
+        edges = [(utils.name2idx(self.graph, utils.val2str(c[0])), utils.name2idx(self.graph, utils.val2str(c[1])))
                  for c in connections]
         weights = [c[2] for c in connections]
         self.graph.add_edges(edges)
@@ -328,14 +329,14 @@ class LazyPRM():
         start_added = False
         end_added = False
         for q_near in self._neighbors(start_value, k_override=30, within_ball=True):
-            if self._name2idx(self.graph, self._val2name(q_near)) != 0:
+            if utils.name2idx(self.graph, utils.val2str(q_near)) != 0:
                 successful, local_path = self._extend(start_value, q_near)
                 if successful:
                     start_added = True
                     self._add_edge_to_graph(
                         start_value, q_near, self._weight(local_path))
         for q_near in self._neighbors(end_value, k_override=30, within_ball=True):
-            if self._name2idx(self.graph, self._val2name(q_near)) != 1:
+            if utils.name2idx(self.graph, utils.val2str(q_near)) != 1:
                 successful, local_path = self._extend(q_near, end_value)
                 if successful:
                     end_added = True
@@ -354,7 +355,7 @@ class LazyPRM():
 
     def _validate(self, sample):
         # We keep track of whether or not a node is valid.
-        if self.graph.vs.find(self._val2name(list(sample))).attributes().get('validity', False) == True:
+        if self.graph.vs.find(utils.val2str(list(sample))).attributes().get('validity', False) == True:
             return True
         else:
             return self.svc.validate(sample)
@@ -388,9 +389,9 @@ class LazyPRM():
         return np.array(self.state_space.sample())
 
     def _add_edge_to_graph(self, q_near, q_sample, edge_weight):
-        q_near_idx = self._name2idx(self.graph, self._val2name(q_near))
-        q_sample_idx = self._name2idx(self.graph,
-            self._val2name(q_sample))
+        q_near_idx = utils.name2idx(self.graph, utils.val2str(q_near))
+        q_sample_idx = utils.name2idx(self.graph,
+            utils.val2str(q_sample))
         if tuple(sorted([q_near_idx, q_sample_idx])) not in set([tuple(sorted(edge.tuple)) for edge in self.graph.es]):
             self.graph.add_edge(q_near_idx, q_sample_idx,
                                 **{'weight': edge_weight})
@@ -398,25 +399,6 @@ class LazyPRM():
     def _weight(self, local_path):
         return cumulative_distance(local_path)
 
-    def _val2idx(self, graph, value):
-        return self._name2idx(graph, self._val2name(value))
-
-    def _name2idx(self, graph, name):
-        return graph.vs.find(name).index
-
-    def _val2name(self, value, places=4):
-        def trunc(number, places=4):
-            if not isinstance(places, int):
-                raise ValueError("Decimal places must be an integer.")
-            if places < 1:
-                raise ValueError("Decimal places must be at least 1.")
-            # If you want to truncate to 0 decimal places, just do int(number).
-
-            with localcontext() as context:
-                context.rounding = ROUND_DOWN
-                exponent = Decimal(str(10 ** - places))
-                return Decimal(str(number)).quantize(exponent).to_eng_string()
-        return str([trunc(num, places) for num in value])
 
 class LazyCPRM():
 
@@ -451,7 +433,7 @@ class LazyCPRM():
         self.samples = samples
         self.graph = graph
         for sample in self.samples:
-            self.graph.vs[self._val2idx(self.graph, sample)]['value'] = np.array(sample)
+            self.graph.vs[utils.val2idx(self.graph, sample)]['value'] = np.array(sample)
         self.preloaded = True
 
     def plan(self, q_start, q_goal):
@@ -538,10 +520,10 @@ class LazyCPRM():
                     point_value = self.graph.vs[self.graph.vs['id'].index(
                         point_id)]['value']
                     # We don't need to run validity check if the point is valid.
-                    if not self.graph.vs.find(self._val2name(list(point_value))).attributes().get('validity', False) is True:
+                    if not self.graph.vs.find(utils.val2str(list(point_value))).attributes().get('validity', False) is True:
                         if self._validate(point_value):  # validate the point value
                             # If its valid, set the validity to true to bypass future collision/validity checks.
-                            self.graph.vs.find(self._val2name(list(point_value)))[
+                            self.graph.vs.find(utils.val2str(list(point_value)))[
                                 'validity'] = True
                         else:
                             # if the point is invalid, then we remove it and associated edges from the graph
@@ -572,10 +554,10 @@ class LazyCPRM():
                 if to_id in successful_vertex_sequence:
                     continue
                 # validate the 'to' point value, This is probably redundant right now.
-                if self.graph.vs.find(self._val2name(list(to_value)))[
+                if self.graph.vs.find(utils.val2str(list(to_value)))[
                         'validity'] is True or self._validate(to_value):
                     # If its valid, set the validity to true to bypass future collision/validity checks.
-                    self.graph.vs.find(self._val2name(list(to_value)))[
+                    self.graph.vs.find(utils.val2str(list(to_value)))[
                         'validity'] = True
                    
                     valid = False
@@ -644,9 +626,9 @@ class LazyCPRM():
             # self._add_vertex(smoothing_tree, q_old)
             # self._add_vertex(smoothing_tree, q_s)
             # q_old_name = self._val2str(q_old)
-            # q_old_idx = self._name2idx(smoothing_tree, q_old_name)
+            # q_old_idx = utils.name2idx(smoothing_tree, q_old_name)
             # q_s_name = self._val2str(q_s)
-            # q_s_idx = self._name2idx(smoothing_tree, q_s_name)
+            # q_s_idx = utils.name2idx(smoothing_tree, q_s_name)
             # constrain extended.
             success, smoothed_path_values = self._cbirrt2_connect(q_old, q_s)
             if success:
@@ -679,8 +661,8 @@ class LazyCPRM():
 
     def _get_graph_path(self, from_idx=None, to_idx=None):
         if from_idx is None or to_idx is None:
-            from_idx = self._name2idx(self.graph, self.start_name)
-            to_idx = self._name2idx(self.graph, self.goal_name)
+            from_idx = utils.name2idx(self.graph, self.start_name)
+            to_idx = utils.name2idx(self.graph, self.goal_name)
         if 'weight' in self.graph.es.attributes():
             return self.graph.get_shortest_paths(from_idx, to_idx, weights='weight', mode='OUT')[0]
         else:
@@ -695,21 +677,21 @@ class LazyCPRM():
             q_goal (array-like): The goal configuration.
         """
         self.samples = [q_start, q_goal] + self.samples
-        self.start_name = self._val2name(q_start)
-        self.goal_name = self._val2name(q_goal)
+        self.start_name = utils.val2str(q_start)
+        self.goal_name = utils.val2str(q_goal)
         if 'name' not in self.graph.vs.attributes() or self.start_name not in self.graph.vs['name']:
             self.graph.add_vertex(self.start_name)
-            self.graph.vs[self._name2idx(self.graph, self.start_name)]["value"] = q_start
+            self.graph.vs[utils.name2idx(self.graph, self.start_name)]["value"] = q_start
             self.graph.vs.find(self.start_name)['id'] = self.graph.vs.find(self.start_name).index
         if 'name' not in self.graph.vs.attributes() or self.goal_name not in self.graph.vs['name']:
-            self.graph.add_vertex(self._val2name(q_goal))
-            self.graph.vs[self._name2idx(self.graph, self.goal_name)]["value"] = q_goal
+            self.graph.add_vertex(utils.val2str(q_goal))
+            self.graph.vs[utils.name2idx(self.graph, self.goal_name)]["value"] = q_goal
             self.graph.vs.find(self.goal_name)['id'] = self.graph.vs.find(self.goal_name).index
 
 
     def _attach_start_and_end(self):
-        start = self.graph.vs[self._name2idx(self.graph, self.start_name)]['value']
-        end = self.graph.vs[self._name2idx(self.graph, self.goal_name)]['value']
+        start = self.graph.vs[utils.name2idx(self.graph, self.start_name)]['value']
+        end = self.graph.vs[utils.name2idx(self.graph, self.goal_name)]['value']
         self.samples = self.samples + [start, end]
         
 
@@ -753,14 +735,14 @@ class LazyCPRM():
         return connections
 
     def _build_graph(self, samples, connections):
-        str_values = [self._val2name(list(value)) for value in samples]
+        str_values = [utils.val2str(list(value)) for value in samples]
         values = [list(value) for value in samples]
         # we add a bunch of new vertices for the sampled points, but we already have the graph initialized with two points (start and goal)
         self.graph.add_vertices(len(values)-2)
         self.graph.vs["name"] = str_values
         self.graph.vs["value"] = values
         self.graph.vs['id'] = [v.index for v in self.graph.vs]
-        edges = [(self._val2idx(self.graph, c[0]), self._val2idx(self.graph, c[1]))
+        edges = [(utils.val2idx(self.graph, c[0]), utils.val2idx(self.graph, c[1]))
                  for c in connections]
         weights = [c[2] for c in connections]
         self.graph.add_edges(edges)
@@ -796,7 +778,7 @@ class LazyCPRM():
             self.cbirrt2._random_config  = types.MethodType(_random_config, self.cbirrt2)
 
         graph_plan = self.cbirrt2.plan(self.tsr, q_near, q_target)
-        if graph_plan is not None:
+        if graph_plan is not None and len(graph_plan) > 1:
             points = [self.cbirrt2.connected_tree.vs[idx]['value']
                       for idx in graph_plan]
             return True, points
@@ -823,15 +805,15 @@ class LazyCPRM():
                 list(zip(distances, neighbors)), key=lambda x: x[0]) if distance > 0]
 
     def _add_vertex(self, graph, q):
-        start_val2name = self._val2name(self.graph.vs[self._name2idx(graph, self.start_name)]['value'])
-        goal_val2name = self._val2name(self.graph.vs[self._name2idx(graph, self.goal_name)]['value'])
-        if not self._val2name(q) in graph.vs['name']:
-            if self._val2name(q) != start_val2name and self._val2name(q) != goal_val2name:
-                graph.add_vertex(self._val2name(q), **{'value': q})
+        start_val2name = utils.val2str(self.graph.vs[utils.name2idx(graph, self.start_name)]['value'])
+        goal_val2name = utils.val2str(self.graph.vs[utils.name2idx(graph, self.goal_name)]['value'])
+        if not utils.val2str(q) in graph.vs['name']:
+            if utils.val2str(q) != start_val2name and utils.val2str(q) != goal_val2name:
+                graph.add_vertex(utils.val2str(q), **{'value': q})
     
     def _remove_edge(self, vidx1, vidx2):
-        start_val2name = self._val2name(self.graph.vs[self._name2idx(self.graph, self.start_name)]['value'])
-        goal_val2name = self._val2name(self.graph.vs[self._name2idx(self.graph, self.goal_name)]['value'])
+        start_val2name = utils.val2str(self.graph.vs[utils.name2idx(self.graph, self.start_name)]['value'])
+        goal_val2name = utils.val2str(self.graph.vs[utils.name2idx(self.graph, self.goal_name)]['value'])
         graph_idx1 = self.graph.vs['id'].index(vidx1)
         graph_idx2 = self.graph.vs['id'].index(vidx2)
         if self.graph.vs[graph_idx1]['name'] not in [start_val2name, goal_val2name] and self.graph.vs[graph_idx2]['name'] not in [start_val2name, goal_val2name]:
@@ -839,45 +821,25 @@ class LazyCPRM():
                 graph_idx1, graph_idx2, directed=False, error=True))
 
     def _add_edge(self, graph, q_from, q_to, weight):
-        start_val2name = self._val2name(self.graph.vs[self._name2idx(graph, self.start_name)]['value'])
-        goal_val2name = self._val2name(self.graph.vs[self._name2idx(graph, self.goal_name)]['value'])
-        if self._val2name(q_from) == start_val2name:
-            q_from_idx = self._name2idx(graph, self.start_name)
-        elif self._val2name(q_from) == goal_val2name:
-            q_from_idx = self._name2idx(graph, self.goal_name)
+        start_val2name = utils.val2str(self.graph.vs[utils.name2idx(graph, self.start_name)]['value'])
+        goal_val2name = utils.val2str(self.graph.vs[utils.name2idx(graph, self.goal_name)]['value'])
+        if utils.val2str(q_from) == start_val2name:
+            q_from_idx = utils.name2idx(graph, self.start_name)
+        elif utils.val2str(q_from) == goal_val2name:
+            q_from_idx = utils.name2idx(graph, self.goal_name)
         else:
-            q_from_idx = self._val2idx(graph, q_from)
-        if self._val2name(q_to) == start_val2name:
-            q_to_idx = self._name2idx(graph, self.start_name)
-        elif self._val2name(q_to) == goal_val2name:
-            q_to_idx = self._name2idx(graph, self.goal_name)
+            q_from_idx = utils.val2idx(graph, q_from)
+        if utils.val2str(q_to) == start_val2name:
+            q_to_idx = utils.name2idx(graph, self.start_name)
+        elif utils.val2str(q_to) == goal_val2name:
+            q_to_idx = utils.name2idx(graph, self.goal_name)
         else:
-            q_to_idx = self._val2idx(graph, q_to)
+            q_to_idx = utils.val2idx(graph, q_to)
         if tuple(sorted([q_from_idx, q_to_idx])) not in set([tuple(sorted(edge.tuple)) for edge in graph.es]):
             graph.add_edge(q_from_idx, q_to_idx, **{'weight': weight})
 
     def _delete_vertex(self, graph, value):
-        graph.delete_vertices(self._val2name(value))
-
-    def _val2idx(self, graph, value):
-        return self._name2idx(graph, self._val2name(value))
-
-    def _name2idx(self, graph, name):
-        return graph.vs.find(name).index
-
-    def _val2name(self, value, places=4):
-        def trunc(number, places=4):
-            if not isinstance(places, int):
-                raise ValueError("Decimal places must be an integer.")
-            if places < 1:
-                raise ValueError("Decimal places must be at least 1.")
-            # If you want to truncate to 0 decimal places, just do int(number).
-
-            with localcontext() as context:
-                context.rounding = ROUND_DOWN
-                exponent = Decimal(str(10 ** - places))
-                return Decimal(str(number)).quantize(exponent).to_eng_string()
-        return str([trunc(num, places) for num in value])
+        graph.delete_vertices(utils.val2str(value))
 
     def _weight(self, local_path):
         return cumulative_distance(local_path)

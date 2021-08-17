@@ -8,6 +8,8 @@ import numpy as np
 import igraph as ig
 
 from cairo_planning.constraints.projection import project_config
+
+from cairo_planning.planners import utils
 from cairo_simulator.core.log import Logger
 
 __all__ = ['CBiRRT2']
@@ -116,7 +118,7 @@ class CBiRRT2():
             q_s = self._constrain_config(qs_old=qs_old, q_s=q_s, tsr=tsr)
             if q_s is not None:
                 # this function will occasionally osscilate between to projection values.
-                if self._val2str(q_s) in tree.vs['name']:
+                if utils.val2str(q_s) in tree.vs['name']:
                     # If they've already been added, return the current projection value.
                     return q_s, generated_values
                 elif abs(self._distance(q_s, q_target) - prior_distance) < .005:
@@ -166,10 +168,10 @@ class CBiRRT2():
             # add points into tree
             self._add_vertex(smoothing_tree, q_old)
             self._add_vertex(smoothing_tree, q_s)
-            q_old_name = self._val2str(q_old)
-            q_old_idx = self._name2idx(smoothing_tree, q_old_name)
-            q_s_name = self._val2str(q_s)
-            q_s_idx = self._name2idx(smoothing_tree, q_s_name)
+            q_old_name = utils.val2str(q_old)
+            q_old_idx = utils.name2idx(smoothing_tree, q_old_name)
+            q_s_name = utils.val2str(q_s)
+            q_s_idx = utils.name2idx(smoothing_tree, q_s_name)
             # constrained extend to the potential shortcut point.
             q_reached, added_q_values = self._constrained_extend(smoothing_tree, tsr, q_old, q_s)
             if self._distance(q_reached, q_s) < .01 and len(added_q_values) > 0:
@@ -196,8 +198,8 @@ class CBiRRT2():
         if tree is None:
             tree = self.tree
         if from_idx is None or to_idx is None:
-            from_idx = self._name2idx(tree, self.start_name)
-            to_idx = self._name2idx(tree, self.goal_name)
+            from_idx = utils.name2idx(tree, self.start_name)
+            to_idx = utils.name2idx(tree, self.goal_name)
         if 'weight' in tree.es.attributes():
             return tree.get_shortest_paths(from_idx, to_idx, weights='weight', mode='OUT')[0]
         else:
@@ -239,22 +241,22 @@ class CBiRRT2():
         # they are essentially the same point and we don't need to create an edge between the two
         # points. 
         if len(F.vs) == 1 and len(B.vs) > 1:
-            qf_name = self._val2str(qf)
-            qf_idx = self._name2idx(F, qf_name)
+            qf_name = utils.val2str(qf)
+            qf_idx = utils.name2idx(F, qf_name)
             qf_value = F.vs[qf_idx]['value']
 
-            qb_name = self._val2str(qb)
-            qb_idx = self._name2idx(B, qb_name)
+            qb_name = utils.val2str(qb)
+            qb_idx = utils.name2idx(B, qb_name)
             B.vs[qb_idx]['name'] = qf_name
             B.vs[qb_idx]['value'] = qf_value
         
         if len(F.vs) > 1 and len(B.vs) == 1:
-            qb_name = self._val2str(qb)
-            qb_idx = self._name2idx(B, qb_name)
+            qb_name = utils.val2str(qb)
+            qb_idx = utils.name2idx(B, qb_name)
             qb_value = F.vs[qb_idx]['value']
 
-            qf_name = self._val2str(qf)
-            qf_idx = self._name2idx(F, qf_name)
+            qf_name = utils.val2str(qf)
+            qf_idx = utils.name2idx(F, qf_name)
             F.vs[qf_idx]['name'] = qb_name
             F.vs[qf_idx]['value'] = qb_value
             
@@ -268,20 +270,20 @@ class CBiRRT2():
         F_tree_edges = []
         for e in F.es:
             F_idxs = e.tuple
-            F_tree_edges.append((self._name2idx(tree, self._val2str(F.vs[F_idxs[0]]['value'])), self._name2idx(tree, self._val2str(F.vs[F_idxs[1]]['value']))))
+            F_tree_edges.append((utils.name2idx(tree, utils.val2str(F.vs[F_idxs[0]]['value'])), utils.name2idx(tree, utils.val2str(F.vs[F_idxs[1]]['value']))))
         tree.add_edges(F_tree_edges)
         if len(F.es) > 0:
             tree.es['weight'] = F.es['weight']
 
         # Attach qf to parents/in neighbors of qb, since those parents should be parents to qf
         # Since we built the B graph backwards, we get B's successors
-        b_parents = B.successors(self._name2idx(B, self._val2str(qb)))
+        b_parents = B.successors(utils.name2idx(B, utils.val2str(qb)))
         # collect the edges and weights of qb to parents in B. We collect by name.
         connection_edges_by_name = []
         connection_edge_weights = []
-        qb_name = self._val2str(qb)
-        qb_idx = self._name2idx(B, qb_name)
-        qf_name = self._val2str(qf)
+        qb_name = utils.val2str(qb)
+        qb_idx = utils.name2idx(B, qb_name)
+        qf_name = utils.val2str(qf)
         for parent in b_parents:
             connection_edges_by_name.append((qf_name, B.vs[parent]['name']))
             connection_edge_weights.append(B.es[B.get_eid(qb_idx,  parent)]['weight'])
@@ -297,7 +299,7 @@ class CBiRRT2():
             B_tree_edges = []
             for e in B.es:
                 B_idxs = e.tuple
-                B_tree_edges.append((self._name2idx(tree, B.vs[B_idxs[0]]['name']), self._name2idx(tree, self._val2str(B.vs[B_idxs[1]]['value']))))
+                B_tree_edges.append((utils.name2idx(tree, B.vs[B_idxs[0]]['name']), utils.name2idx(tree, utils.val2str(B.vs[B_idxs[1]]['value']))))
             if len(B.es) > 0:
                 if len(tree.es) > 0:
                     curr_edge_weights = tree.es['weight'] 
@@ -310,7 +312,7 @@ class CBiRRT2():
         connection_edges = []
         for edge_name_pair in connection_edges_by_name:
             # get the idx in the tree
-            connection_edges.append((self._name2idx(tree, edge_name_pair[0]), self._name2idx(tree, edge_name_pair[1])))
+            connection_edges.append((utils.name2idx(tree, edge_name_pair[0]), utils.name2idx(tree, edge_name_pair[1])))
         
         if 'weight' in tree.es.attributes():
             curr_edge_weights = tree.es['weight']
@@ -335,13 +337,13 @@ class CBiRRT2():
         return np.array(self.state_space.sample())
 
     def _initialize_trees(self, start_q, goal_q):
-        self.start_name = self._val2str(start_q)
+        self.start_name = utils.val2str(start_q)
         self.forwards_tree.add_vertex(self.start_name)
         self.forwards_tree.vs.find(name=self.start_name)['value'] = start_q
         self.forwards_tree['name'] = 'forwards'
        
 
-        self.goal_name = self._val2str(goal_q)
+        self.goal_name = utils.val2str(goal_q)
         self.backwards_tree.add_vertex(self.goal_name)
         self.backwards_tree.vs.find(name=self.goal_name)['value'] = goal_q
         self.backwards_tree['name'] = 'backwards'
@@ -363,25 +365,16 @@ class CBiRRT2():
             i += 1
 
     def _add_vertex(self, tree, q):
-        tree.add_vertex(self._val2str(q), **{'value': q})
+        tree.add_vertex(utils.val2str(q), **{'value': q})
 
 
     def _add_edge(self, tree, q_from, q_to, weight):
-        q_from_idx = self._name2idx(tree, self._val2str(q_from))
-        q_to_idx = self._name2idx(tree, self._val2str(q_to))
-        if self._val2str(q_from) == self.start_name and self._val2str(q_to) == self.goal_name:
+        q_from_idx = utils.name2idx(tree, utils.val2str(q_from))
+        q_to_idx = utils.name2idx(tree, utils.val2str(q_to))
+        if utils.val2str(q_from) == self.start_name and utils.val2str(q_to) == self.goal_name:
             tree.add_edge(q_from_idx, q_to_idx, **{'weight': weight})
         elif tuple(sorted([q_from_idx, q_to_idx])) not in set([tuple(sorted(edge.tuple)) for edge in tree.es]):
             tree.add_edge(q_from_idx, q_to_idx, **{'weight': weight})
-
-    def  _name2idx(self, tree, name):
-        try:
-            return tree.vs.find(name).index
-        except Exception as e:
-            self.log.warn(e)
-    
-    def _val2str(self, value):
-        return str(["{:.8f}".format(val) for val in value])
     
     def _distance(self, q1, q2):
         return np.linalg.norm(np.array(q1) - np.array(q2))
