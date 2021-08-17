@@ -192,8 +192,8 @@ class LazyPRM():
                         if to_id == goal_idx:
                             success = True  # if we made a path to goal, then planning was a success and we can break out
                             break
-                        current_best_plan = self._get_best_path(
-                            self.start_name, self.goal_name)
+                        # current_best_plan = self._get_best_path(
+                        #     self.start_name, self.goal_name)
                     else:
                         self._remove_edge(from_id, to_id)
                         current_best_plan = self._get_best_path(
