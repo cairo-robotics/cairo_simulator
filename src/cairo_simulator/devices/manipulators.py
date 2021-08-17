@@ -73,8 +73,8 @@ class Manipulator(Robot):
         '''
         self._init_joint_names()
         self._init_joint_limits()
-        # Default to 50% of max movement speed
-        self.set_default_joint_velocity_pct(0.5)
+        # Default to 25% of max movement speed
+        self.set_default_joint_velocity_pct(0.25)
 
     @abstractmethod
     def _init_forward_kinematics(self, urdf_file):
@@ -321,7 +321,6 @@ class Manipulator(Robot):
             return False
 
         cur_pos = self.get_current_joint_states()
-
         return np.linalg.norm(np.array(pos) - np.array(cur_pos)) < epsilon
 
 
@@ -744,9 +743,12 @@ class Sawyer(Manipulator):
         sim.set_robot_trajectory(
             self._simulator_id, joint_positions, joint_velocities)
 
-    def check_if_at_position(self, pos, epsilon=0.2):
+    def check_if_at_position(self, pos, epsilon=0.35):
         '''
         Returns True if the robot's joints are within (epsilon) of pos, false otherwise
+
+        We use a fairly large epsilon for Sawyer because the robot seems to get stuck often with smaller values.
+
         @param pos Vector of length 7, 8, or 9, corresponding to arm position, arm+gripper%, or arm+gripper position
 
         Args:
@@ -769,7 +771,6 @@ class Sawyer(Manipulator):
             pos = pos[:7] + self.get_gripper_pct_finger_positions(pos[7])
 
         dist = np.linalg.norm(np.array(pos) - np.array(cur_pos))
-
         # rospy.loginfo("Checking if Sawyer is at %s. (dist=%g) %s" % (str(pos), dist, str(dist <= epsilon)))
         if dist <= epsilon:
             return True
