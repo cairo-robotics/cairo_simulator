@@ -70,7 +70,7 @@ def main():
         interp = partial(parametric_lerp, steps=10)
         # See params for PRM specific parameters
         prm = LazyCPRM(SawyerCPRMSimContext, config, sawyer_robot, tsr, planning_space, tree_state_space, svc, interp, params={
-            'n_samples': 16000, 'k': 15, 'planning_attempts': 5, 'ball_radius': 2.5}, tree_params={'iters': 50, 'q_step': .5})
+            'n_samples': 12000, 'k': 15, 'planning_attempts': 5, 'ball_radius': 10}, tree_params={'iters': 50, 'q_step': .5, 'e_step': .25})
         logger.info("Planning....")
         path = prm.generate_roadmap(np.array(start), np.array(goal))
 

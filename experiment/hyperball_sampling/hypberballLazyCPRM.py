@@ -25,7 +25,7 @@ def main():
 
     # Reload the samples and configuration
     directory = os.path.join(os.path.dirname(
-        os.path.abspath(__file__)), "serialization_data/2021-08-16T21-01-57")
+        os.path.abspath(__file__)), "serialization_data/2021-08-17T16-25-40")
     config, samples, graph = load_model(directory)
     config["sim_objects"] = [
         {
