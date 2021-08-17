@@ -448,10 +448,18 @@ class LazyCPRM():
         self.preloaded = True
 
     def plan(self, q_start, q_goal):
+        if not self.svc.validate(q_start) and not self.svc.validate(q_goal):
+            raise Exception("Starting and ending for planning is invalid according to state validity checker.)")
+        if not self.svc.validate(q_start):
+            raise Exception("Starting point for planning is invalid according to state validity checker.")
+        if not self.svc.validate(q_goal):
+                    raise Exception("Ending point for planning is invalid according to state validity checker.)")
         self.generate_roadmap(q_start, q_goal)
         self.log.debug("Finding feasible best path in graph if available...")
         vertex_sequence, path = self.get_lazy_path()
+        self.log.debug(vertex_sequence)
         if self.smooth_path:
+            self.log.debug("Smoothing path...")
             vertex_sequence = self._smooth_path(vertex_sequence)
             self.log.debug(vertex_sequence)
         return path
