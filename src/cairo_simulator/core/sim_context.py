@@ -75,7 +75,7 @@ class SawyerSimContext(AbstractSimContext):
 
         logger_config = self.config.get("logger", {
             "handlers": ['logging'],
-            "level": "info"
+            "level": "debug"
         })
         self.config['logger'] = logger_config
 
@@ -199,7 +199,7 @@ class SawyerCPRMSimContext(AbstractSimContext):
 
         logger_config = self.config.get("logger", {
             "handlers": ['logging'],
-            "level": "info"
+            "level": "debug"
         })
 
         sawyer_config = self.config.get("sawyer", {
