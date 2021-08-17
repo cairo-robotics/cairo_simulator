@@ -73,8 +73,8 @@ class Manipulator(Robot):
         '''
         self._init_joint_names()
         self._init_joint_limits()
-        # Default to 50% of max movement speed
-        self.set_default_joint_velocity_pct(0.5)
+        # Default to 25% of max movement speed
+        self.set_default_joint_velocity_pct(0.25)
 
     @abstractmethod
     def _init_forward_kinematics(self, urdf_file):
