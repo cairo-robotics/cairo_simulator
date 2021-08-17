@@ -434,12 +434,18 @@ class LazyCPRM():
         self.k = params.get('k', 5)
         self.ball_radius = params.get('ball_radius', .55)
         self.smooth_path = params.get('smooth_path', False)
+        self.smoothing_time = params.get('smoothing_time', 10)
+        self.cbirrt2_sampling_space = params.get('cbirrt2_sampling_space', 'hyperball')
         self.tree_params = tree_params
+        self.tree_params['smooth_path'] = False
+        self.tree_params['log_level'] = 'info'
+        self.cbirrt2 = CBiRRT2(self.robot, self.tree_state_space,
+                          self.svc, self.interp_fn, params=self.tree_params)
         self.graph = ig.Graph()
         self.samples = []
-        self.log =  logger if logger is not None else Logger(handlers=['logging'], level=params.get('log_level', 'info'))
-        self.log.debug("PRM Params: N: {}, k: {}, r: {}".format(
-            self.n_samples, self.k, self.ball_radius))
+        self.log =  logger if logger is not None else Logger(name='LazyCPRM', handlers=['logging'], level=params.get('log_level', 'debug'))
+        self.log.debug("LazyCPRM Params: N: {}, k: {}, r: {}, smoothing: {}, smoothing_time: {}".format(
+            self.n_samples, self.k, self.ball_radius, self.smooth_path, self.smoothing_time))
 
     def preload(self, samples, graph):
         self.samples = samples
