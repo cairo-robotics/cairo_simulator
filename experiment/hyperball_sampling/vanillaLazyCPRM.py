@@ -25,7 +25,7 @@ def main():
 
     # Reload the samples and configuration
     directory = os.path.join(os.path.dirname(
-        os.path.abspath(__file__)), "2021-08-16T21-01-57")
+        os.path.abspath(__file__)), "serialization_data/2021-08-16T21-01-57")
     config, samples, graph = load_model(directory)
     config["sim_objects"] = [
         {
@@ -75,7 +75,7 @@ def main():
         interp = partial(parametric_lerp, steps=10)
         # See params for PRM specific parameters
         prm = LazyCPRM(SawyerCPRMSimContext, config, sawyer_robot, tsr, planning_space, tree_state_space, svc, interp, params={
-            'n_samples': 3000, 'k': 15, 'planning_attempts': 5, 'ball_radius': 10, 'smooth_path': False, 'cbirrt2_sampling_space': 'uniform', 'smoothing_time': 5}, tree_params={'iters': 50, 'q_step': .48, 'e_step': .25})
+            'n_samples': 3000, 'k': 15, 'planning_attempts': 5, 'ball_radius': 10, 'smooth_path': True, 'cbirrt2_sampling_space': 'uniform', 'smoothing_time': 5}, tree_params={'iters': 50, 'q_step': .48, 'e_step': .25})
         logger.info("Planning....")
         prm.preload(samples, graph)
         ptime1 = time.process_time()

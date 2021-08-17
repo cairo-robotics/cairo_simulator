@@ -25,7 +25,7 @@ def main():
 
     # Reload the samples and configuration
     directory = os.path.join(os.path.dirname(
-        os.path.abspath(__file__)), "2021-08-16T21-01-57")
+        os.path.abspath(__file__)), "serialization_data/2021-08-16T21-01-57")
     config, samples, graph = load_model(directory)
     config["sim_objects"] = [
         {
@@ -62,15 +62,11 @@ def main():
             0.2383928041974519, -2.7327884695211555, -2.2177502341009134, -0.08992133311928363]
 
     sawyer_robot.move_to_joint_pos(start)
-    time.sleep(5)
+    time.sleep(2)
     # Utilizes RPY convention
     with DisabledCollisionsContext(sim, [], []):
-        print(sawyer_robot.get_current_joint_states())
-        svc.validate(start)
-        print(svc.validate(start))
-        time.sleep(1)
         ###########
-        # LazyPRM #
+        # LazyCPRM #
         ###########
         # The specific space we sample from is the Hyberball centered at the midpoint between two candidate points.
         # This is used to bias tree grwoth between two points when using CBiRRT2 as our local planner for a constrained PRM.
@@ -85,6 +81,7 @@ def main():
         prm.preload(samples, graph)
         ptime1 = time.process_time()
         path = prm.plan(np.array(start), np.array(goal))
+        logger.info("Path length {}".format(len(path)))
     # splining uses numpy so needs to be converted
     path = [np.array(p) for p in path]
     # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
