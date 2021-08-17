@@ -3,6 +3,7 @@ import itertools
 from functools import partial
 import multiprocessing as mp
 import random
+from decimal import Decimal, localcontext, ROUND_DOWN
 from timeit import default_timer as timer
 
 import numpy as np
@@ -13,6 +14,8 @@ from cairo_planning.local.interpolation import cumulative_distance
 from cairo_planning.local.neighbors import NearestNeighbors
 from cairo_planning.planners.parallel_workers import parallel_connect_worker, parallel_sample_worker, parallel_projection_worker, parallel_cbirrt_worker
 from cairo_planning.planners.tree import CBiRRT2
+from cairo_planning.planners import utils
+from cairo_simulator.core.log import Logger
 
 __all__ = ['PRM', 'PRMParallel', 'CPRM']
 
@@ -217,6 +220,7 @@ class PRM():
 
 class PRMParallel():
     # TODO: Need to incorporate new name attribute as string of value for fast indexing / lookups.
+    # VERY OUT OF DATE
     def __init__(self, sim_context_cls, sim_config, svc, interpolation_fn, params):
         self.graph = ig.Graph()
         self.sim_context_cls = sim_context_cls
@@ -383,7 +387,7 @@ class PRMParallel():
 
 class CPRM():
 
-    def __init__(self, sim_context_cls, sim_config, robot, tsr, state_space, tree_state_space, state_validity_checker, interpolation_fn, params, tree_params):
+    def __init__(self, sim_context_cls, sim_config, robot, tsr, state_space, tree_state_space, state_validity_checker, interpolation_fn, params, tree_params, logger=None):
         self.sim_context = sim_context_cls
         self.sim_config = sim_config
         self.robot = robot
@@ -396,34 +400,38 @@ class CPRM():
         self.k = params.get('k', 5)
         self.ball_radius = params.get('ball_radius', .55)
         self.tree_params = tree_params
-        self.graph = ig.Graph()
-        print("PRM Params: N: {}, k: {}, r: {}".format(
+        self.tree_params = tree_params
+        self.tree_params['smooth_path'] = False
+        self.tree_params['log_level'] = 'info'
+        self.graph = ig.Graph(directed=False)
+        self.log =  logger if logger is not None else Logger(name='CPRM', handlers=['logging'], level=params.get('log_level', 'debug'))
+        self.log.info("CPRM Params: N: {}, k: {}, r: {}".format(
             self.n_samples, self.k, self.ball_radius))
 
     def plan(self, q_start, q_goal):
         # Initial sampling of roadmap and NN data structure.
-        print("Initializing roadmap...")
+        self.log.debug("Initializing roadmap...")
         self._init_roadmap(q_start, q_goal)
-        print("Generating valid random samples...")
+        self.log.debug("Generating valid random samples...")
         if self.n_samples <= 100:
-            samples = self._generate_samples()
+            self.samples = self._generate_samples()
         else:
-            samples = self._generate_samples_parallel()
+            self.samples = self._generate_samples_parallel()
         # Create NN datastructure
-        print("Creating NN datastructure...")
+        self.log.debug("Creating NN datastructure...")
         self.nn = NearestNeighbors(X=np.array(
-            samples), model_kwargs={"leaf_size": 100})
+            self.samples), model_kwargs={"leaf_size": 100})
         # Generate NN connectivity.
-        print("Generating nearest neighbor connectivity...")
+        self.log.debug("Generating nearest neighbor connectivity...")
         if self.n_samples <= 100:
-            self._generate_connections(samples=samples)
+            self._generate_connections(samples=self.samples)
         else:
-            self._generate_connections_parallel(samples=samples)
-        print("Adding connections")
+            self._generate_connections_parallel(samples=self.samples)
+        self.log.debug("Adding connections")
 
-        print("Attaching start and end to graph...")
+        self.log.debug("Attaching start and end to graph...")
         self._attach_start_and_end()
-        print("Finding feasible best path in graph if available...")
+        self.log.debug("Finding feasible best path in graph if available...")
         return self._get_graph_path()
 
     def get_path(self, plan):
@@ -438,7 +446,7 @@ class CPRM():
         return path
 
     def _get_graph_path(self):
-        return self.graph.get_shortest_paths(self._name2idx(self.graph, 'start'), self._name2idx(self.graph, 'goal'), weights='weight', mode='ALL')[0]
+        return self.graph.get_shortest_paths(utils.name2idx(self.graph, self.start_name), utils.name2idx(self.graph, self.goal_name), weights='weight', mode='ALL')[0]
 
     def _init_roadmap(self, q_start, q_goal):
         """
@@ -448,27 +456,25 @@ class CPRM():
             q_start (array-like): The starting configuration.
             q_goal (array-like): The goal configuration.
         """
-        self.graph.add_vertex("start")
-        # Start is always at the 0 index.
-        self.graph.vs[0]["value"] = q_start
-        self.graph.add_vertex("goal")
-        # Goal is always at the 1 index.
-        self.graph.vs[1]["value"] = q_goal
+        self.start_name = utils.val2str(q_start)
+        self.goal_name = utils.val2str(q_goal)
+        self.graph.add_vertex(self.start_name, **{'value': q_start})
+        self.graph.add_vertex(self.goal_name, **{'value': q_goal})
 
     def _attach_start_and_end(self):
-        start = self.graph.vs[self._name2idx(self.graph, 'start')]['value']
-        end = self.graph.vs[self._name2idx(self.graph, 'goal')]['value']
+        start = self.graph.vs[utils.name2idx(self.graph, self.start_name)]['value']
+        end = self.graph.vs[utils.name2idx(self.graph, self.goal_name)]['value']
         start_added = False
         end_added = False
         for q_near in self._neighbors(start, k_override=15, within_ball=False):
-            if self._val2name(q_near) in self.graph.vs['name']:
-                if self._val2idx(self.graph, q_near) != 0:
+            if utils.val2str(q_near) in self.graph.vs['name']:
+                if utils.val2idx(self.graph, q_near) != 0:
                     successful = self._cbirrt2_connect(start, q_near)
                     if successful:
                         start_added = True
         for q_near in self._neighbors(end, k_override=15, within_ball=False):
-            if self._val2name(q_near) in self.graph.vs['name']:
-                if self._val2idx(self.graph, q_near) != 1:
+            if utils.val2str(q_near) in self.graph.vs['name']:
+                if utils.val2idx(self.graph, q_near) != 1:
                     successful = self._cbirrt2_connect(q_near, end)
                     if successful:
                         end_added = True
@@ -486,7 +492,7 @@ class CPRM():
             if np.any(q_rand):
                 if self._validate(q_rand):
                     if count % 100 == 0:
-                        print("{} valid samples...".format(count))
+                        self.log.debug("{} valid samples...".format(count))
                     valid_samples.append(q_rand)
                     count += 1
                     # sampling_times.append(timer() - start_time)
@@ -512,12 +518,13 @@ class CPRM():
         point_pairs = []
         for q_rand in samples:
             for q_neighbor in self._neighbors(q_rand):
-                if (self._val2name(q_rand), self._val2name(q_neighbor)) not in evaluated_name_pairs and (self._val2name(q_neighbor), self._val2name(q_rand)) not in evaluated_name_pairs:
+                if (utils.val2str(q_rand), utils.val2str(q_neighbor)) not in evaluated_name_pairs and (utils.val2str(q_neighbor), utils.val2str(q_rand)) not in evaluated_name_pairs:
                     point_pairs.append((q_rand, q_neighbor))
                     evaluated_name_pairs.append(
-                        (self._val2name(q_rand), self._val2name(q_neighbor)))
+                        (utils.val2str(q_rand), utils.val2str(q_neighbor)))
                     evaluated_name_pairs.append(
-                        (self._val2name(q_neighbor), self._val2name(q_rand)))
+                        (utils.val2str(q_neighbor), utils.val2str(q_rand)))
+        self.log.debug("Attempting to connect {} node pairs...".format(len(point_pairs)))
         num_workers = mp.cpu_count()
         batches = np.array_split(point_pairs, num_workers)
         worker_fn = partial(
@@ -528,22 +535,40 @@ class CPRM():
             # the value of each dictionary is a dictionary with keys 'points' and 'edges'
             # the points are the actual points and the edges are the edges between points needed between points.
             # we have to add the points to the graphs, then created edges betweenthem.
+            self.log.debug("Paralell connections finished, adding points")
             results = {}
             for result in batch_results:
                 for named_value_tuple, value in result.items():
                     results[named_value_tuple] = value
-
+            valid_values = []
+            valid_edges = []
+            valid_edge_weights = []
             for named_tuple in evaluated_name_pairs:
                 connection = results.get(named_tuple, None)
                 if connection is not None:
-                    # TODO: Should this be necessary?
-                    valid = subdivision_evaluate(self.svc.validate, connection['points'])
-                    if valid:
-                        for point in connection['points']:
-                            self._add_vertex(self.graph, point)
-                        for edge in connection['edges']:
-                            self._add_edge(
-                                self.graph, edge[0], edge[1], self._distance(edge[0], edge[1]))
+                    for point in connection['points']:
+                       valid_values.append(point)
+                    for edge in connection['edges']:
+                        valid_edges.append((edge[0], edge[1]))
+                        valid_edge_weights.append(self._distance(edge[0], edge[1]))
+
+            values = [self.graph.vs.find(name=self.start_name)["value"],
+                  self.graph.vs.find(name=self.goal_name)["value"]] + valid_values
+            str_values = [utils.val2str(list(value)) for value in values]
+            values = [list(value) for value in values]
+            self.graph.add_vertices(len(values))
+            self.graph.vs["name"] = str_values
+            self.graph.vs["value"] = values
+            self.graph.vs['id'] = list(range(0, self.graph.vcount()))
+            # This below step is BY FAR the slowest part of the the graph building since it has to do lookups by attribute which is quite slow for python igrpah.
+            edges = [(utils.name2idx(self.graph, utils.val2str(c[0])), utils.name2idx(self.graph, utils.val2str(c[1])))
+                    for c in valid_edges]
+            self.graph.add_edges(edges)
+            self.graph.es['weight'] = valid_edge_weights
+            for edge in self.graph.es:
+                idx = edge.index
+                self.graph.es[idx]['id'] = idx
+
 
     def _cbirrt2_connect(self, q_near, q_target):
         centroid = (np.array(q_near) + np.array(q_target)) / 2
@@ -592,41 +617,48 @@ class CPRM():
                 list(zip(distances, neighbors)), key=lambda x: x[0]) if distance > 0]
 
     def _add_vertex(self, graph, q):
-        start_val2name = self._val2name(self.graph.vs[self._name2idx(graph, 'start')]['value'])
-        goal_val2name = self._val2name(self.graph.vs[self._name2idx(graph, 'goal')]['value'])
-        if not self._val2name(q) in graph.vs['name']:
-            if self._val2name(q) != start_val2name and self._val2name(q) != goal_val2name:
-                graph.add_vertex(self._val2name(q), **{'value': q})
+        if not utils.val2str(q) in graph.vs['name']:
+            if utils.val2str(q) != self.start_name and utils.val2str(q) != self.goal_name:
+                graph.add_vertex(utils.val2str(q), **{'value': q})
 
     def _add_edge(self, tree, q_from, q_to, weight):
-        start_val2name = self._val2name(self.graph.vs[self._name2idx(tree, 'start')]['value'])
-        goal_val2name = self._val2name(self.graph.vs[self._name2idx(tree, 'goal')]['value'])
-        if self._val2name(q_from) == start_val2name:
-            q_from_idx = self._name2idx(tree, 'start')
-        elif self._val2name(q_from) == goal_val2name:
-            q_from_idx = self._name2idx(tree, 'goal')
+        if utils.val2str(q_from) == self.start_name:
+            q_from_idx = utils.name2idx(tree, self.start_name)
+        elif utils.val2str(q_from) == self.goal_name:
+            q_from_idx = utils.name2idx(tree, self.goal_name)
         else:
-            q_from_idx = self._val2idx(tree, q_from)
-        if self._val2name(q_to) == start_val2name:
-            q_to_idx = self._name2idx(tree, 'start')
-        elif self._val2name(q_to) == goal_val2name:
-            q_to_idx = self._name2idx(tree, 'goal')
+            q_from_idx = utils.val2idx(tree, q_from)
+        if utils.val2str(q_to) == self.start_name:
+            q_to_idx = utils.name2idx(tree, self.start_name)
+        elif utils.val2str(q_to) == self.goal_name:
+            q_to_idx = utils.name2idx(tree, self.goal_name)
         else:
-            q_to_idx = self._val2idx(tree, q_to)
+            q_to_idx = utils.val2idx(tree, q_to)
         if tuple(sorted([q_from_idx, q_to_idx])) not in set([tuple(sorted(edge.tuple)) for edge in tree.es]):
             tree.add_edge(q_from_idx, q_to_idx, **{'weight': weight})
 
     def _delete_vertex(self, graph, q):
-        graph.delete_vertices(self._val2name(q))
+        graph.delete_vertices(utils.val2str(q))
 
     def _val2idx(self, graph, value):
-        return self._name2idx(graph, self._val2name(value))
+        return utils.name2idx(graph, utils.val2str(value))
 
     def _name2idx(self, graph, name):
         return graph.vs.find(name).index
 
-    def _val2name(self, value):
-        return str(["{:.4f}".format(val) for val in value])
+    def _val2name(self, value, places=4):
+        def trunc(number, places=4):
+            if not isinstance(places, int):
+                raise ValueError("Decimal places must be an integer.")
+            if places < 1:
+                raise ValueError("Decimal places must be at least 1.")
+            # If you want to truncate to 0 decimal places, just do int(number).
+
+            with localcontext() as context:
+                context.rounding = ROUND_DOWN
+                exponent = Decimal(str(10 ** - places))
+                return Decimal(str(number)).quantize(exponent).to_eng_string()
+        return str([trunc(num, places) for num in value])
 
     def _distance(self, q1, q2):
         return np.linalg.norm(q1 - q2)

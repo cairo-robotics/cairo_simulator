@@ -186,7 +186,7 @@ def robot_body_collision_test(joint_configuration, robot, object_body_id, client
      # Set new configuration and get link states
     for i, idx in enumerate(robot._arm_dof_indices):
         p.resetJointState(robot_id, idx, targetValue=joint_configuration[i], targetVelocity=0, physicsClientId=client_id)
-    p.performCollisionDetection()
+    # p.performCollisionDetection()
     if len(get_closest_points(client_id=client_id, body1=robot_id, body2=object_body_id, max_distance=max_distance)) == 0:
         return True
     else:

@@ -8,7 +8,7 @@ numpy==1.19.0
 pybullet==3.1.7
 pylint==2.5.3
 pyquaternion==0.9.5
-python-igraph==0.8.2
+python-igraph==0.9.6 
 scikit-learn==0.23.1
 scipy==1.5.1
 six==1.15.0
