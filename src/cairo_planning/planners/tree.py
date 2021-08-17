@@ -87,6 +87,11 @@ class CBiRRT2():
             else:
                  a_tree, b_tree = next(tree_swp)
     
+    def reset_planner(self):
+        self.tree = ig.Graph(directed=True)
+        self.forwards_tree = ig.Graph(directed=True)
+        self.backwards_tree = ig.Graph(directed=True)
+    
     def _constrained_extend(self, tree, tsr, q_near, q_target):
         generated_values = []
         q_s = np.array(q_near)
