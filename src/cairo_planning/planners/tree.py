@@ -30,8 +30,8 @@ class CBiRRT2():
         self.e_step = params.get('e_step', .25)
         self.iters = params.get('iters', 1000)
         self.smoothing_time = params.get('smoothing_time', 10)
-        self.log =  logger if logger is not None else Logger(handlers=['logging'], level=params.get('log_level', 'info'))
-        self.log.debug("q_step: {}, epsilon: {}, e_step: {}, BiRRT Iters {}".format(self.q_step, self.epsilon, self.e_step, self.iters))
+        self.log =  logger if logger is not None else Logger(name="CBiRRT2", handlers=['logging'], level=params.get('log_level', 'debug'))
+        self.log.info("q_step: {}, epsilon: {}, e_step: {}, BiRRT Iters {}".format(self.q_step, self.epsilon, self.e_step, self.iters))
     
     def plan(self, tsr, start_q, goal_q):
         """ Top level plan function for CBiRRT2. Trees are first initialized with start and end points, constrained birrt is executed, and the path is smoothed.
@@ -333,7 +333,7 @@ class CBiRRT2():
     def _random_config(self):
         # generate a random config to extend towards. This can be biased by whichever StateSpace and/or sampler we'd like to use.
         return np.array(self.state_space.sample())
-    
+
     def _initialize_trees(self, start_q, goal_q):
         self.start_name = self._val2str(start_q)
         self.forwards_tree.add_vertex(self.start_name)
