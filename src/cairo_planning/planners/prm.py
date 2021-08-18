@@ -402,37 +402,72 @@ class CPRM():
         self.tree_params = tree_params
         self.tree_params = tree_params
         self.tree_params['smooth_path'] = False
-        self.tree_params['log_level'] = 'info'
+        self.tree_params['log_level'] = 'debug'
         self.graph = ig.Graph(directed=False)
+        self.preloaded = False
         self.log =  logger if logger is not None else Logger(name='CPRM', handlers=['logging'], level=params.get('log_level', 'debug'))
         self.log.info("CPRM Params: N: {}, k: {}, r: {}".format(
             self.n_samples, self.k, self.ball_radius))
 
+    def preload(self, samples, graph):
+        self.graph = graph
+        for sample in samples:
+            if utils.val2idx(self.graph, sample) is not None:
+                self.graph.vs[utils.val2idx(self.graph, sample)]['value'] = np.array(sample)
+        self.samples = samples
+        self.preloaded = True
+
     def plan(self, q_start, q_goal):
+        if not self.svc.validate(q_start) and not self.svc.validate(q_goal):
+            raise Exception("Starting and ending for planning is invalid according to state validity checker.)")
+        if not self.svc.validate(q_start):
+            raise Exception("Starting point for planning is invalid according to state validity checker.")
+        if not self.svc.validate(q_goal):
+                    raise Exception("Ending point for planning is invalid according to state validity checker.)")
+        self.generate_roadmap(q_start, q_goal)
+        self.log.debug("Attaching start and end to graph...")
+        self._attach_start_and_end()
+        self.log.debug("Finding feasible best path in graph if available...")
+        return [self.graph.vs[idx]['value'] for idx in self._get_graph_path()]
+    
+    def generate_roadmap(self, q_start, q_goal):
         # Initial sampling of roadmap and NN data structure.
-        self.log.debug("Initializing roadmap...")
-        self._init_roadmap(q_start, q_goal)
-        self.log.debug("Generating valid random samples...")
-        if self.n_samples <= 100:
-            self.samples = self._generate_samples()
+        if self.preloaded is False:
+            self.log.debug("Generating valid random samples...")
+            if self.n_samples <= 100:
+                self.samples = self._generate_samples()
+            else:
+                self.samples = self._generate_samples_parallel()
+            self.log.debug("Initializing roadmap with start and goal...")
+            self._init_roadmap(q_start, q_goal)
+            self.log.debug(len(self.graph.vs))
         else:
-            self.samples = self._generate_samples_parallel()
+            self.log.debug("Using provided samples...")
+            self.log.debug("Initializing roadmap with start and goal...")
+            self._init_roadmap(q_start, q_goal)
+        # print("Attaching start and end to graph...")
+        # # self._attach_start_and_end()
         # Create NN datastructure
         self.log.debug("Creating NN datastructure...")
         self.nn = NearestNeighbors(X=np.array(
             self.samples), model_kwargs={"leaf_size": 100})
         # Generate NN connectivity.
-        self.log.debug("Generating nearest neighbor connectivity...")
-        if self.n_samples <= 100:
-            self._generate_connections(samples=self.samples)
+        if self.preloaded is False:
+            self.log.debug("Adding connections")
+            if self.n_samples <= 100:
+                self._generate_connections(samples=self.samples)
+            else:
+                self._generate_connections_parallel(samples=self.samples)
+            self.samples = [vs['value'] for vs in self.graph.vs]
+            self.log.debug("Recreating NN datastructure from connectable samples...")
+            self.nn = NearestNeighbors(X=np.array(
+            self.samples), model_kwargs={"leaf_size": 100})
         else:
-            self._generate_connections_parallel(samples=self.samples)
-        self.log.debug("Adding connections")
+            self.log.debug("Using provided graph...")
 
-        self.log.debug("Attaching start and end to graph...")
-        self._attach_start_and_end()
-        self.log.debug("Finding feasible best path in graph if available...")
-        return self._get_graph_path()
+        # self.log.debug("Attaching start and end to graph...")
+        # self._attach_start_and_end()
+        # self.log.debug("Finding feasible best path in graph if available...")
 
     def get_path(self, plan):
         points = [self.graph.vs[idx]['value'] for idx in plan]
@@ -456,10 +491,20 @@ class CPRM():
             q_start (array-like): The starting configuration.
             q_goal (array-like): The goal configuration.
         """
-        self.start_name = utils.val2str(q_start)
-        self.goal_name = utils.val2str(q_goal)
-        self.graph.add_vertex(self.start_name, **{'value': q_start})
-        self.graph.add_vertex(self.goal_name, **{'value': q_goal})
+      
+        # check if start and goal exist in graph already
+        if utils.val2idx(self.graph, q_start) is None:
+            self.start_name = utils.val2str(q_start)
+            self.graph.add_vertex(self.start_name, **{'value': list(q_start)})
+        else:
+            self.start_name = utils.val2str(q_start)
+            self.graph.vs[utils.val2idx(self.graph, q_start)]['value'] = list(q_start)
+        if utils.val2idx(self.graph, q_goal) is None:
+            self.goal_name = utils.val2str(q_goal)
+            self.graph.add_vertex(self.goal_name, **{'value': list(q_goal)})
+        else:
+            self.goal_name = utils.val2str(q_goal)
+            self.graph.vs[utils.val2idx(self.graph, q_goal)]['value'] = list(q_goal)
 
     def _attach_start_and_end(self):
         start = self.graph.vs[utils.name2idx(self.graph, self.start_name)]['value']
@@ -547,7 +592,9 @@ class CPRM():
                 connection = results.get(named_tuple, None)
                 if connection is not None:
                     for point in connection['points']:
-                       valid_values.append(point)
+                        if point is None:
+                            print("NONE POINT WTF?")
+                        valid_values.append(list(point))
                     for edge in connection['edges']:
                         valid_edges.append((edge[0], edge[1]))
                         valid_edge_weights.append(self._distance(edge[0], edge[1]))
@@ -556,10 +603,10 @@ class CPRM():
                   self.graph.vs.find(name=self.goal_name)["value"]] + valid_values
             str_values = [utils.val2str(list(value)) for value in values]
             values = [list(value) for value in values]
-            self.graph.add_vertices(len(values))
+            self.graph.add_vertices(len(valid_values))
             self.graph.vs["name"] = str_values
             self.graph.vs["value"] = values
-            self.graph.vs['id'] = list(range(0, self.graph.vcount()))
+            self.graph.vs['id'] = list(range(0, len(values)))
             # This below step is BY FAR the slowest part of the the graph building since it has to do lookups by attribute which is quite slow for python igrpah.
             edges = [(utils.name2idx(self.graph, utils.val2str(c[0])), utils.name2idx(self.graph, utils.val2str(c[1])))
                     for c in valid_edges]
@@ -620,6 +667,7 @@ class CPRM():
         if not utils.val2str(q) in graph.vs['name']:
             if utils.val2str(q) != self.start_name and utils.val2str(q) != self.goal_name:
                 graph.add_vertex(utils.val2str(q), **{'value': q})
+                graph.vs[utils.val2idx(graph, q)]['id'] = graph.vs[utils.val2idx(graph, q)].index
 
     def _add_edge(self, tree, q_from, q_to, weight):
         if utils.val2str(q_from) == self.start_name:

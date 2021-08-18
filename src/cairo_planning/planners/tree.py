@@ -71,6 +71,7 @@ class CBiRRT2():
         while continue_to_plan:
             iters += 1
             if iters > self.iters:
+                self.log.debug("Max iters reach...no feasbile plan.")
                 return None
             q_rand = self._random_config()
             qa_near = self._neighbors(a_tree, q_rand)  # closest leaf value to q_rand
@@ -262,7 +263,7 @@ class CBiRRT2():
             
 
 
-        # add all the verticies and edges of the forward tree ot the directed graph
+        # add all the verticies and edges of the forward tree to the directed graph
         tree.add_vertices(len(F.vs))
         tree.vs["name"] = F.vs['name']
         tree.vs["value"] = F.vs['value']

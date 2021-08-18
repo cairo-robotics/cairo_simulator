@@ -1,11 +1,13 @@
 import os
 from functools import partial
 import time
+import sys 
 
 import pybullet as p
 if os.environ.get('ROS_DISTRO'):
     import rospy
 import numpy as np
+import igraph as ig
 
 from cairo_simulator.core.sim_context import SawyerCPRMSimContext
 
@@ -13,38 +15,17 @@ from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.local.interpolation import parametric_lerp
 from cairo_planning.local.curve import JointTrajectoryCurve
 from cairo_planning.planners import CPRM
-from cairo_planning.sampling.samplers import HyperballSampler, UniformSampler
+from cairo_planning.sampling.samplers import HyperballSampler
 from cairo_planning.geometric.state_space import SawyerConfigurationSpace
 
-from cairo_planning.core.serialization import dump_model
+from cairo_planning.core.serialization import load_model
 
 def main():
 
-    config = {}
-    config["sim_objects"] = [
-        {
-            "object_name": "Ground",
-            "model_file_or_sim_id": "plane.urdf",
-            "position": [0, 0, 0]
-        },
-        # {
-        #     "object_name": "sphere",
-        #     "model_file_or_sim_id": 'sphere2.urdf',
-        #     "position": [1.0, -.3, .6],
-        #     "orientation":  [0, 0, 1.5708],
-        #     "fixed_base": 1    
-        # }
-    ]
+    # Reload the samples and configuration
+    directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), "serialization_data/2021-08-18T14-54-36")
+    config, samples, graph = load_model(directory)
 
-    config["tsr"] = {
-        'degrees': False,
-        "T0_w": [.7, 0, 0, 0, 0, 0],
-        "Tw_e": [-.2, 0, 1.0, np.pi/2, 3*np.pi/2, np.pi/2], # level end-effector pointing away from sawyer's "front"
-        "Bw": [[[0, 100], [-100, 100], [-100, .3]],  # Cannot go above 1.3 m
-              [[-.07, .07], [-.07, .07], [-.07, .07]]]
-    }
-
-    config = {}
     config["sim_objects"] = [
         {
             "object_name": "Ground",
@@ -52,23 +33,22 @@ def main():
             "position": [0, 0, 0]
         },
         {
-            "object_name": "sphere",
+            "object_name": "sphere1",
             "model_file_or_sim_id": 'sphere2.urdf',
             "position": [1.0, -.3, .6],
             "orientation":  [0, 0, 1.5708],
-            "fixed_base": 1    
+            "fixed_base": 1
+        },
+        {
+            "object_name": "sphere2",
+            "model_file_or_sim_id": 'sphere2.urdf',
+            "position": [1.0, -.3, 1.65],
+            "orientation":  [0, 0, 1.5708],
+            "fixed_base": 1
         }
     ]
 
-    config["tsr"] = {
-        'degrees': False,
-        "T0_w": [.7, 0, 0, 0, 0, 0],
-        "Tw_e": [-.2, 0, 1.0, np.pi/2, 3*np.pi/2, np.pi/2], # level end-effector pointing away from sawyer's "front"
-        "Bw": [[[0, 100], [-100, 100], [-100, .3]],  # Cannot go above 1.3 m
-              [[-.07, .07], [-.07, .07], [-.07, .07]]]
-    }
-
-    sim_context = SawyerCPRMSimContext(config)
+    sim_context = SawyerCPRMSimContext(configuration=config)
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
     planning_space = sim_context.get_state_space()
@@ -86,25 +66,48 @@ def main():
     sawyer_robot.move_to_joint_pos(start)
     time.sleep(5)
     # Utilizes RPY convention
-
+ 
     with DisabledCollisionsContext(sim, [], []):
-        #########################
-        # Contrained PRM (CPRM) #
-        #########################
+        ###########
+        # LazyPRM #
+        ###########
         # The specific space we sample from is the Hyberball centered at the midpoint between two candidate points. 
         # This is used to bias tree grwoth between two points when using CBiRRT2 as our local planner for a constrained PRM.
         tree_state_space = SawyerConfigurationSpace(sampler=HyperballSampler())
         # Use parametric linear interpolation with 10 steps between points.
         interp = partial(parametric_lerp, steps=10)
-        # See params for PRM specific parameters robot, tsr, state_space, state_validity_checker, interpolation_fn, params
+        # See params for PRM specific parameters
         prm = CPRM(SawyerCPRMSimContext, config, sawyer_robot, tsr, planning_space, tree_state_space, svc, interp, params={
-            'n_samples': 150, 'k': 10, 'planning_attempts': 5, 'ball_radius': 3.5}, tree_params={'iters': 50, 'q_step': .48, 'e_step': .25})
+            'n_samples': 3000, 'k': 8, 'planning_attempts': 5, 'ball_radius': 2.0, 'smooth_path': True}, tree_params={'iters': 50, 'q_step': .5}, logger=logger)
         logger.info("Planning....")
-        plan = prm.plan(np.array(start), np.array(goal))
-        # get_path() reuses the interp function to get the path between vertices of a successful plan
+        prm.preload(samples, graph)
+        path = prm.plan(np.array(start), np.array(goal))
+    print(path)
 
-    # Dump thje samples and configuration
-    dump_model(sim_context.config, prm, os.path.dirname(os.path.abspath(__file__)))
+    if len(path) == 0:
+        visual_style = {}
+        visual_style["vertex_color"] = ["blue" if v['name'] in [
+            'start', 'goal'] else "white" for v in prm.graph.vs]
+        visual_style["bbox"] = (1200, 1200)
+        ig.plot(prm.graph, **visual_style)
+        logger.info("Planning failed....")
+        sys.exit(1)
+    logger.info("Plan found....")
+    input("Press any key to continue...")
+    # splining uses numpy so needs to be converted
+    path = [np.array(p) for p in path]
+    # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
+    jtc = JointTrajectoryCurve()
+    traj = jtc.generate_trajectory(path, move_time=20)
+    sawyer_robot.execute_trajectory(traj)
+    try:
+        while True:
+            sim.step()
+    except KeyboardInterrupt:
+        p.disconnect()
+        sys.exit(0)
+
 
 if __name__ == "__main__":
     main()
+
