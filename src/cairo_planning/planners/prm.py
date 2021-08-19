@@ -3,6 +3,7 @@ import itertools
 from functools import partial
 import multiprocessing as mp
 import random
+import types
 from decimal import Decimal, localcontext, ROUND_DOWN
 from timeit import default_timer as timer
 
@@ -274,12 +275,10 @@ class PRMParallel():
     def _init_roadmap(self, q_start, q_goal):
         self.start_name = str(list(q_start))
         self.graph.add_vertex(str(list(q_start)))
-        # Start is always at the 0 index.
         self.graph.vs.find(name=str(list(q_start)))["value"] = list(q_start)
 
         self.goal_name = str(list(q_goal))
         self.graph.add_vertex("goal")
-        # Goal is always at the 1 index.
         self.graph.vs.find(name=str(list(q_start)))["value"] = list(q_goal)
 
     def _parallel_sample(self, n_tasks=8):
@@ -400,11 +399,12 @@ class CPRM():
         self.k = params.get('k', 5)
         self.ball_radius = params.get('ball_radius', .55)
         self.tree_params = tree_params
-        self.tree_params = tree_params
         self.tree_params['smooth_path'] = False
         self.tree_params['log_level'] = 'debug'
         self.graph = ig.Graph(directed=False)
         self.preloaded = False
+        self.cbirrt2 = CBiRRT2(self.robot, self.tree_state_space,
+                          self.svc, self.interp_fn, params=self.tree_params)
         self.log =  logger if logger is not None else Logger(name='CPRM', handlers=['logging'], level=params.get('log_level', 'debug'))
         self.log.info("CPRM Params: N: {}, k: {}, r: {}".format(
             self.n_samples, self.k, self.ball_radius))
@@ -412,8 +412,7 @@ class CPRM():
     def preload(self, samples, graph):
         self.graph = graph
         for sample in samples:
-            if utils.val2idx(self.graph, sample) is not None:
-                self.graph.vs[utils.val2idx(self.graph, sample)]['value'] = np.array(sample)
+            self.graph.vs[utils.val2idx(self.graph, sample)]['value'] = np.array(sample)
         self.samples = samples
         self.preloaded = True
 
@@ -428,6 +427,7 @@ class CPRM():
         self.log.debug("Attaching start and end to graph...")
         self._attach_start_and_end()
         self.log.debug("Finding feasible best path in graph if available...")
+        self.log.debug(self._get_graph_path())
         return [self.graph.vs[idx]['value'] for idx in self._get_graph_path()]
     
     def generate_roadmap(self, q_start, q_goal):
@@ -507,20 +507,20 @@ class CPRM():
             self.graph.vs[utils.val2idx(self.graph, q_goal)]['value'] = list(q_goal)
 
     def _attach_start_and_end(self):
-        start = self.graph.vs[utils.name2idx(self.graph, self.start_name)]['value']
-        end = self.graph.vs[utils.name2idx(self.graph, self.goal_name)]['value']
+        q_start = self.graph.vs[utils.name2idx(self.graph, self.start_name)]['value']
+        q_end = self.graph.vs[utils.name2idx(self.graph, self.goal_name)]['value']
         start_added = False
         end_added = False
-        for q_near in self._neighbors(start, k_override=15, within_ball=False):
+        for q_near in self._neighbors(q_start, k_override=15, within_ball=False):
             if utils.val2str(q_near) in self.graph.vs['name']:
                 if utils.val2idx(self.graph, q_near) != 0:
-                    successful = self._cbirrt2_connect(start, q_near)
+                    successful = self._cbirrt2_connect(q_start, q_near, add_points_to_samples=True)
                     if successful:
                         start_added = True
-        for q_near in self._neighbors(end, k_override=15, within_ball=False):
+        for q_near in self._neighbors(q_end, k_override=15, within_ball=False):
             if utils.val2str(q_near) in self.graph.vs['name']:
                 if utils.val2idx(self.graph, q_near) != 1:
-                    successful = self._cbirrt2_connect(q_near, end)
+                    successful = self._cbirrt2_connect(q_near, q_end, add_points_to_samples=True)
                     if successful:
                         end_added = True
         if not start_added or not end_added:
@@ -617,26 +617,27 @@ class CPRM():
                 self.graph.es[idx]['id'] = idx
 
 
-    def _cbirrt2_connect(self, q_near, q_target):
-        centroid = (np.array(q_near) + np.array(q_target)) / 2
-        radius = self._distance(np.array(q_near), np.array(q_target)) / 2
+    def _cbirrt2_connect(self, q_start, q_target, add_points_to_samples=False):
+        self.cbirrt2.reset_planner()
 
+        centroid = (np.array(q_start) + np.array(q_target)) / 2
+        radius = self._distance(np.array(q_start), np.array(q_target)) / 2
+        
         def _random_config(self):
             return self.state_space.sample(centroid=centroid, radius=radius)
 
-        # monkey-patch goodness to allow for a special type of sampling via hyperball between, and containing q_near and q_target:
-        CBiRRT2._random_config = _random_config
+        self.cbirrt2._random_config  = types.MethodType(_random_config, self.cbirrt2)
 
-        cbirrt2 = CBiRRT2(self.robot, self.tree_state_space,
-                          self.svc, self.interp_fn, params=self.tree_params)
-
-        graph_plan = cbirrt2.plan(self.tsr, q_near, q_target)
+        graph_plan = self.cbirrt2.plan(self.tsr, q_start, q_target)
         if graph_plan is not None:
-            points = [cbirrt2.connected_tree.vs[idx]['value']
+            points = [self.cbirrt2.connected_tree.vs[idx]['value']
                       for idx in graph_plan]
             edges = list(zip(points, points[1:]))
             for point in points:
                 self._add_vertex(self.graph, point)
+                if add_points_to_samples:
+                    if utils.val2str(point) != self.start_name and utils.val2str(point) != self.goal_name:
+                        self.samples.append(point)
             for e in edges:
                 self._add_edge(self.graph, e[0],
                                e[1], self._distance(e[0], e[1]))
@@ -666,7 +667,7 @@ class CPRM():
     def _add_vertex(self, graph, q):
         if not utils.val2str(q) in graph.vs['name']:
             if utils.val2str(q) != self.start_name and utils.val2str(q) != self.goal_name:
-                graph.add_vertex(utils.val2str(q), **{'value': q})
+                graph.add_vertex(utils.val2str(q), **{'value': list(q)})
                 graph.vs[utils.val2idx(graph, q)]['id'] = graph.vs[utils.val2idx(graph, q)].index
 
     def _add_edge(self, tree, q_from, q_to, weight):
