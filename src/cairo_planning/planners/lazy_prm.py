@@ -810,6 +810,7 @@ class LazyCPRM():
         if not utils.val2str(q) in graph.vs['name']:
             if utils.val2str(q) != start_val2name and utils.val2str(q) != goal_val2name:
                 graph.add_vertex(utils.val2str(q), **{'value': q})
+                graph.vs[utils.val2idx(graph, q)]['id'] = utils.val2idx(graph, q)
     
     def _remove_edge(self, vidx1, vidx2):
         start_val2name = utils.val2str(self.graph.vs[utils.name2idx(self.graph, self.start_name)]['value'])
