@@ -53,32 +53,32 @@ def main():
             "model_file_or_sim_id": "plane.urdf",
             "position": [0, 0, 0]
         },
-        {
-            "object_name": "Table",
-            "model_file_or_sim_id": ASSETS_PATH + 'table.sdf',
-            "position": [0.9, 0, 0],
-            "orientation":  [0, 0, 1.5708]
-        },
-        {
-            "object_name": "cube0",
-            "model_file_or_sim_id": "cube_small.urdf",
-            "position": [0.75, 0, .55]
-        },
-        {
-            "object_name": "cube1",
-            "model_file_or_sim_id": "cube_small.urdf",
-            "position": [0.74, 0.05, .55]
-        },
-        {
-            "object_name": "cube2",
-            "model_file_or_sim_id": "cube_small.urdf",
-            "position": [0.67, -0.1, .55]
-        },
-        {
-            "object_name": "cube3",
-            "model_file_or_sim_id": "cube_small.urdf",
-            "position": [0.69, 0.1, .55]
-        }
+        # {
+        #     "object_name": "Table",
+        #     "model_file_or_sim_id": ASSETS_PATH + 'table.sdf',
+        #     "position": [0.9, 0, 0],
+        #     "orientation":  [0, 0, 1.5708]
+        # },
+        # {
+        #     "object_name": "cube0",
+        #     "model_file_or_sim_id": "cube_small.urdf",
+        #     "position": [0.75, 0, .55]
+        # },
+        # {
+        #     "object_name": "cube1",
+        #     "model_file_or_sim_id": "cube_small.urdf",
+        #     "position": [0.74, 0.05, .55]
+        # },
+        # {
+        #     "object_name": "cube2",
+        #     "model_file_or_sim_id": "cube_small.urdf",
+        #     "position": [0.67, -0.1, .55]
+        # },
+        # {
+        #     "object_name": "cube3",
+        #     "model_file_or_sim_id": "cube_small.urdf",
+        #     "position": [0.69, 0.1, .55]
+        # }
     ]
     sim_context = SawyerSimContext(configuration)
     sim = sim_context.get_sim_instance()
@@ -93,10 +93,23 @@ def main():
     sawyer_robot.move_to_joint_pos(start_pos)
 
     joint_config = sawyer_robot.solve_inverse_kinematics(
-        [0.9, 0, 1.5], [0, 0, 0, 1])
+        [ 0.7074708676269519,  -0.08765564452576573, 0.9], [0, 0, 0, 1])
 
-    joint_config2 = sawyer_robot.solve_inverse_kinematics(
-        [0.7,0,1.5], [0,0,0,1])
+    # joint_config2 = sawyer_robot.solve_inverse_kinematics(
+    #     [ 0.7074708676269519, -0.08765564452576573, 0.744752279781234485], 
+    #     [-0.9811850913657468, -0.0013224117851769242, -0.19302238661442592, 0.0040528970296797445])
+
+    joint_config2 = sawyer_robot.solve_inverse_kinematics([ 0.7074708676269519, -0.08765564452576573, 0.744752279781234485], [-3.1335505133609978, -0.3884907841856089, 0.0011134329847108074])
+
+    # joint_config2 = [
+    #             -0.622220703125,
+    #             -0.2009404296875,
+    #             -3.038296875,
+    #             -1.7336015625,
+    #             -0.437501953125,
+    #             0.3058515625,
+    #             -4.713828125
+    #         ]
 
     sawyer_robot.set_default_joint_velocity_pct(0.5)
     traj = ((1., joint_config), (2., joint_config2),

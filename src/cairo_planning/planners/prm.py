@@ -592,8 +592,6 @@ class CPRM():
                 connection = results.get(named_tuple, None)
                 if connection is not None:
                     for point in connection['points']:
-                        if point is None:
-                            print("NONE POINT WTF?")
                         valid_values.append(list(point))
                     for edge in connection['edges']:
                         valid_edges.append((edge[0], edge[1]))
