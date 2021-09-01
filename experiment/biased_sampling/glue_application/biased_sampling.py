@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import datetime
 
 import pybullet as p
 if os.environ.get('ROS_DISTRO'):
@@ -13,11 +14,15 @@ from cairo_simulator.core.utils import ASSETS_PATH
 from cairo_planning.geometric.state_space import SawyerTSRConstrainedSpace
 from cairo_planning.geometric.distribution import KernelDensityDistribution
 from cairo_planning.sampling.samplers import DistributionSampler, UniformSampler
-from cairo_planning.geometric.transformation import xyzrpy2trans, bounds_matrix, quat2rpy
-from cairo_planning.geometric.tsr import TSR
+
+import matplotlib.pyplot as plt
+
 
 def main():
     
+    NUM_SAMPLES = 10
+    fraction_uniform_increments = [0, .05, .1, .15, .2, .25, .3, .35, .4, .45, .5, .55, .6, .65, .7, .75, .8, .85, .9, .95, 1]
+
     config = {}
     config["sim"] = {
             "run_parallel": False,
@@ -40,44 +45,68 @@ def main():
               [[-.07, .07], [-.07, .07], [-.07, .07]]] # Strict orientation constraint
     }
 
+
     sim_context = SawyerCPRMSimContext(config)
     sawyer_robot = sim_context.get_robot()
     svc = sim_context.get_state_validity()
     tsr = sim_context.get_tsr()
-  
+
+    results = {}
+
     # Collect all joint configurations from all demonstration .json files.
     configurations = []
-    directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
-    for name in os.listdir(directory):
-        filename = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", name)
-        with open(filename, "r") as f:
-            data = json.load(f)
-            for entry in data:
-                configurations.append(entry['robot']['joint_angle'])
+    data_directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+    for subject_dir_name in os.listdir(data_directory):
+        print("Running biased sampling test for {}".format(subject_dir_name))
+        subject_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", subject_dir_name)
+        for json_file in os.listdir(subject_path):
+            filename = os.path.join(subject_path, json_file)
+            with open(filename, "r") as f:
+                data = json.load(f)
+                for entry in data:
+                    configurations.append(entry['robot']['joint_angle'])
 
 
-    # Create a KernelDensityDistribution with those configuration points
-    model = KernelDensityDistribution(bandwidth=.1)
-    model.fit(np.array(configurations))
-    
-    fraction_time_tuples = []
-    fractions = [0, .05, .1, .15, .2, .25, .3, .35, .4, .45, .5, .55, .6, .65, .7, .75, .8, .85, .9, .95, 1]
-    for fraction in fractions:
-        # Create the DistributionSampler and associated SawyerTSRConstrainedSpace
-        state_space = SawyerTSRConstrainedSpace(robot=sawyer_robot, TSR=tsr, svc=svc, sampler=DistributionSampler(distribution_model=model, fraction_uniform=fraction), limits=None)
+        # Create a KernelDensityDistribution with those configuration points
+        model = KernelDensityDistribution(bandwidth=.1)
+        model.fit(np.array(configurations))
         
-        ptime1 = time.process_time()
-        count = 0
-        while count != 1000:
-            sample = state_space.sample()
-            if sample is not None:
-                count += 1
-                print(sample)
-        ptime2 = time.process_time()
-        print(ptime2 - ptime1)
-        fraction_time_tuples.append((fraction, ptime2 - ptime1))
+        fraction_time_tuples = []
+        
+        for fraction in fraction_uniform_increments:
+            # Create the DistributionSampler and associated SawyerTSRConstrainedSpace
+            state_space = SawyerTSRConstrainedSpace(robot=sawyer_robot, TSR=tsr, svc=svc, sampler=DistributionSampler(distribution_model=model, fraction_uniform=fraction), limits=None)
+            
+            ptime1 = time.process_time()
+            count = 0
+            while count != NUM_SAMPLES:
+                sample = state_space.sample()
+                if sample is not None:
+                    count += 1
+            ptime2 = time.process_time()
+            print(ptime2 - ptime1)
+            fraction_time_tuples.append((fraction, ptime2 - ptime1))
 
-    print(fraction_time_tuples)
+        results[subject_dir_name] = fraction_time_tuples
+
+    # Output results to unique filename
+    now = datetime.datetime.today()
+    nTime = now.strftime('%Y-%m-%dT%H-%M-%S')
+    results_filename = "results_" + nTime
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), results_filename), "w") as f:
+        json.dump(results, f)
+
+    # Create plots
+    for subject, subject_data in results.items():
+    
+        result_times = [result[1] for result in subject_data]
+        plt.plot(fraction_uniform_increments, result_times, label=subject)
+    plt.xlabel('Fraction Uniform Sampling')
+    plt.ylabel('Time (s)')
+    plt.suptitle('Time to Sample {} Constrained Points vs. Fraction Uniform'.format(NUM_SAMPLES), fontsize=16)
+    plt.title('Angled at Table Height Constraint'.format(NUM_SAMPLES), fontsize=12)
+    plt.legend()
+    plt.show()
 
 if __name__ == "__main__":
     main()
