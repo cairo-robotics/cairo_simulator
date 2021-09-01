@@ -64,7 +64,7 @@ def quat2rpy(wxyz, degrees=False):
         ndarray: Returns the rpy angles of the quaternion.
     """
     r = R.from_quat([wxyz[1], wxyz[2], wxyz[3], wxyz[0]])
-    return r.as_euler("xyz", degrees=degrees)
+    return r.as_euler("XYZ", degrees=degrees)
 
 
 def rpy2quat(rpy, degrees=False):
@@ -79,7 +79,7 @@ def rpy2quat(rpy, degrees=False):
         ndarray: The quaternion in wxzy form.
     """
     quat = R.from_euler(
-        'xyz', rpy, degrees=degrees).as_quat()
+        'XYZ', rpy, degrees=degrees).as_quat()
     return np.array((quat[3], quat[0], quat[1], quat[2]))
 
 
