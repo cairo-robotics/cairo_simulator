@@ -26,37 +26,6 @@ def main():
             "object_name": "Ground",
             "model_file_or_sim_id": "plane.urdf",
             "position": [0, 0, 0]
-        },
-        # {
-        #     "object_name": "sphere",
-        #     "model_file_or_sim_id": 'sphere2.urdf',
-        #     "position": [1.0, -.3, .6],
-        #     "orientation":  [0, 0, 1.5708],
-        #     "fixed_base": 1    
-        # }
-    ]
-
-    config["tsr"] = {
-        'degrees': False,
-        "T0_w": [.7, 0, 0, 0, 0, 0],
-        "Tw_e": [-.2, 0, 1.0, np.pi/2, 3*np.pi/2, np.pi/2], # level end-effector pointing away from sawyer's "front"
-        "Bw": [[[0, 100], [-100, 100], [-100, .3]],  # Cannot go above 1.3 m
-              [[-.07, .07], [-.07, .07], [-.07, .07]]]
-    }
-
-    config = {}
-    config["sim_objects"] = [
-        {
-            "object_name": "Ground",
-            "model_file_or_sim_id": "plane.urdf",
-            "position": [0, 0, 0]
-        },
-        {
-            "object_name": "sphere",
-            "model_file_or_sim_id": 'sphere2.urdf',
-            "position": [1.0, -.3, .6],
-            "orientation":  [0, 0, 1.5708],
-            "fixed_base": 1    
         }
     ]
 
@@ -98,7 +67,7 @@ def main():
         interp = partial(parametric_lerp, steps=10)
         # See params for PRM specific parameters robot, tsr, state_space, state_validity_checker, interpolation_fn, params
         prm = CPRM(SawyerCPRMSimContext, config, sawyer_robot, tsr, planning_space, tree_state_space, svc, interp, params={
-            'n_samples': 150, 'k': 10, 'planning_attempts': 5, 'ball_radius': 3.5}, tree_params={'iters': 50, 'q_step': .48, 'e_step': .25})
+            'n_samples': 12000, 'k': 10, 'planning_attempts': 5, 'ball_radius': 3.5}, tree_params={'iters': 50, 'q_step': .48, 'e_step': .25})
         logger.info("Planning....")
         plan = prm.plan(np.array(start), np.array(goal))
         # get_path() reuses the interp function to get the path between vertices of a successful plan
