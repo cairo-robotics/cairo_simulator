@@ -70,7 +70,7 @@ class DistributionSpace():
 
 class SawyerTSRConstrainedSpace():
 
-    def __init__(self, sampler, limits, svc, TSR, robot):
+    def __init__(self, sampler, svc, TSR, robot, limits=None):
         self.limits = [['right_j0', (-3.0503, 3.0503)],
                        ['right_j1', (-3.8095, 2.2736)],
                        ['right_j2', (-3.0426, 3.0426)],

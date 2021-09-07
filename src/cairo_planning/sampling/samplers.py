@@ -71,6 +71,7 @@ class DistributionSampler():
             distribution_model (object): The distribution model. Expects a sample() member function.
         """
         self.model = distribution_model
+        print(self.model)
         self.fraction_uniform = fraction_uniform
     
     def sample(self, dimension_limits):

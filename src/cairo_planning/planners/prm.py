@@ -6,6 +6,7 @@ import random
 import types
 from decimal import Decimal, localcontext, ROUND_DOWN
 from timeit import default_timer as timer
+import time
 
 import numpy as np
 import igraph as ig
@@ -399,8 +400,9 @@ class CPRM():
         self.k = params.get('k', 5)
         self.ball_radius = params.get('ball_radius', .55)
         self.tree_params = tree_params
-        self.tree_params['smooth_path'] = False
-        self.tree_params['log_level'] = 'debug'
+        self.smooth_path = params.get('smooth_path', False)
+        self.smoothing_time = params.get('smoothing_time', 10)
+        self.tree_params['log_level'] = 'info'
         self.graph = ig.Graph(directed=False)
         self.preloaded = False
         self.cbirrt2 = CBiRRT2(self.robot, self.tree_state_space,
@@ -428,7 +430,13 @@ class CPRM():
         self._attach_start_and_end()
         self.log.debug("Finding feasible best path in graph if available...")
         self.log.debug(self._get_graph_path())
-        return [self.graph.vs[idx]['value'] for idx in self._get_graph_path()]
+        vertex_sequence = self._get_graph_path()
+        if self.smooth_path:
+            self.log.debug("Smoothing path...")
+            vertex_sequence, path = self._smooth_path(vertex_sequence, self.smoothing_time)
+            return path
+        else:
+            return [self.graph.vs[idx]['value'] for idx in self._get_graph_path()]
     
     def generate_roadmap(self, q_start, q_goal):
         # Initial sampling of roadmap and NN data structure.
@@ -480,8 +488,62 @@ class CPRM():
             path = path + seg
         return path
 
-    def _get_graph_path(self):
-        return self.graph.get_shortest_paths(utils.name2idx(self.graph, self.start_name), utils.name2idx(self.graph, self.goal_name), weights='weight', mode='ALL')[0]
+    def _smooth_path(self, vertex_sequence, smoothing_time=10):
+        # create empty tree. 
+        smoothing_tree = ig.Graph(directed=True)
+        smoothing_tree['name'] = 'smoothing'
+        start_time = time.time()
+
+        number_of_shortcuts = 0
+        while True:
+            current_time = time.time()
+            elapsed_time = current_time - start_time
+
+            if elapsed_time > smoothing_time:
+                self.log.debug("Finished smoothing iterations in: " + str(int(elapsed_time))  + " seconds")
+                break
+            # Get two random indeces from path
+            rand_idx1, rand_idx2 = random.sample(vertex_sequence, 2)
+            if vertex_sequence.index(rand_idx1) > vertex_sequence.index(rand_idx2):
+                continue
+            q_old = self.graph.vs[rand_idx1]['value']
+            q_s = self.graph.vs[rand_idx2]['value']
+            # add points into tree
+            # self._add_vertex(smoothing_tree, q_old)
+            # self._add_vertex(smoothing_tree, q_s)
+            # q_old_name = self._val2str(q_old)
+            # q_old_idx = utils.name2idx(smoothing_tree, q_old_name)
+            # q_s_name = self._val2str(q_s)
+            # q_s_idx = utils.name2idx(smoothing_tree, q_s_name)
+            # constrain extended.
+            success, smoothed_path_values, _ = self._cbirrt2_connect(q_old, q_s)
+            if success:
+                # smoothed_path_values = [smoothing_tree.vs[idx] for idx in self._extract_graph_path(smoothing_tree, q_old_idx, q_s_idx)]
+                curr_path_values = [self.graph.vs[idx]['value'] for idx in self._get_graph_path(rand_idx1, rand_idx2)]
+                smoothed_path_value_pairs = [(smoothed_path_values[i], smoothed_path_values[(i + 1) % len(smoothed_path_values)]) for i in range(len(smoothed_path_values))][:-1]
+                curr_path_values_pairs = [(curr_path_values[i], curr_path_values[(i + 1) % len(curr_path_values)]) for i in range(len(curr_path_values))][:-1]
+                smooth_path_distance = sum([self._distance(pair[0], pair[1]) for pair in smoothed_path_value_pairs])
+                curr_path_distance = sum([self._distance(pair[0], pair[1]) for pair in curr_path_values_pairs])
+
+                # if the newly found path between indices is shorter, lets use it and add it do the graph
+                if smooth_path_distance < curr_path_distance:
+                    number_of_shortcuts += 1
+                    for q in smoothed_path_values:
+                        self._add_vertex(self.graph, q)
+                    for pair in smoothed_path_value_pairs:
+                        self._add_edge(self.graph, pair[0], pair[1], self._distance(pair[0], pair[1]))
+        self.log.debug("Number of shortcuts made during smoothing: {}".format(number_of_shortcuts))
+        new_best_vertex_sequence = self._get_graph_path()
+        return [self.graph.vs['id'].index(_id) for _id in new_best_vertex_sequence], [self.graph.vs[_id]['value'] for _id in new_best_vertex_sequence]
+
+    def _get_graph_path(self, from_idx=None, to_idx=None):
+        if from_idx is None or to_idx is None:
+            from_idx = utils.name2idx(self.graph, self.start_name)
+            to_idx = utils.name2idx(self.graph, self.goal_name)
+        if 'weight' in self.graph.es.attributes():
+            return self.graph.get_shortest_paths(from_idx, to_idx, weights='weight', mode='ALL')[0]
+        else:
+            return self.graph.get_shortest_paths(from_idx, to_idx, mode='ALL')[0]
 
     def _init_roadmap(self, q_start, q_goal):
         """
@@ -514,13 +576,13 @@ class CPRM():
         for q_near in self._neighbors(q_start, k_override=15, within_ball=False):
             if utils.val2str(q_near) in self.graph.vs['name']:
                 if utils.val2idx(self.graph, q_near) != 0:
-                    successful = self._cbirrt2_connect(q_start, q_near, add_points_to_samples=True)
+                    successful, _, _ = self._cbirrt2_connect(q_start, q_near, add_points_to_samples=True)
                     if successful:
                         start_added = True
         for q_near in self._neighbors(q_end, k_override=15, within_ball=False):
             if utils.val2str(q_near) in self.graph.vs['name']:
                 if utils.val2idx(self.graph, q_near) != 1:
-                    successful = self._cbirrt2_connect(q_near, q_end, add_points_to_samples=True)
+                    successful, _, _ = self._cbirrt2_connect(q_near, q_end, add_points_to_samples=True)
                     if successful:
                         end_added = True
         if not start_added or not end_added:
@@ -548,7 +610,7 @@ class CPRM():
         num_workers = mp.cpu_count()
         samples_per_worker = int(self.n_samples / num_workers)
         worker_fn = partial(
-            parallel_projection_worker, sim_context_cls=self.sim_context, sim_config=self.sim_config, tsr=self.tsr)
+            parallel_projection_worker, sim_context_cls=self.sim_context, sim_config=self.sim_config)
         with mp.get_context("spawn").Pool(num_workers) as p:
             results = p.map(worker_fn, [samples_per_worker] * num_workers)
             return list(itertools.chain.from_iterable(results))
@@ -556,19 +618,17 @@ class CPRM():
     def _generate_connections(self, samples):
         for q_rand in samples:
             for q_near in self._neighbors(q_rand):
-                _ = self._cbirrt2_connect(q_rand, q_near)
+                _, _, _ = self._cbirrt2_connect(q_rand, q_near)
 
     def _generate_connections_parallel(self, samples):
-        evaluated_name_pairs = []
+        evaluated_name_pairs = {}
         point_pairs = []
         for q_rand in samples:
             for q_neighbor in self._neighbors(q_rand):
-                if (utils.val2str(q_rand), utils.val2str(q_neighbor)) not in evaluated_name_pairs and (utils.val2str(q_neighbor), utils.val2str(q_rand)) not in evaluated_name_pairs:
+                if not evaluated_name_pairs.get((utils.val2str(q_rand), utils.val2str(q_neighbor)), False) and not evaluated_name_pairs.get((utils.val2str(q_neighbor), utils.val2str(q_rand)), False):
                     point_pairs.append((q_rand, q_neighbor))
-                    evaluated_name_pairs.append(
-                        (utils.val2str(q_rand), utils.val2str(q_neighbor)))
-                    evaluated_name_pairs.append(
-                        (utils.val2str(q_neighbor), utils.val2str(q_rand)))
+                    evaluated_name_pairs[(utils.val2str(q_rand), utils.val2str(q_neighbor))] = True
+                    evaluated_name_pairs[(utils.val2str(q_neighbor), utils.val2str(q_rand))] = True
         self.log.debug("Attempting to connect {} node pairs...".format(len(point_pairs)))
         num_workers = mp.cpu_count()
         batches = np.array_split(point_pairs, num_workers)
@@ -615,7 +675,7 @@ class CPRM():
                 self.graph.es[idx]['id'] = idx
 
 
-    def _cbirrt2_connect(self, q_start, q_target, add_points_to_samples=False):
+    def _cbirrt2_connect(self, q_start, q_target, add_points_to_samples=False, update_graph=True):
         self.cbirrt2.reset_planner()
 
         centroid = (np.array(q_start) + np.array(q_target)) / 2
@@ -631,17 +691,19 @@ class CPRM():
             points = [self.cbirrt2.connected_tree.vs[idx]['value']
                       for idx in graph_plan]
             edges = list(zip(points, points[1:]))
-            for point in points:
-                self._add_vertex(self.graph, point)
-                if add_points_to_samples:
-                    if utils.val2str(point) != self.start_name and utils.val2str(point) != self.goal_name:
-                        self.samples.append(point)
-            for e in edges:
-                self._add_edge(self.graph, e[0],
-                               e[1], self._distance(e[0], e[1]))
-            return True
+            if update_graph:
+                for point in points:
+                    self._add_vertex(self.graph, point)
+                    if add_points_to_samples:
+                        if utils.val2str(point) != self.start_name and utils.val2str(point) != self.goal_name:
+                            self.samples.append(point)
+                for e in edges:
+                    e = [np.array(val) for val in e]
+                    self._add_edge(self.graph, e[0],
+                                e[1], self._distance(e[0], e[1]))
+            return True, points, edges
         else:
-            return False
+            return False, [], []
 
     def _sample(self):
         return np.array(self.state_space.sample())
@@ -708,4 +770,4 @@ class CPRM():
         return str([trunc(num, places) for num in value])
 
     def _distance(self, q1, q2):
-        return np.linalg.norm(q1 - q2)
+        return np.linalg.norm(np.array(q1) - np.array(q2))

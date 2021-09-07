@@ -60,7 +60,7 @@ def parallel_connect_worker(batches, interp_fn, distance_fn, sim_context_cls, si
                         [q_near, q_sample, distance_fn(local_path)])
         return connections
 
-def parallel_projection_worker(num_samples, sim_context_cls, sim_config, tsr):
+def parallel_projection_worker(num_samples, sim_context_cls, sim_config):
     sim_context = sim_context_cls(sim_config, setup=False)
     sim_context.setup(sim_overrides={"run_parallel": True, "use_gui": False})
     sim = sim_context.get_sim_instance()
