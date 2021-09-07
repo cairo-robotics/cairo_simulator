@@ -67,10 +67,10 @@ def create_collision_shape(geometry, pose=unit_pose(), client=0):
         'physicsClientId': client,
     }
     collision_args.update(geometry)
-    if 'length' in collision_args:
-        # TODO: pybullet bug visual => length, collision => height
-        collision_args['height'] = collision_args['length']
-        del collision_args['length']
+    # if 'length' in collision_args:
+    #     # TODO: pybullet bug visual => length, collision => height
+    #     collision_args['height'] = collision_args['length']
+    #     del collision_args['length']
     return p.createCollisionShape(**collision_args)
 
 def create_body(collision_id=-1, visual_id=-1, mass=0, client=0):
