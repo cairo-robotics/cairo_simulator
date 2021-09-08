@@ -25,7 +25,9 @@ def main():
     # Reload the samples and configuration
     directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data/serialization_data/test_model")
     config, samples, graph = load_model(directory)
-
+    config["sim"] = {
+            "use_real_time": False
+        }
     config['tsr'] = {
             'degrees': False,
             "T0_w": [.7, 0, 0, 0, 0, 0],
@@ -78,13 +80,12 @@ def main():
     biased_state_space = sim_context.get_state_space()
     svc = sim_context.get_state_validity()
     tsr = sim_context.get_tsr()
-    sawyer_robot.move_to_joint_pos(start)
-    sawyer_robot.move_to_joint_pos(start)
-    time.sleep(2)
+    sawyer_robot.set_joint_state(start)
+    time.sleep(3)
     # Utilizes RPY convention
     with DisabledCollisionsContext(sim, [], []):
         ###########
-        # LazyPRM #
+        # CPRM #
         ###########
         # The specific space we sample from is the Hyberball centered at the midpoint between two candidate points. 
         # This is used to bias tree grwoth between two points when using CBiRRT2 as our local planner for a constrained PRM.
@@ -93,7 +94,7 @@ def main():
         interp = partial(parametric_lerp, steps=10)
         # See params for PRM specific parameters
         prm = CPRM(SawyerBiasedCPRMSimContext, config, sawyer_robot, tsr, biased_state_space, tree_state_space, svc, interp, params={
-            'n_samples': 3000, 'k': 8, 'planning_attempts': 5, 'ball_radius': 2.0, 'smooth_path': True, 'smoothing_time':10}, tree_params={'iters': 50, 'q_step': .5}, logger=logger)
+            'n_samples': 3000, 'k': 8, 'planning_attempts': 5, 'ball_radius': 2.0, 'smooth_path': True, 'smoothing_time':10}, tree_params={'iters': 1000, 'q_step': .1}, logger=logger)
         logger.info("Planning....")
         prm.preload(samples, graph)
         path = prm.plan(np.array(start), np.array(goal))
@@ -101,15 +102,20 @@ def main():
     path = [np.array(p) for p in path]
     # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
     jtc = JointTrajectoryCurve()
-    traj = jtc.generate_trajectory(path, move_time=20)
-    sawyer_robot.execute_trajectory(traj)
+    traj = jtc.generate_trajectory(path, move_time=5)
+    input("Press any key to execute...")
     try:
-        while True:
-            sim.step()
+        prior_time = 0
+        for i, point in enumerate(traj):
+            if not svc.validate(point[1]):
+                print("Invalid point: {}".format(point[1]))
+                continue
+            sawyer_robot.set_joint_state(point[1])
+            time.sleep(point[0] - prior_time)
+            prior_time = point[0]
     except KeyboardInterrupt:
-        p.disconnect()
-        sys.exit(0)
-   
+        pass
+    control = input("Press q to quit...")
 
 if __name__ == "__main__":
     main()

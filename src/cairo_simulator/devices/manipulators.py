@@ -463,7 +463,7 @@ class Sawyer(Manipulator):
             target_velocity = self._extra_joint_default_velocity[0]
         p.setJointMotorControl2(self._simulator_id, self._extra_dof_indices[0], p.POSITION_CONTROL,
                                 target_position, target_velocity, maxVelocity=target_velocity)
-
+    
     @rosmethod
     def publish_state(self):
         """
@@ -548,6 +548,26 @@ class Sawyer(Manipulator):
         else:
             self.logger.warn(
                 "Invalid joint configuration provided for Sawyer %s. Needs to be 7 floats (arm) or 9 floats (arm+gripper)" % self._name)
+    
+    def set_joint_state(self, target_position):
+        list_tgt_position = list(target_position)
+        if len(target_position) == 7:
+            joint_dofs = self._arm_dof_indices + self._gripper_dof_indices
+            gripper_pos = p.getJointStates(
+                        self._simulator_id, self._gripper_dof_indices)
+            target_position = list_tgt_position + [val[0] for val in list(gripper_pos)]
+            # Set new configuration
+            for i, idx in enumerate(joint_dofs):
+                p.resetJointState(self._simulator_id, idx, targetValue=target_position[i], targetVelocity=0, physicsClientId=0)
+
+        elif len(target_position) == 9:
+            joint_dofs = self._arm_dof_indices + self._gripper_dof_indices
+            # Set new configuration
+            for i, idx in enumerate(joint_dofs):
+                p.resetJointState(self._simulator_id, idx, targetValue=target_position[i], targetVelocity=0, physicsClientId=0)
+        else:
+            self.logger.warn(
+                "Invalid joint configuration provided for Sawyer %s. Needs to be 7 floats (arm) or 9 floats (arm+gripper)" % self._name)
 
     def move_to_joint_pos_vel_callback(self, target_position_vel_float32array):
         """
@@ -609,7 +629,7 @@ class Sawyer(Manipulator):
 
         dynamics = p.calculateInverseDynamics(self._simulator_id, tgt_positions, tgt_velocities, [0]*len(tgt_positions))
         '''
-        # p.setJointMotorControlArray(self._simulator_id, joints_list[:len(target_positions)], p.POSITION_CONTROL, targetPositions=target_position, targetVelocities=target_velocity)
+        # p.setJointMotorControlArray(self._simulator_id, joints_list[:len(target_position)], p.POSITION_CONTROL, targetPositions=target_position, targetVelocities=target_velocity)
 
         for i, j_idx in enumerate(joints_list):
             p.setJointMotorControl2(self._simulator_id, j_idx, p.POSITION_CONTROL,
@@ -632,7 +652,10 @@ class Sawyer(Manipulator):
             p.setJointMotorControl2(self._simulator_id,
                                     j_idx,
                                     p.VELOCITY_CONTROL,
-                                    targetVelocity=target_velocity[i])
+                                    targetVelocity=target_velocity[i], force=500)
+    
+    def zero_joint_velocities(self):
+        self.move_with_joint_vel([0.] * len(self._arm_dof_indices))
 
     def get_current_joint_states(self):
         """
@@ -743,7 +766,7 @@ class Sawyer(Manipulator):
         sim.set_robot_trajectory(
             self._simulator_id, joint_positions, joint_velocities)
 
-    def check_if_at_position(self, pos, epsilon=0.35):
+    def check_if_at_position(self, pos, epsilon=0.1):
         '''
         Returns True if the robot's joints are within (epsilon) of pos, false otherwise
 

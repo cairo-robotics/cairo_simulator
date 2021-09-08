@@ -114,7 +114,7 @@ class SawyerSimContext(AbstractSimContext):
         self.sim_objects = [SimObject(**config)
                             for config in sim_obj_configs]
         primitive_builder = PrimitiveBuilder()
-        self.sim_ojebcts = self.sim_objects + [primitive_builder.build(config) for config in primitive_configs]
+        self.sim_objects = self.sim_objects + [primitive_builder.build(config, client=self.sim.get_client_id()) for config in primitive_configs]
         # Turn rendering back on
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
         # self._setup_state_validity(self.sawyer_robot)
@@ -241,7 +241,7 @@ class SawyerCPRMSimContext(AbstractSimContext):
         self.sim_objects = [SimObject(**config)
                             for config in sim_obj_configs]
         primitive_builder = PrimitiveBuilder()
-        self.sim_ojebcts = self.sim_objects + [primitive_builder.build(config) for config in primitive_configs]
+        self.sim_objects = self.sim_objects + [primitive_builder.build(config) for config in primitive_configs]
         # Turn rendering back on
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
         self._setup_state_validity(self.sawyer_robot)
@@ -393,7 +393,7 @@ class SawyerBiasedCPRMSimContext(AbstractSimContext):
         self.sim_objects = [SimObject(**config)
                             for config in sim_obj_configs]
         primitive_builder = PrimitiveBuilder()
-        self.sim_ojebcts = self.sim_objects + [primitive_builder.build(config) for config in primitive_configs]
+        self.sim_objects = self.sim_objects + [primitive_builder.build(config) for config in primitive_configs]
         # Turn rendering back on
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
         self._setup_state_validity(self.sawyer_robot)

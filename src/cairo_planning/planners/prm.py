@@ -516,7 +516,7 @@ class CPRM():
             # q_s_name = self._val2str(q_s)
             # q_s_idx = utils.name2idx(smoothing_tree, q_s_name)
             # constrain extended.
-            success, smoothed_path_values, _ = self._cbirrt2_connect(q_old, q_s)
+            success, smoothed_path_values, _ = self._cbirrt2_connect(q_old, q_s,  add_points_to_samples=False, update_graph=False)
             if success:
                 # smoothed_path_values = [smoothing_tree.vs[idx] for idx in self._extract_graph_path(smoothing_tree, q_old_idx, q_s_idx)]
                 curr_path_values = [self.graph.vs[idx]['value'] for idx in self._get_graph_path(rand_idx1, rand_idx2)]
@@ -618,7 +618,7 @@ class CPRM():
     def _generate_connections(self, samples):
         for q_rand in samples:
             for q_near in self._neighbors(q_rand):
-                _, _, _ = self._cbirrt2_connect(q_rand, q_near)
+                _, _, _ = self._cbirrt2_connect(q_rand, q_near, add_points_to_samples=False, update_graph=True)
 
     def _generate_connections_parallel(self, samples):
         evaluated_name_pairs = {}

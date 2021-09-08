@@ -5,6 +5,8 @@ from functools import partial
 import datetime
 
 import pybullet as p
+
+from cairo_planning.geometric import state_space
 if os.environ.get('ROS_DISTRO'):
     import rospy
 import numpy as np
@@ -12,13 +14,14 @@ import numpy as np
 from cairo_simulator.core.sim_context import SawyerBiasedCPRMSimContext
 from cairo_simulator.core.utils import ASSETS_PATH
 
-from cairo_planning.geometric.state_space import SawyerConfigurationSpace
+from cairo_planning.geometric.state_space import DistributionSpace, SawyerConfigurationSpace
 
 
 from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.local.interpolation import parametric_lerp
 from cairo_planning.planners import CPRM
-from cairo_planning.sampling.samplers import HyperballSampler
+from cairo_planning.sampling.samplers import HyperballSampler, DistributionSampler
+from cairo_planning.geometric.distribution import KernelDensityDistribution
 from cairo_planning.core.serialization import dump_model
 
 def main():
@@ -68,7 +71,7 @@ def main():
             'degrees': False,
             "T0_w": [.7, 0, 0, 0, 0, 0],
             "Tw_e": [-.2, 0, .739, -3.1261701132911655, 0.023551837572146628, 0.060331404738664496],
-            "Bw": [[(0, 100), (-100, 100), (-.1, 0)],  # allow some tolerance in the z and y and only positve in x
+            "Bw": [[(0, 100), (-100, 100), (-.1, 0)],  
                     [(-.07, .07), (-.07, .07), (-.07, .07)]]
         }
 
@@ -117,7 +120,7 @@ def main():
     svc = sim_context.get_state_validity()
     tsr = sim_context.get_tsr()
     sawyer_robot.move_to_joint_pos(start)
-    time.sleep(2)
+    time.sleep(3)
     # Utilizes RPY convention
     with DisabledCollisionsContext(sim, [], []):
         ###########

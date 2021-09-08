@@ -67,10 +67,10 @@ def create_collision_shape(geometry, pose=unit_pose(), client=0):
         'physicsClientId': client,
     }
     collision_args.update(geometry)
-    # if 'length' in collision_args:
-    #     # TODO: pybullet bug visual => length, collision => height
-    #     collision_args['height'] = collision_args['length']
-    #     del collision_args['length']
+    if 'length' in collision_args:
+        # TODO: pybullet bug visual => length, collision => height
+        collision_args['height'] = collision_args['length']
+        del collision_args['length']
     return p.createCollisionShape(**collision_args)
 
 def create_body(collision_id=-1, visual_id=-1, mass=0, client=0):
@@ -128,8 +128,10 @@ class PrimitiveBuilder():
             'sphere': create_sphere
         }
     
-    def build(self, configs):
+    def build(self, configs, client=0):
         primitive_fn = self.primitive_type_fn_map[configs['type']]
+        configs['primitive_configs']['client'] = client
+        print(client)
         body_id = primitive_fn(**configs['primitive_configs'])
         return SimObject(**configs['sim_object_configs'], model_file_or_sim_id=body_id)
 

@@ -30,7 +30,7 @@ class R2():
 
 class DistributionSpace():
 
-    def __init__(self, sampler, limits):
+    def __init__(self, sampler, limits=None):
         """
         Represents a learned distribution space. This could be a keyframe distribution, trajectory distribution, or any arbitrary distrubtion. 
         It utilizes a sampler that contains the learned distribution model.
@@ -44,7 +44,17 @@ class DistributionSpace():
             limits (list): Dx2. The limits of each dimension used by the sampler to ensure the sampled dimensions are valid. 
         """
         self.sampler = sampler
-        self.limits = limits
+        self.limits = [['right_j0', (-3.0503, 3.0503)],
+                       ['right_j1', (-3.8095, 2.2736)],
+                       ['right_j2', (-3.0426, 3.0426)],
+                       ['right_j3', (-3.0439, 3.0439)],
+                       ['right_j4', (-2.9761, 2.9761)],
+                       ['right_j5', (-2.9761, 2.9761)],
+                       ['right_j6', (-4.7124, 4.7124)],
+                       ['right_gripper_l_finger_joint', (0.0, 0.020833)],
+                       ['right_gripper_r_finger_joint',
+                        (-0.020833, 0.0)],
+                       ['head_pan', (-5.0952, 0.9064)]] if limits is None else limits
 
     def _get_limits(self, joint_names):
         """

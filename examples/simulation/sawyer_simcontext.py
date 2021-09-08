@@ -1,7 +1,7 @@
 import sys
 import os
 import time
-import copy
+from cairo_planning.collisions import DisabledCollisionsContext
 
 if os.environ.get('ROS_DISTRO'):
     import rospy
@@ -33,7 +33,7 @@ def main():
     configuration = {}
 
     configuration["sim"] = {
-            "use_real_time": True
+            "use_real_time": False
         }
 
     configuration["logging"] = {
@@ -80,47 +80,70 @@ def main():
         #     "position": [0.69, 0.1, .55]
         # }
     ]
+    configuration["primitives"] = [
+        {
+            "type": "box",
+            "primitive_configs": {"w": .2, "l": .45, "h": .35},
+            "sim_object_configs": 
+                {
+                    "object_name": "box",
+                    "position": [.6, 0, .7],
+                    "orientation":  [0, 0, 0],
+                    "fixed_base": 1    
+                }
+        },
+        {
+            "type": "box",
+            "primitive_configs": {"w": .2, "l": .45, "h": .35},
+            "sim_object_configs": 
+                {
+                    "object_name": "box",
+                    "position": [.9, 0, .7],
+                    "orientation":  [0, 0, 0],
+                    "fixed_base": 1    
+                }
+        },
+        ]
     sim_context = SawyerSimContext(configuration)
     sim = sim_context.get_sim_instance()
     _ = sim_context.get_logger()
     _ = sim_context.get_state_space()
-    _ = sim_context.get_state_validity()
+    svc = sim_context.get_state_validity()
     sawyer_robot = sim_context.get_robot()
     _ = sawyer_robot.get_simulator_id()
     _ = sim_context.get_sim_objects(['Ground'])[0]
+    with DisabledCollisionsContext(sim, [], [], disable_visualization=False):
+        start_pos = [0]*7
+        # sawyer_robot.move_to_joint_pos(start_pos)
 
-    start_pos = [0]*7
-    sawyer_robot.move_to_joint_pos(start_pos)
+        joint_config = sawyer_robot.solve_inverse_kinematics(
+            [ 0.7074708676269519,  -0.08765564452576573, 0.9], [0, 0, 0, 1])
 
-    joint_config = sawyer_robot.solve_inverse_kinematics(
-        [ 0.7074708676269519,  -0.08765564452576573, 0.9], [0, 0, 0, 1])
+        # joint_config2 = sawyer_robot.solve_inverse_kinematics(
+        #     [ 0.7074708676269519, -0.08765564452576573, 0.744752279781234485], 
+        #     [-0.9811850913657468, -0.0013224117851769242, -0.19302238661442592, 0.0040528970296797445])
 
-    # joint_config2 = sawyer_robot.solve_inverse_kinematics(
-    #     [ 0.7074708676269519, -0.08765564452576573, 0.744752279781234485], 
-    #     [-0.9811850913657468, -0.0013224117851769242, -0.19302238661442592, 0.0040528970296797445])
+        # joint_config2 = sawyer_robot.solve_inverse_kinematics( [ 0.7074708676269519,  -0.08765564452576573, 0.9], [0, 0, 0, 1])
 
-    # joint_config2 = sawyer_robot.solve_inverse_kinematics( [ 0.7074708676269519,  -0.08765564452576573, 0.9], [0, 0, 0, 1])
+        joint_config2 = [-0.93220603, -0.38925626,  0.22872595,  1.47503778, -0.60152948,
+            0.459639  , -1.87886531]
+        sawyer_robot.set_default_joint_velocity_pct(0.5)
+        traj = ((1., joint_config), (2, joint_config2))
 
-    joint_config2 = [1.10381587, 0.33895823, 1.7249788, 0.06114207, 2.70975419, 1.1963256, 0.48311679]
-
-    sawyer_robot.set_default_joint_velocity_pct(0.5)
-    traj = ((1., joint_config), (2., joint_config2),
-            (2.5, joint_config), (5, joint_config2))
-
-    time.sleep(3)
-    while sawyer_robot.check_if_at_position(start_pos, 0.5) is False:
-        time.sleep(0.1)
-        pass
-
-    sawyer_robot.execute_trajectory(traj)
-
-    # Loop until someone shuts us down
-    try:
-        while True:
-            sim.step()
-    except KeyboardInterrupt:
-        p.disconnect()
-        sys.exit(0)
+        while sawyer_robot.check_if_at_position(start_pos, 0.5) is False:
+            time.sleep(0.1)
+            pass
+        print(svc.validate(joint_config2))
+        sawyer_robot.execute_trajectory(traj)
+    
+        # Loop until someone shuts us down
+        try:
+            while True:
+                sim.step()
+                print(sawyer_robot.get_current_joint_states())
+        except KeyboardInterrupt:
+            p.disconnect()
+            sys.exit(0)
 
 
 if __name__ == "__main__":
