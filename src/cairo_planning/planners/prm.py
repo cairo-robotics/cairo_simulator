@@ -503,7 +503,11 @@ class CPRM():
                 self.log.debug("Finished smoothing iterations in: " + str(int(elapsed_time))  + " seconds")
                 break
             # Get two random indeces from path
-            rand_idx1, rand_idx2 = random.sample(vertex_sequence, 2)
+            center_idx = random.sample(range(0, len(vertex_sequence)), 1)[0]
+            lower_range = center_idx - 10 if center_idx - 10 >= 0 else 0
+            upper_range = center_idx + 10 if center_idx + 10 <= len(vertex_sequence) else len(vertex_sequence)
+            vertex_window = vertex_sequence[lower_range:upper_range]
+            rand_idx1, rand_idx2 = random.sample(vertex_window, 2)
             if vertex_sequence.index(rand_idx1) > vertex_sequence.index(rand_idx2):
                 continue
             q_old = self.graph.vs[rand_idx1]['value']
