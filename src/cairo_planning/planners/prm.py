@@ -520,9 +520,11 @@ class CPRM():
             # q_s_name = self._val2str(q_s)
             # q_s_idx = utils.name2idx(smoothing_tree, q_s_name)
             # constrain extended.
+            
             success, smoothed_path_values, _ = self._cbirrt2_connect(q_old, q_s,  add_points_to_samples=False, update_graph=False)
             if success:
                 # smoothed_path_values = [smoothing_tree.vs[idx] for idx in self._extract_graph_path(smoothing_tree, q_old_idx, q_s_idx)]
+                self._add_edge(self.graph, smoothed_path_values[-1], q_s, self._distance(smoothed_path_values[-1], q_s))
                 curr_path_values = [self.graph.vs[idx]['value'] for idx in self._get_graph_path(rand_idx1, rand_idx2)]
                 smoothed_path_value_pairs = [(smoothed_path_values[i], smoothed_path_values[(i + 1) % len(smoothed_path_values)]) for i in range(len(smoothed_path_values))][:-1]
                 curr_path_values_pairs = [(curr_path_values[i], curr_path_values[(i + 1) % len(curr_path_values)]) for i in range(len(curr_path_values))][:-1]
@@ -530,6 +532,7 @@ class CPRM():
                 curr_path_distance = sum([self._distance(pair[0], pair[1]) for pair in curr_path_values_pairs])
 
                 # if the newly found path between indices is shorter, lets use it and add it do the graph
+                print(smooth_path_distance, curr_path_distance)
                 if smooth_path_distance < curr_path_distance:
                     number_of_shortcuts += 1
                     for q in smoothed_path_values:
