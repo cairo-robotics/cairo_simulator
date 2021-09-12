@@ -83,7 +83,6 @@ class CBiRRT2():
             qb_reach, _ = self._constrained_extend(b_tree, tsr, qb_near, qa_reach)
             # if the qa_reach and qb_reach are equivalent, the trees are connectable. 
             if self._equal(qa_reach, qb_reach):
-                # print("Connecting trees...")
                 self.connected_tree = self._join_trees(a_tree, qa_reach, b_tree, qb_reach)
                 return self.connected_tree
             # otherwise we swap trees and repeat.

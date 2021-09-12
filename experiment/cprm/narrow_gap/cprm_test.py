@@ -23,7 +23,7 @@ from cairo_planning.core.serialization import load_model
 
 def main():
     # Reload the samples and configuration
-    directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data/serialization_data/test_model")
+    directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data/serialized_model")
     config, samples, graph = load_model(directory)
     config["sim"] = {
             "use_real_time": False
@@ -99,10 +99,10 @@ def main():
         prm.preload(samples, graph)
         path = prm.plan(np.array(start), np.array(goal))
     # splining uses numpy so needs to be converted
-    path = [np.array(p) for p in path]
+    path = np.array([np.array(p) for p in path])
     # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
     jtc = JointTrajectoryCurve()
-    traj = jtc.generate_trajectory(path, move_time=5)
+    traj = jtc.generate_trajectory(path, move_time=10)
     input("Press any key to execute...")
     try:
         prior_time = 0
@@ -115,7 +115,6 @@ def main():
             prior_time = point[0]
     except KeyboardInterrupt:
         pass
-    control = input("Press q to quit...")
 
 if __name__ == "__main__":
     main()

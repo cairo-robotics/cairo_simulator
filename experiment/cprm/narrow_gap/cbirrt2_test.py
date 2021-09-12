@@ -148,7 +148,7 @@ def main():
             # Use parametric linear interpolation with 5 steps between points.
             interp = partial(parametric_lerp, steps=10)
             # See params for PRM specific parameters
-            cbirrt = CBiRRT2(sawyer_robot, state_space, svc, interp, params={'smooth_path': True, 'smoothing_time':5, 'q_step': .1, 'e_step': .25, 'iters': 20000})
+            cbirrt = CBiRRT2(sawyer_robot, state_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 10, 'q_step': .1, 'e_step': .25, 'iters': 20000})
             logger.info("Planning....")
             plan = cbirrt.plan(tsr, np.array(start), np.array(goal))
             path = cbirrt.get_path(plan)
