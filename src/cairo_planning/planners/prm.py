@@ -663,7 +663,7 @@ class CPRM():
                     for edge in connection['edges']:
                         valid_edges.append((edge[0], edge[1]))
                         valid_edge_weights.append(self._distance(edge[0], edge[1]))
-
+            self.samples = self.samples + valid_values
             values = [self.graph.vs.find(name=self.start_name)["value"],
                   self.graph.vs.find(name=self.goal_name)["value"]] + valid_values
             str_values = [utils.val2str(list(value)) for value in values]
@@ -682,7 +682,7 @@ class CPRM():
                 self.graph.es[idx]['id'] = idx
 
 
-    def _cbirrt2_connect(self, q_start, q_target, add_points_to_samples=False, update_graph=True):
+    def _cbirrt2_connect(self, q_start, q_target, add_points_to_samples=True, update_graph=True):
         self.cbirrt2.reset_planner()
 
         centroid = (np.array(q_start) + np.array(q_target)) / 2
