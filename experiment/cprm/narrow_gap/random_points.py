@@ -1,7 +1,7 @@
 import random
 import time
 import copy
-
+import numpy as np
 from cairo_simulator.core.sim_context import SawyerBiasedCPRMSimContext
 from cairo_simulator.core.utils import ASSETS_PATH
 
@@ -105,6 +105,7 @@ def main():
             if svc.validate(new_config):
                 new_config
                 break
+        new_config[-1] = new_config[-1] + np.pi/2
         random_start_configurations.append(copy.deepcopy(new_config))
     
     random_goal_configurations = []
@@ -116,6 +117,7 @@ def main():
             new_config = sawyer_robot.solve_inverse_kinematics(new_position, goal_world_pose[1])
             if svc.validate(new_config):
                 break
+        new_config[-1] = new_config[-1] + np.pi/2
         random_goal_configurations.append(new_config)
 
     print(random_start_configurations)

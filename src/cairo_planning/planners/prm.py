@@ -414,7 +414,11 @@ class CPRM():
     def preload(self, samples, graph):
         self.graph = graph
         for sample in samples:
-            self.graph.vs[utils.val2idx(self.graph, sample)]['value'] = np.array(sample)
+            if utils.val2idx(self.graph, sample) is not None:
+                try:
+                    self.graph.vs[utils.val2idx(self.graph, sample)]['value'] = np.array(sample)
+                except TypeError as e:
+                    print(e)
         self.samples = samples
         self.preloaded = True
 
@@ -466,7 +470,6 @@ class CPRM():
                 self._generate_connections(samples=self.samples)
             else:
                 self._generate_connections_parallel(samples=self.samples)
-            self.samples = [vs['value'] for vs in self.graph.vs]
             self.log.debug("Recreating NN datastructure from connectable samples...")
             self.nn = NearestNeighbors(X=np.array(
             self.samples), model_kwargs={"leaf_size": 100})
@@ -586,12 +589,14 @@ class CPRM():
                     successful, _, _ = self._cbirrt2_connect(q_start, q_near, add_points_to_samples=True)
                     if successful:
                         start_added = True
+                        break
         for q_near in self._neighbors(q_end, k_override=15, within_ball=False):
             if utils.val2str(q_near) in self.graph.vs['name']:
                 if utils.val2idx(self.graph, q_near) != 1:
                     successful, _, _ = self._cbirrt2_connect(q_near, q_end, add_points_to_samples=True)
                     if successful:
                         end_added = True
+                        break
         if not start_added or not end_added:
             raise Exception("Planning failure! Could not add either start {} and end {} successfully to graph.".format(
                 {start_added}, {end_added}))

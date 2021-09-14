@@ -9,7 +9,7 @@ if os.environ.get('ROS_DISTRO'):
     import rospy
 import numpy as np
 
-from cairo_simulator.core.sim_context import SawyerBiasedCPRMSimContext
+from cairo_simulator.core.sim_context import SawyerSimContext
 from cairo_simulator.core.utils import ASSETS_PATH
 
 from cairo_planning.collisions import DisabledCollisionsContext
@@ -82,29 +82,6 @@ def main():
         }
         
 
-    # Collect all joint configurations from all demonstration .json files.
-    configurations = []
-    data_directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data/sampling_bias")
-  
-    print("Running biased sampling test for {}".format(data_directory))
-    for json_file in os.listdir(data_directory):
-        filename = os.path.join(data_directory, json_file)
-        with open(filename, "r") as f:
-            data = json.load(f)
-            for entry in data:
-                configurations.append(entry['robot']['joint_angle'])
-
-    config['sampling_bias'] = {
-        'bandwidth': .1,
-        'fraction_uniform': .25,
-        'data': configurations
-    }
-
-    model = KernelDensityDistribution(bandwidth=config['sampling_bias']['bandwidth'])
-    model.fit(config['sampling_bias']['data'])
-    sampler = DistributionSampler(distribution_model=model, fraction_uniform=config['sampling_bias']['fraction_uniform'])
-    state_space = DistributionSpace(sampler=sampler)
-
     start = [
         0.673578125,
         -0.2995908203125,
@@ -123,10 +100,10 @@ def main():
         0.8245869140625,
         -1.6826474609375]
 
-    sim_context = SawyerBiasedCPRMSimContext(configuration=config)
+    sim_context = SawyerSimContext(configuration=config)
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
-    # _ = sim_context.get_state_space()
+    state_space = sim_context.get_state_space()
     sawyer_robot = sim_context.get_robot()
     # _ = sawyer_robot.get_simulator_id()
     tsr = sim_context.get_tsr()

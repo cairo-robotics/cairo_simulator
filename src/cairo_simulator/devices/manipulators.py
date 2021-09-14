@@ -213,6 +213,7 @@ class Manipulator(Robot):
             rospy.logerr(
                 "Inverse Kinematics solver not initialized properly for robot %s: end effector link index not set!" % self._name)
             return
+        jd=[0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001]
 
         ik_solution = None
 
@@ -234,14 +235,17 @@ class Manipulator(Robot):
             if len(target_orientation) == 3:
                 target_orientation = p.getQuaternionFromEuler(
                     target_orientation)
-            ik_solution = p.calculateInverseKinematics(
-                self._simulator_id, self._end_effector_link_index, target_position, targetOrientation=target_orientation, maxNumIterations=120)
-
+            ik_solution = list(p.calculateInverseKinematics(
+                self._simulator_id, self._end_effector_link_index, target_position, targetOrientation=target_orientation, maxNumIterations=125))
+        # ikpy_ik =  self.fk_chain.inverse_kinematics(target_position, p.getEulerFromQuaternion(target_orientation), orientation_mode='all')
+        # print(ikpy_ik)
         # Return a configuration of only the arm's joints.
         arm_config = [0] * len(self._arm_ik_indices)
         for i, idx in enumerate(self._arm_ik_indices):
+            # why pybullet is maintaining a reference to the ik_solution value is crazy. What in god's name is going on...
             arm_config[i] = ik_solution[idx]
-
+        # for some reason pybulletrs inverse kinematics fore the last wrist angle is off by pi/2 ??
+        print(arm_config)
         return arm_config
 
     def execute_trajectory(self, trajectory_data):
@@ -362,7 +366,8 @@ class Sawyer(Manipulator):
         gripper_tip_elements = get_chain_from_joints(urdf_file, joints=['right_arm_mount', 'right_j0', 'right_j1', 'right_j2',
                                                                         'right_j3', 'right_j4', 'right_j5', 'right_j6', 'right_hand', 'right_gripper_base_joint', 'right_gripper_tip_joint'])
         self.fk_chain = Chain.from_urdf_file(
-            urdf_file, base_elements=gripper_tip_elements, active_links_mask=[True] + 8 * [True] + 3 * [False])
+            urdf_file, base_elements=gripper_tip_elements, active_links_mask=[True]*2 + 7 * [True] + 3 * [False])
+        print("hello")
 
     def _init_joint_names(self):
         """
