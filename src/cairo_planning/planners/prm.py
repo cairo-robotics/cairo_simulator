@@ -507,27 +507,17 @@ class CPRM():
                 break
             # Get two random indeces from path
             center_idx = random.sample(range(0, len(vertex_sequence)), 1)[0]
-            lower_range = center_idx - 10 if center_idx - 10 >= 0 else 0
-            upper_range = center_idx + 10 if center_idx + 10 <= len(vertex_sequence) else len(vertex_sequence)
+            lower_range = center_idx - 5 if center_idx - 5 >= 0 else 0
+            upper_range = center_idx + 5 if center_idx + 5 <= len(vertex_sequence) else len(vertex_sequence)
             vertex_window = vertex_sequence[lower_range:upper_range]
             rand_idx1, rand_idx2 = random.sample(vertex_window, 2)
             if vertex_sequence.index(rand_idx1) > vertex_sequence.index(rand_idx2):
                 continue
             q_old = self.graph.vs[rand_idx1]['value']
             q_s = self.graph.vs[rand_idx2]['value']
-            # add points into tree
-            # self._add_vertex(smoothing_tree, q_old)
-            # self._add_vertex(smoothing_tree, q_s)
-            # q_old_name = self._val2str(q_old)
-            # q_old_idx = utils.name2idx(smoothing_tree, q_old_name)
-            # q_s_name = self._val2str(q_s)
-            # q_s_idx = utils.name2idx(smoothing_tree, q_s_name)
-            # constrain extended.
-            
+
             success, smoothed_path_values, _ = self._cbirrt2_connect(q_old, q_s,  add_points_to_samples=False, update_graph=False)
             if success:
-                # smoothed_path_values = [smoothing_tree.vs[idx] for idx in self._extract_graph_path(smoothing_tree, q_old_idx, q_s_idx)]
-                self._add_edge(self.graph, smoothed_path_values[-1], q_s, self._distance(smoothed_path_values[-1], q_s))
                 curr_path_values = [self.graph.vs[idx]['value'] for idx in self._get_graph_path(rand_idx1, rand_idx2)]
                 smoothed_path_value_pairs = [(smoothed_path_values[i], smoothed_path_values[(i + 1) % len(smoothed_path_values)]) for i in range(len(smoothed_path_values))][:-1]
                 curr_path_values_pairs = [(curr_path_values[i], curr_path_values[(i + 1) % len(curr_path_values)]) for i in range(len(curr_path_values))][:-1]
@@ -535,13 +525,14 @@ class CPRM():
                 curr_path_distance = sum([self._distance(pair[0], pair[1]) for pair in curr_path_values_pairs])
 
                 # if the newly found path between indices is shorter, lets use it and add it do the graph
-                print(smooth_path_distance, curr_path_distance)
                 if smooth_path_distance < curr_path_distance:
                     number_of_shortcuts += 1
                     for q in smoothed_path_values:
                         self._add_vertex(self.graph, q)
                     for pair in smoothed_path_value_pairs:
                         self._add_edge(self.graph, pair[0], pair[1], self._distance(pair[0], pair[1]))
+                    # since constrain extend does include last point as dded values we need to make that last edge connection we need to do so.
+                    self._add_edge(self.graph, smoothed_path_values[-1], q_s, self._distance(smoothed_path_values[-1], q_s))
         self.log.debug("Number of shortcuts made during smoothing: {}".format(number_of_shortcuts))
         new_best_vertex_sequence = self._get_graph_path()
         return [self.graph.vs['id'].index(_id) for _id in new_best_vertex_sequence], [self.graph.vs[_id]['value'] for _id in new_best_vertex_sequence]
@@ -567,13 +558,17 @@ class CPRM():
         # check if start and goal exist in graph already
         if utils.val2idx(self.graph, q_start) is None:
             self.start_name = utils.val2str(q_start)
+            # we manually add because self._add_vertex prevents adding a vertex if its the start or goal
             self.graph.add_vertex(self.start_name, **{'value': list(q_start)})
+            self.graph.vs[utils.val2idx(self.graph, q_start)]['id'] = self.graph.vs[utils.val2idx(self.graph, q_start)].index
         else:
             self.start_name = utils.val2str(q_start)
             self.graph.vs[utils.val2idx(self.graph, q_start)]['value'] = list(q_start)
         if utils.val2idx(self.graph, q_goal) is None:
             self.goal_name = utils.val2str(q_goal)
+            # we manually add because self._add_vertex prevents adding a vertex if its the start or goal
             self.graph.add_vertex(self.goal_name, **{'value': list(q_goal)})
+            self.graph.vs[utils.val2idx(self.graph, q_goal)]['id'] = self.graph.vs[utils.val2idx(self.graph, q_goal)].index
         else:
             self.goal_name = utils.val2str(q_goal)
             self.graph.vs[utils.val2idx(self.graph, q_goal)]['value'] = list(q_goal)
