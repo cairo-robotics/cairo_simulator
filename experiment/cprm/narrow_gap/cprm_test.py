@@ -9,7 +9,7 @@ if os.environ.get('ROS_DISTRO'):
     import rospy
 import numpy as np
 
-from cairo_simulator.core.sim_context import SawyerBiasedCPRMSimContext
+from cairo_simulator.core.sim_context import SawyerBiasedTSRSimContext
 from cairo_simulator.core.utils import ASSETS_PATH
 
 from cairo_planning.collisions import DisabledCollisionsContext
@@ -103,7 +103,7 @@ def main():
     #     'data': configurations
     # }
 
-    sim_context = SawyerBiasedCPRMSimContext(configuration=config)
+    sim_context = SawyerBiasedTSRSimContext(configuration=config)
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
     sawyer_robot = sim_context.get_robot()
@@ -123,7 +123,7 @@ def main():
         # Use parametric linear interpolation with 10 steps between points.
         interp = partial(parametric_lerp, steps=10)
         # See params for PRM specific parameters
-        prm = CPRM(SawyerBiasedCPRMSimContext, config, sawyer_robot, tsr, biased_state_space, tree_state_space, svc, interp, params={
+        prm = CPRM(SawyerBiasedTSRSimContext, config, sawyer_robot, tsr, biased_state_space, tree_state_space, svc, interp, params={
             'n_samples': 3000, 'k': 8, 'planning_attempts': 5, 'ball_radius': 2.0, 'smooth_path': True, 'smoothing_time':10}, tree_params={'iters': 100, 'q_step': .1}, logger=logger)
         logger.info("Preloading samples and model....")
         prm.preload(samples, graph)

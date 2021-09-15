@@ -9,16 +9,15 @@ if os.environ.get('ROS_DISTRO'):
     import rospy
 import numpy as np
 
-from cairo_simulator.core.sim_context import SawyerSimContext
+from cairo_simulator.core.sim_context import SawyerTSRSimContext
 from cairo_simulator.core.utils import ASSETS_PATH
 
 from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.local.interpolation import parametric_lerp
 from cairo_planning.local.curve import JointTrajectoryCurve
 from cairo_planning.planners import CBiRRT2
-from cairo_planning.geometric.state_space import DistributionSpace
-from cairo_planning.sampling.samplers import DistributionSampler
-from cairo_planning.geometric.distribution import KernelDensityDistribution
+from cairo_planning.geometric.state_space import SawyerConfigurationSpace
+
 
 
 
@@ -100,16 +99,18 @@ def main():
         0.8245869140625,
         -1.6826474609375]
 
-    sim_context = SawyerSimContext(configuration=config)
+    sim_context = SawyerTSRSimContext(configuration=config)
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
-    state_space = sim_context.get_state_space()
+    _ = sim_context.get_state_space()
     sawyer_robot = sim_context.get_robot()
     # _ = sawyer_robot.get_simulator_id()
     tsr = sim_context.get_tsr()
     _ = sim_context.get_sim_objects(['Ground'])[0]
     svc = sim_context.get_state_validity()
 
+    state_space = SawyerConfigurationSpace()
+    
     sawyer_robot.set_joint_state(start)
     time.sleep(5)
 

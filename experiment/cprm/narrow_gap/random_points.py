@@ -2,7 +2,7 @@ import random
 import time
 import copy
 import numpy as np
-from cairo_simulator.core.sim_context import SawyerBiasedCPRMSimContext
+from cairo_simulator.core.sim_context import SawyerBiasedTSRSimContext
 from cairo_simulator.core.utils import ASSETS_PATH
 
 
@@ -82,7 +82,7 @@ def main():
         0.8245869140625,
         -1.6826474609375]
 
-    sim_context = SawyerBiasedCPRMSimContext(configuration=config)
+    sim_context = SawyerBiasedTSRSimContext(configuration=config)
     sawyer_robot = sim_context.get_robot()
     svc = sim_context.get_state_validity()
 

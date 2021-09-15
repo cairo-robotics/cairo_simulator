@@ -182,7 +182,7 @@ class SawyerSimContext(AbstractSimContext):
         return self.collision_exclusions
 
 
-class SawyerCPRMSimContext(AbstractSimContext):
+class SawyerTSRSimContext(AbstractSimContext):
 
     def __init__(self, configuration=None, setup=True):
         self.config = configuration if configuration is not None else {}
@@ -332,7 +332,7 @@ class SawyerCPRMSimContext(AbstractSimContext):
     def get_collision_exclusions(self):
         return self.collision_exclusions
 
-class SawyerBiasedCPRMSimContext(AbstractSimContext):
+class SawyerBiasedTSRSimContext(AbstractSimContext):
 
     def __init__(self, configuration=None, setup=True):
         self.config = configuration if configuration is not None else {}

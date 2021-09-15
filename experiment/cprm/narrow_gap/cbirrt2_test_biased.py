@@ -9,7 +9,7 @@ if os.environ.get('ROS_DISTRO'):
     import rospy
 import numpy as np
 
-from cairo_simulator.core.sim_context import SawyerBiasedCPRMSimContext
+from cairo_simulator.core.sim_context import SawyerTSRSimContext
 from cairo_simulator.core.utils import ASSETS_PATH
 
 from cairo_planning.collisions import DisabledCollisionsContext
@@ -123,7 +123,7 @@ def main():
         0.8245869140625,
         -1.6826474609375]
 
-    sim_context = SawyerBiasedCPRMSimContext(configuration=config)
+    sim_context = SawyerTSRSimContext(configuration=config)
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
     # _ = sim_context.get_state_space()

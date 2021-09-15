@@ -367,7 +367,6 @@ class Sawyer(Manipulator):
                                                                         'right_j3', 'right_j4', 'right_j5', 'right_j6', 'right_hand', 'right_gripper_base_joint', 'right_gripper_tip_joint'])
         self.fk_chain = Chain.from_urdf_file(
             urdf_file, base_elements=gripper_tip_elements, active_links_mask=[True]*2 + 7 * [True] + 3 * [False])
-        print("hello")
 
     def _init_joint_names(self):
         """

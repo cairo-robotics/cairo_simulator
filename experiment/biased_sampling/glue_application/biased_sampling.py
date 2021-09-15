@@ -8,7 +8,7 @@ if os.environ.get('ROS_DISTRO'):
     import rospy
 import numpy as np
 
-from cairo_simulator.core.sim_context import SawyerCPRMSimContext
+from cairo_simulator.core.sim_context import SawyerTSRSimContext
 from cairo_simulator.core.utils import ASSETS_PATH
 
 from cairo_planning.geometric.state_space import SawyerTSRConstrainedSpace
@@ -46,7 +46,7 @@ def main():
     }
 
 
-    sim_context = SawyerCPRMSimContext(config)
+    sim_context = SawyerTSRSimContext(config)
     sawyer_robot = sim_context.get_robot()
     svc = sim_context.get_state_validity()
     tsr = sim_context.get_tsr()
