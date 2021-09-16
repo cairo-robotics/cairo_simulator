@@ -11,6 +11,7 @@ import numpy as np
 
 from cairo_simulator.core.sim_context import SawyerTSRSimContext
 from cairo_simulator.core.utils import ASSETS_PATH
+from cairo_planning.geometric.transformation import quat2rpy
 
 from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.local.interpolation import parametric_lerp
@@ -74,10 +75,10 @@ def main():
             
     config['tsr'] = {
             'degrees': False,
-            "T0_w": [.7, 0, 0, 0, 0, 0],
-            "Tw_e": [-.2, 0, .739, -3.1261701132911655, 0.023551837572146628, 0.060331404738664496],
-            "Bw": [[(0, 100), (-100, 100), (-.1, 0)],  
-                    [(-.07, .07), (-.07, .07), (-.07, .07)]]
+            "T0_w": [0, 0, .9, 0, 0, 0],
+            "Tw_e": [.6, 0, 0, np.pi, 0, np.pi/2],
+            "Bw": [[(0, 100), (-100, 100), (-100, 0)],  
+                    [(-.02, .02), (-.02, .02), (-.02, .02)]]
         }
         
 
@@ -112,6 +113,7 @@ def main():
     state_space = SawyerConfigurationSpace()
     
     sawyer_robot.set_joint_state(start)
+    print(quat2rpy(sawyer_robot.solve_forward_kinematics(start)[0][1]))
     time.sleep(5)
 
     control = 'g'
@@ -124,9 +126,9 @@ def main():
             # LazyPRM #
             #######
             # Use parametric linear interpolation with 5 steps between points.
-            interp = partial(parametric_lerp, steps=10)
+            interp = partial(parametric_lerp, steps=5)
             # See params for PRM specific parameters
-            cbirrt = CBiRRT2(sawyer_robot, state_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 10, 'q_step': .1, 'e_step': .25, 'iters': 20000})
+            cbirrt = CBiRRT2(sawyer_robot, state_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 5, 'q_step': .35, 'e_step': .25, 'iters': 20000})
             logger.info("Planning....")
             plan = cbirrt.plan(tsr, np.array(start), np.array(goal))
             path = cbirrt.get_path(plan)
@@ -141,7 +143,7 @@ def main():
             path = [np.array(p) for p in path]
             # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
             jtc = JointTrajectoryCurve()
-            traj = jtc.generate_trajectory(path, move_time=5)
+            traj = jtc.generate_trajectory(path, move_time=10)
             for i, point in enumerate(traj):
                 if not svc.validate(point[1]):
                     print("Invalid point: {}".format(point[1]))

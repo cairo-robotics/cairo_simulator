@@ -27,7 +27,7 @@ def main():
     configuration = {}
 
     configuration["sim"] = {
-        "use_real_time": True,
+        "use_real_time": False,
         "use_gui": True,
         "run_parallel": False
     }
@@ -86,18 +86,28 @@ def main():
     _ = sim_context.get_sim_objects(['Ground'])[0]
 
 
+            #     config['tsr'] = {
+        #     'degrees': False,
+        #     "T0_w": [0, 0, .9, 0, 0, 0],
+        #     "Tw_e": [0, 0, 0, -3.12266697, 0.02430386, -1.50671032],
+        #     "Bw": [[(0, 100), (-100, 100), (-5, 5)],  
+        #             [(-.07, .07), (-.07, .07), (-.07, .07)]]
+        # }
+        
+
+
     n_samples = 5
     valid_samples = []
     starttime = timeit.default_timer()
 
     # Utilizes RPY convention
-    T0_w = xyzrpy2trans([.7, 0, 0, 0, 0, 0], degrees=False)
+    T0_w = xyzrpy2trans([0, 0, .9, 0, 0, 0], degrees=False)
 
     # Utilizes RPY convention
-    Tw_e = xyzrpy2trans([-.2, 0, 1.0, np.pi/2, 3*np.pi/2, np.pi/2], degrees=False)
+    Tw_e = xyzrpy2trans([0, 0, 0, 3.12266697, 0, 1.50671032], degrees=False)
     
     # Utilizes RPY convention
-    Bw = bounds_matrix([(0, 100), (-100, 100), (-100, 100)],  # allow some tolerance in the z and y and only positve in x
+    Bw = bounds_matrix([(-100, 100), (-100, 100), (-100, 100)],  # allow some tolerance in the z and y and only positve in x
                        [(-.07, .07), (-.07, .07), (-.07, .07)])  # any rotation about z, with limited rotation about x, and y.
     tsr = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw,
               manipindex=0, bodyandlink=16)
@@ -128,10 +138,7 @@ def main():
         world_pose, local_pose = sawyer_robot.solve_forward_kinematics(sample)
         trans, quat = world_pose[0], world_pose[1]
         print(trans, quat2rpy(quat))
-        sawyer_robot.move_to_joint_pos(list(sample))
-        while sawyer_robot.check_if_at_position(list(sample), 0.5) is False:
-            time.sleep(0.1)
-            pass
+        sawyer_robot.set_joint_state(sample)
         time.sleep(1.5)
 
     # # Loop until someone shuts us down

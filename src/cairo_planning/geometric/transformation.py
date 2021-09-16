@@ -52,19 +52,19 @@ def analytic_xyz_jacobian(J_r, rpy):
     return np.dot(Ei, J_r)
 
 
-def quat2rpy(wxyz, degrees=False):
+def quat2rpy(xyzw, degrees=False):
     """
-    Converts a quaternion in wxyz form to euler angle rotation xyz/rpy extrinsic form.
+    Converts a quaternion in xyzw form to euler angle rotation xyz/rpy extrinsic form.
 
     Args:
-        wxyz (array-like): wxyz quaternion vector.
+        xyzw (array-like): xyzw quaternion vector.
         degrees (bool, optional): False for radians, True for degrees. Defaults to False.
 
     Returns:
         ndarray: Returns the rpy angles of the quaternion.
     """
-    r = R.from_quat([wxyz[1], wxyz[2], wxyz[3], wxyz[0]])
-    return r.as_euler("XYZ", degrees=degrees)
+    r = R.from_quat([xyzw[0], xyzw[1], xyzw[2], xyzw[3]])
+    return r.as_euler("xyz", degrees=degrees)
 
 
 def rpy2quat(rpy, degrees=False):
@@ -76,28 +76,28 @@ def rpy2quat(rpy, degrees=False):
         degrees (bool, optional): False for radians, True for degrees. Defaults to False.
 
     Returns:
-        ndarray: The quaternion in wxzy form.
+        ndarray: The quaternion in xyzw form.
     """
     quat = R.from_euler(
-        'XYZ', rpy, degrees=degrees).as_quat()
-    return np.array((quat[3], quat[0], quat[1], quat[2]))
+        'xyz', rpy, degrees=degrees).as_quat()
+    return np.array((quat[0], quat[1], quat[2], quat[3]))
 
 
-def pose2trans(xyzwxyz):
+def pose2trans(xyzxyzw):
     """
-    Converts a pose vector [x, y, z, w, x, y, z] consisting of stacked position and quaternion orientation 
+    Converts a pose vector [x, y, z, x, y, z, w] consisting of stacked position and quaternion orientation 
     to a transformation matrix.
 
     Args:
-        xyzwxyz (array-like): The pose vector. Quatnernion in wxyz form.
+        xyzxyzw (array-like): The pose vector. Quatnernion in wxyz form.
 
     Returns:
         ndarray: Trasnformation matrix.
     """
-    trans = xyzwxyz[0:3]
-    quat = xyzwxyz[3:7]
+    trans = xyzxyzw[0:3]
+    quat = xyzxyzw[3:7]
     rot_mat = R.from_quat(
-        np.array((quat[1], quat[2], quat[3], quat[0]))).as_matrix()
+        np.array((quat[0], quat[1], quat[2], quat[3]))).as_matrix()
     return np.vstack([np.hstack([rot_mat, np.array(trans).reshape(3, 1)]),
                       np.array((0, 0, 0, 1))])
 

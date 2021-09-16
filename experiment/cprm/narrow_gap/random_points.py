@@ -101,11 +101,13 @@ def main():
             delta_x = random.uniform(.2, .2)
             delta_y = random.uniform(-.2, .2)
             new_position = copy.deepcopy([copy.deepcopy(start_world_pose[0][0]) + delta_x, copy.deepcopy(start_world_pose[0][1]) + delta_y, copy.deepcopy(start_world_pose[0][2])])
-            new_config = sawyer_robot.solve_inverse_kinematics(new_position, copy.deepcopy(start_world_pose[1]))
+            new_config = None
+            for i in range(0,5):
+                print("hi")
+                new_config = sawyer_robot.solve_inverse_kinematics(new_position, copy.deepcopy(start_world_pose[1]))
             if svc.validate(new_config):
-                new_config
                 break
-        new_config[-1] = new_config[-1] + np.pi/2
+        new_config[-1] = new_config[-1] 
         random_start_configurations.append(copy.deepcopy(new_config))
     
     random_goal_configurations = []
@@ -117,7 +119,7 @@ def main():
             new_config = sawyer_robot.solve_inverse_kinematics(new_position, goal_world_pose[1])
             if svc.validate(new_config):
                 break
-        new_config[-1] = new_config[-1] + np.pi/2
+        new_config[-1] = new_config[-1]
         random_goal_configurations.append(new_config)
 
     print(random_start_configurations)

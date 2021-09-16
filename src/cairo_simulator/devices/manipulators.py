@@ -160,16 +160,24 @@ class Manipulator(Robot):
         Returns:
             List: [(world_pos, world_ori), (local_pos, local_ori)]
         '''
-        fk_results = self.fk_chain.forward_kinematics(
-            joints=[0] * 2 + list(joint_configuration) + 3 * [0], full_kinematics=False)
+        # fk_results = self.fk_chain.forward_kinematics(
+        #     joints=[0] * 2 + list(joint_configuration) + 3 * [0], full_kinematics=False)
 
-        local_pos = list(fk_results[:3, 3])
-        local_ori = quaternion_from_matrix(fk_results[:3, :3])
-        base_pose, _ = p.getBasePositionAndOrientation(self._simulator_id)
+        # local_pos = list(fk_results[:3, 3])
+        # local_ori = quaternion_from_matrix(fk_results[:3, :3])
+        # base_pose, _ = p.getBasePositionAndOrientation(self._simulator_id)
 
-        world_pos = [sum(x) for x in zip(local_pos, base_pose)]
-        world_ori = local_ori
-        return ((world_pos, world_ori), (local_pos, local_ori))
+        # world_pos = [sum(x) for x in zip(local_pos, base_pose)]
+        # world_ori = local_ori
+        # return ((world_pos, world_ori), (local_pos, local_ori))
+        curr_config = self.get_current_joint_states()
+        self.set_joint_state(joint_configuration)
+        pyb_fk_results = p.getLinkState(self._simulator_id, self._end_effector_link_index, computeForwardKinematics=False)
+        pyb_world_pos, pyb_world_ori = list(pyb_fk_results[0]), list(pyb_fk_results[1]),
+        pyb_local_pos, pyb_local_ori = list(pyb_fk_results[2]), list(pyb_fk_results[3])
+        self.set_joint_state(curr_config)
+        return ((pyb_world_pos, pyb_world_ori), (pyb_local_pos, pyb_local_ori))
+        
 
     def get_joint_pose_in_world_frame(self, joint_index=None):
         '''
@@ -235,17 +243,17 @@ class Manipulator(Robot):
             if len(target_orientation) == 3:
                 target_orientation = p.getQuaternionFromEuler(
                     target_orientation)
-            ik_solution = list(p.calculateInverseKinematics(
-                self._simulator_id, self._end_effector_link_index, target_position, targetOrientation=target_orientation, maxNumIterations=125))
+            ik_solution = p.calculateInverseKinematics(
+                self._simulator_id, self._end_effector_link_index, target_position, targetOrientation=target_orientation, maxNumIterations=125)
         # ikpy_ik =  self.fk_chain.inverse_kinematics(target_position, p.getEulerFromQuaternion(target_orientation), orientation_mode='all')
         # print(ikpy_ik)
         # Return a configuration of only the arm's joints.
         arm_config = [0] * len(self._arm_ik_indices)
         for i, idx in enumerate(self._arm_ik_indices):
             # why pybullet is maintaining a reference to the ik_solution value is crazy. What in god's name is going on...
+            # If you add this np.pi/2 offset, watch what happens to the return value of ik_solution from the p.calculateInverseKinematics.
             arm_config[i] = ik_solution[idx]
-        # for some reason pybulletrs inverse kinematics fore the last wrist angle is off by pi/2 ??
-        print(arm_config)
+            # arm_config[i] = ik_solution[idx]
         return arm_config
 
     def execute_trajectory(self, trajectory_data):
@@ -334,7 +342,7 @@ class Sawyer(Manipulator):
     Concrete Manipulator representing a Sawyer Robot in Simulation.
     """
 
-    def __init__(self, robot_name, position, orientation=[0, 0, 0, 1], fixed_base=0, publish_full_state=False):
+    def __init__(self, robot_name, position, urdf_file=None, orientation=[0, 0, 0, 1], fixed_base=0, publish_full_state=False):
         """
         Initialize a Sawyer Robot at coordinates (x,y,z) and add it to the simulator manager
 
@@ -347,8 +355,8 @@ class Sawyer(Manipulator):
             urdf_flags (int): Bitwise flags.
             publish_full_state (bool): True will publish more detailed state info., False will publish config/pose only.
         """
-        super().__init__(robot_name, ASSETS_PATH +
-                         'sawyer_description/urdf/sawyer_static.urdf', position, orientation, fixed_base)
+        urdf_file = ASSETS_PATH + 'sawyer_description/urdf/sawyer_static.urdf' if urdf_file is None else urdf_file
+        super().__init__(robot_name, urdf_file, position, orientation, fixed_base)
 
         if Simulator.using_ros():
             # Should the full robot state be published each cycle (pos/vel/force), or just joint positions
@@ -366,7 +374,7 @@ class Sawyer(Manipulator):
         gripper_tip_elements = get_chain_from_joints(urdf_file, joints=['right_arm_mount', 'right_j0', 'right_j1', 'right_j2',
                                                                         'right_j3', 'right_j4', 'right_j5', 'right_j6', 'right_hand', 'right_gripper_base_joint', 'right_gripper_tip_joint'])
         self.fk_chain = Chain.from_urdf_file(
-            urdf_file, base_elements=gripper_tip_elements, active_links_mask=[True]*2 + 7 * [True] + 3 * [False])
+            urdf_file, base_elements=gripper_tip_elements, active_links_mask=[False]*2 + 7 * [True] + 3 * [False])
 
     def _init_joint_names(self):
         """

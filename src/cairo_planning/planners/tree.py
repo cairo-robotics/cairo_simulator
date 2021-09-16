@@ -30,7 +30,7 @@ class CBiRRT2():
         self.q_step = params.get('q_step', .1)
         self.epsilon = params.get('epsilon', .1)
         self.e_step = params.get('e_step', .1)
-        self.iters = params.get('iters', 1000)
+        self.iters = params.get('iters', 20000)
         self.smoothing_time = params.get('smoothing_time', 10)
         self.log =  logger if logger is not None else Logger(name="CBiRRT2", handlers=['logging'], level=params.get('log_level', 'debug'))
         self.log.info("q_step: {}, epsilon: {}, e_step: {}, BiRRT Iters {}".format(self.q_step, self.epsilon, self.e_step, self.iters))

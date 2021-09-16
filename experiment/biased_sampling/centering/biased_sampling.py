@@ -73,6 +73,7 @@ def main():
         fraction_time_tuples = []
         
         for fraction in fraction_uniform_increments:
+            print("Sampling with uniform fraction at {}".format(fraction))
             # Create the DistributionSampler and associated SawyerTSRConstrainedSpace
             state_space = SawyerTSRConstrainedSpace(robot=sawyer_robot, TSR=tsr, svc=svc, sampler=DistributionSampler(distribution_model=model, fraction_uniform=fraction), limits=None)
             

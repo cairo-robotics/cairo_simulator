@@ -20,8 +20,8 @@ import matplotlib.pyplot as plt
 
 def main():
     
-    NUM_SAMPLES = 10
-    fraction_uniform_increments = [0, .05, .1, .15, .2, .25, .3, .35, .4, .45, .5, .55, .6, .65, .7, .75, .8, .85, .9, .95, 1]
+    NUM_SAMPLES = 100
+    fraction_uniform_increments = [0, .05, .1, .15, .2, .25, .3, .35, .4, .45, .5, .55, .6, .65, .7, .75, .8, .85, .9, .95, .99, .9999, .999999, 1]
 
     config = {}
     config["sim"] = {
@@ -40,7 +40,7 @@ def main():
     config["tsr"] = {
         'degrees': False,
         "T0_w": [0, 0, .9, 0, 0, 0],
-        "Tw_e": [0, 0, 0, np.pi/2, 3*np.pi/2, np.pi/2], # level end-effector pointing away from sawyer's "front"
+        "Tw_e": [0, 0, 0, np.pi/2, 0, np.pi/2], # level end-effector pointing away from sawyer's "front"
         "Bw": [[[-100, 100], [-100, 100], [-100, 100]], 
               [[-.07, .07], [-.07, .07], [-.07, .07]]]
     }

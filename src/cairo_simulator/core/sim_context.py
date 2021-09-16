@@ -66,7 +66,7 @@ class SawyerSimContext(AbstractSimContext):
     def setup(self, sim_overrides=None):
         sim_config = self.config.get("sim", {
             "run_parallel": False,
-            "use_real_time": True,
+            "use_real_time": False,
             "use_gui": True
         })
         self.config["sim"] = sim_config
@@ -192,7 +192,7 @@ class SawyerTSRSimContext(AbstractSimContext):
     def setup(self, sim_overrides=None):
         sim_config = self.config.get("sim", {
             "run_parallel": False,
-            "use_real_time": True,
+            "use_real_time": False,
             "use_gui": True
         })
         if sim_overrides is not None:
@@ -342,7 +342,7 @@ class SawyerBiasedTSRSimContext(AbstractSimContext):
     def setup(self, sim_overrides=None):
         sim_config = self.config.get("sim", {
             "run_parallel": False,
-            "use_real_time": True,
+            "use_real_time": False,
             "use_gui": True
         })
         if sim_overrides is not None:

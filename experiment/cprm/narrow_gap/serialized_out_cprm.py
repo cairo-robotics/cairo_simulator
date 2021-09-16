@@ -118,7 +118,7 @@ def main():
         interp = partial(parametric_lerp, steps=10)
         # See params for PRM specific parameters
         prm = CPRM(SawyerBiasedTSRSimContext, config, sawyer_robot, tsr, biased_state_space, tree_state_space, svc, interp, params={
-            'n_samples': 30000, 'k': 15, 'planning_attempts': 5, 'ball_radius': 10.0, 'smooth_path': True, 'cbirrt2_sampling_space': 'hyperball', 'smoothing_time': 5}, tree_params={'iters': 50, 'q_step': .48, 'e_step': .25})
+            'n_samples': 25000, 'k': 15, 'planning_attempts': 5, 'ball_radius': 10.0, 'smooth_path': True, 'cbirrt2_sampling_space': 'hyperball', 'smoothing_time': 5}, tree_params={'iters': 50, 'q_step': .48, 'e_step': .25})
         path = prm.generate_roadmap(np.array(start), np.array(goal))
        # Dump thje samples and configuration
     dump_model(sim_context.config, prm, os.path.dirname(os.path.abspath(__file__)))

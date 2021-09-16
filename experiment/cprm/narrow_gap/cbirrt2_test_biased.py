@@ -9,7 +9,7 @@ if os.environ.get('ROS_DISTRO'):
     import rospy
 import numpy as np
 
-from cairo_simulator.core.sim_context import SawyerTSRSimContext
+from cairo_simulator.core.sim_context import SawyerBiasedTSRSimContext
 from cairo_simulator.core.utils import ASSETS_PATH
 
 from cairo_planning.collisions import DisabledCollisionsContext
@@ -75,10 +75,10 @@ def main():
             
     config['tsr'] = {
             'degrees': False,
-            "T0_w": [.7, 0, 0, 0, 0, 0],
-            "Tw_e": [-.2, 0, .739, -3.1261701132911655, 0.023551837572146628, 0.060331404738664496],
-            "Bw": [[(0, 100), (-100, 100), (-.1, 0)],  
-                    [(-.07, .07), (-.07, .07), (-.07, .07)]]
+            "T0_w": [0, 0, .9, 0, 0, 0],
+            "Tw_e": [.6, 0, 0, np.pi, 0, np.pi/2],
+            "Bw": [[(0, 100), (-100, 100), (-100, 0)],  
+                    [(-.02, .02), (-.02, .02), (-.02, .02)]]
         }
         
 
@@ -123,7 +123,7 @@ def main():
         0.8245869140625,
         -1.6826474609375]
 
-    sim_context = SawyerTSRSimContext(configuration=config)
+    sim_context = SawyerBiasedTSRSimContext(configuration=config)
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
     # _ = sim_context.get_state_space()

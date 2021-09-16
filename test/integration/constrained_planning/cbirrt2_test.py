@@ -83,16 +83,16 @@ def main():
 
         # sawyer_robot.move_to_joint_pos(goal)
         # time.sleep(5)
-        sawyer_robot.move_to_joint_pos(start)
+        sawyer_robot.set_joint_state(start)
         time.sleep(1.0)
         # Utilizes RPY convention
-        T0_w = xyzrpy2trans([.7, 0, 0, 0, 0, 0], degrees=False)
+        T0_w = xyzrpy2trans([0, 0, .9, 0, 0, 0], degrees=False)
 
         # Utilizes RPY convention
-        Tw_e = xyzrpy2trans([-.2, 0, 1.0, np.pi/2, 3*np.pi/2, np.pi/2], degrees=False)
+        Tw_e = xyzrpy2trans([0, 0, 0, np.pi/2, 0, np.pi/2], degrees=False)
         
         # Utilizes RPY convention
-        Bw = bounds_matrix([(0, 100), (-100, 100), (-100, .3)],  # allow some tolerance in the z and y and only positve in x
+        Bw = bounds_matrix([(0, 100), (-100, 100), (-100, .2)],  # allow some tolerance in the z and y and only positve in x
                         [(-.07, .07), (-.07, .07), (-.07, .07)])  # any rotation about z, with limited rotation about x, and y.
         tsr = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw,
                 manipindex=0, bodyandlink=16)
@@ -106,29 +106,34 @@ def main():
             # Use parametric linear interpolation with 5 steps between points.
             interp = partial(parametric_lerp, steps=10)
             # See params for PRM specific parameters
-            cbirrt = CBiRRT2(sawyer_robot, planning_space, svc, interp, params={'smooth_path': True, 'q_step': .48, 'e_step': .25})
+            cbirrt = CBiRRT2(sawyer_robot, planning_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 2, 'q_step': .35, 'e_step': .25})
             logger.info("Planning....")
             plan = cbirrt.plan(tsr, np.array(start), np.array(goal))
             path = cbirrt.get_path(plan)
     
         
-        if len(path) == 0:
-            logger.info("Planning failed....")
-            sys.exit(1)
-        logger.info("Plan found....")
+            if len(path) == 0:
+                logger.info("Planning failed....")
+                sys.exit(1)
+            logger.info("Plan found....")
         input("Press any key to continue...")
         # splining uses numpy so needs to be converted
         path = [np.array(p) for p in path]
         # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
         jtc = JointTrajectoryCurve()
-        traj = jtc.generate_trajectory(path, move_time=10)
-        sawyer_robot.execute_trajectory(traj)
+        traj = jtc.generate_trajectory(path, move_time=5)
+        print(traj)
         try:
-            while True:
-                sim.step()
+            prior_time = 0
+            for i, point in enumerate(traj):
+                if not svc.validate(point[1]):
+                    print("Invalid point: {}".format(point[1]))
+                    continue
+                sawyer_robot.set_joint_state(point[1])
+                time.sleep(point[0] - prior_time)
+                prior_time = point[0]
         except KeyboardInterrupt:
             pass
-        control = input("Press q to quit...")
 
        
 
