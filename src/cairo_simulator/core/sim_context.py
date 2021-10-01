@@ -249,6 +249,8 @@ class SawyerTSRSimContext(AbstractSimContext):
         # self._setup_collision_exclusions()
 
     def _setup_tsr(self, tsr_config):
+        self.projection_epsilon = tsr_config.get('epsilon', .1)
+        self.projection_e_step = tsr_config.get('e_step', .25)
         T0_w = xyzrpy2trans(tsr_config['T0_w'], degrees=tsr_config['degrees'])
         Tw_e = xyzrpy2trans(tsr_config['Tw_e'], degrees=tsr_config['degrees'])
         Bw = bounds_matrix(tsr_config['Bw'][0], tsr_config['Bw'][1]) 
@@ -323,7 +325,7 @@ class SawyerTSRSimContext(AbstractSimContext):
                (-0.020833, 0.0)],
               ['head_pan', (-5.0952, 0.9064)]]
         planning_space = SawyerTSRConstrainedSpace(
-        sampler=UniformSampler(), limits=limits, svc=self.svc, TSR=self.tsr, robot=self.sawyer_robot)
+        sampler=UniformSampler(), limits=limits, svc=self.svc, TSR=self.tsr, robot=self.sawyer_robot, epsilon=self.projection_epsilon, e_step=self.projection_e_step)
         return planning_space
 
     def get_tsr(self):
@@ -370,6 +372,7 @@ class SawyerBiasedTSRSimContext(AbstractSimContext):
             
         tsr_config = self.config.get("tsr", {
             'degrees': False,
+            'epsilon': .1,
             "T0_w": [.7, 0, 0, 0, 0, 0],
             "Tw_e": [-.2, 0, 1.0, np.pi/2, 3*np.pi/2, np.pi/2],
             "Bw": [[[0, 100], [-100, 100], [-100, .3]],  # allow some tolerance in the z and y and only positve in x

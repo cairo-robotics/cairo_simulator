@@ -65,7 +65,7 @@ def main():
         {
             "object_name": "Table",
             "model_file_or_sim_id": ASSETS_PATH + 'table.sdf',
-            "position": [0.9, 0, .17],
+            "position": [0.6, 0, .1],
             "orientation":  [0, 0, 1.5708]
         },
     ]
@@ -76,7 +76,7 @@ def main():
             "sim_object_configs": 
                 {
                     "object_name": "center_wall",
-                    "position": [.74, 0, .7],
+                    "position": [.67, 0, .64],
                     "orientation":  [0, 0, 0],
                     "fixed_base": 1    
                 }
@@ -87,7 +87,7 @@ def main():
             "sim_object_configs": 
                 {
                     "object_name": "right_outer_bend",
-                    "position": [.86, .25, .7],
+                    "position": [.79, .25, .64],
                     "orientation":  [0, 0, -np.pi/6],
                     "fixed_base": 1    
                 }
@@ -98,7 +98,7 @@ def main():
             "sim_object_configs": 
                 {
                     "object_name": "right_outer_bend2",
-                    "position": [.69, .25, .7],
+                    "position": [.62, .25, .64],
                     "orientation":  [0, 0, np.pi/6],
                     "fixed_base": 1    
                 }
@@ -109,7 +109,7 @@ def main():
             "sim_object_configs": 
                 {
                     "object_name": "right_inner_bend",
-                    "position": [.80, .29, .7],
+                    "position": [.73, .29, .64],
                     "orientation":  [0, 0, -np.pi/6],
                     "fixed_base": 1    
                 }
@@ -120,7 +120,7 @@ def main():
             "sim_object_configs": 
                 {
                     "object_name": "right_inner_bend2",
-                    "position": [.76, .29, .7],
+                    "position": [.69, .29, .64],
                     "orientation":  [0, 0, np.pi/6],
                     "fixed_base": 1    
                 }
@@ -131,7 +131,7 @@ def main():
             "sim_object_configs": 
                 {
                     "object_name": "left_outer_bend",
-                    "position": [.86, -.25, .7],
+                    "position": [.79, -.25, .64],
                     "orientation":  [0, 0, np.pi/6],
                     "fixed_base": 1    
                 }
@@ -142,7 +142,7 @@ def main():
             "sim_object_configs": 
                 {
                     "object_name": "left_outer_bend2",
-                    "position": [.69, -.25, .7],
+                    "position": [.62, -.25, .64],
                     "orientation":  [0, 0, -np.pi/6],
                     "fixed_base": 1    
                 }
@@ -153,7 +153,7 @@ def main():
             "sim_object_configs": 
                 {
                     "object_name": "left_inner_bend",
-                    "position": [.80, -.29, .7],
+                    "position": [.73, -.29, .64],
                     "orientation":  [0, 0, np.pi/6],
                     "fixed_base": 1    
                 }
@@ -164,7 +164,7 @@ def main():
             "sim_object_configs": 
                 {
                     "object_name": "left_inner_bend2",
-                    "position": [.76, -.29, .7],
+                    "position": [.69, -.29, .64],
                     "orientation":  [0, 0, -np.pi/6],
                     "fixed_base": 1    
                 }
@@ -175,7 +175,7 @@ def main():
             "sim_object_configs": 
                 {
                     "object_name": "center_wall2",
-                    "position": [.81, 0, .7],
+                    "position": [.74, 0, .64],
                     "orientation":  [0, 0, 0],
                     "fixed_base": 1    
                 }
@@ -183,14 +183,7 @@ def main():
         ]
             
 
-    start = [
-        0.673578125,
-        -0.2995908203125,
-        -0.21482421875,
-        1.4868740234375,
-        0.53829296875,
-        0.4117080078125,
-        -1.2169501953125]
+    start = [0.4512693515323636, 0.578072751043309, -1.7085853204387587, 0.596159706024823, 1.9871449177039127, 1.2134687707559257, -1.569380122838989]
     
 
     sim_context = SawyerTSRSimContext(configuration=config)

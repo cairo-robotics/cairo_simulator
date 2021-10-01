@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import timeit
+import json
 
 import pybullet as p
 if os.environ.get('ROS_DISTRO'):
@@ -24,59 +25,149 @@ from cairo_planning.geometric.utils import geodesic_distance, wrap_to_interval
 
 def main():
 
-    configuration = {}
+    config = {}
+    config["sim"] = {
+            "use_real_time": False
+        }
 
-    configuration["sim"] = {
-        "use_real_time": False,
-        "use_gui": True,
-        "run_parallel": False
-    }
+    config["logging"] = {
+            "handlers": ['logging'],
+            "level": "debug"
+        }
 
-    configuration["logging"] = {
-        "handlers": ['logging'],
-        "level": "debug"
-    }
+    config["sawyer"] = {
+            "robot_name": "sawyer0",
+            'urdf_file': ASSETS_PATH + 'sawyer_description/urdf/sawyer_static_blockcombine.urdf',
+            "position": [0, 0, 0.9],
+            "fixed_base": True
+        }
 
-    configuration["sawyer"] = {
-        "robot_name": "sawyer0",
-        "position": [0, 0, 0.9],
-        "fixed_base": True
-    }
-
-    configuration["sim_objects"] = [
+    config["sim_objects"] = [
         {
             "object_name": "Ground",
             "model_file_or_sim_id": "plane.urdf",
             "position": [0, 0, 0]
         },
-        # {
-        #     "object_name": "Table",
-        #     "model_file_or_sim_id": ASSETS_PATH + 'table.sdf',
-        #     "position": [0.7, 0, 0],
-        #     "orientation":  [0, 0, 1.5708]
-        # },
         {
-            "object_name": "cube0",
-            "model_file_or_sim_id": "cube_small.urdf",
-            "position": [0.75, 0, .55]
+            "object_name": "Table",
+            "model_file_or_sim_id": ASSETS_PATH + 'table.sdf',
+            "position": [0.6, 0, .1],
+            "orientation":  [0, 0, 1.5708]
         },
-        {
-            "object_name": "cube1",
-            "model_file_or_sim_id": "cube_small.urdf",
-            "position": [0.74, 0.05, .55]
-        },
-        {
-            "object_name": "cube2",
-            "model_file_or_sim_id": "cube_small.urdf",
-            "position": [0.67, -0.1, .55]
-        },
-        {
-            "object_name": "cube3",
-            "model_file_or_sim_id": "cube_small.urdf",
-            "position": [0.69, 0.1, .55]
-        }
     ]
-    sim_context = SawyerSimContext(configuration)
+    config["primitives"] = [
+        {
+            "type": "box",
+            "primitive_configs": {"w": .015, "l": .35, "h": .06},
+            "sim_object_configs": 
+                {
+                    "object_name": "center_wall",
+                    "position": [.67, 0, .64],
+                    "orientation":  [0, 0, 0],
+                    "fixed_base": 1    
+                }
+        },
+        {
+            "type": "box",
+            "primitive_configs": {"w": .015, "l": .2, "h": .06},
+            "sim_object_configs": 
+                {
+                    "object_name": "right_outer_bend",
+                    "position": [.79, .25, .64],
+                    "orientation":  [0, 0, -np.pi/6],
+                    "fixed_base": 1    
+                }
+        },
+        {
+            "type": "box",
+            "primitive_configs": {"w": .015, "l": .2, "h": .06},
+            "sim_object_configs": 
+                {
+                    "object_name": "right_outer_bend2",
+                    "position": [.62, .25, .64],
+                    "orientation":  [0, 0, np.pi/6],
+                    "fixed_base": 1    
+                }
+        },
+         {
+            "type": "box",
+            "primitive_configs": {"w": .015, "l": .10, "h": .06},
+            "sim_object_configs": 
+                {
+                    "object_name": "right_inner_bend",
+                    "position": [.73, .29, .64],
+                    "orientation":  [0, 0, -np.pi/6],
+                    "fixed_base": 1    
+                }
+        },
+        {
+            "type": "box",
+            "primitive_configs": {"w": .015, "l": .10, "h": .06},
+            "sim_object_configs": 
+                {
+                    "object_name": "right_inner_bend2",
+                    "position": [.69, .29, .64],
+                    "orientation":  [0, 0, np.pi/6],
+                    "fixed_base": 1    
+                }
+        },
+        {
+            "type": "box",
+            "primitive_configs": {"w": .015, "l": .2, "h": .06},
+            "sim_object_configs": 
+                {
+                    "object_name": "left_outer_bend",
+                    "position": [.79, -.25, .64],
+                    "orientation":  [0, 0, np.pi/6],
+                    "fixed_base": 1    
+                }
+        },
+        {
+            "type": "box",
+            "primitive_configs": {"w": .015, "l": .2, "h": .06},
+            "sim_object_configs": 
+                {
+                    "object_name": "left_outer_bend2",
+                    "position": [.62, -.25, .64],
+                    "orientation":  [0, 0, -np.pi/6],
+                    "fixed_base": 1    
+                }
+        },
+         {
+            "type": "box",
+            "primitive_configs": {"w": .015, "l": .10, "h": .06},
+            "sim_object_configs": 
+                {
+                    "object_name": "left_inner_bend",
+                    "position": [.73, -.29, .64],
+                    "orientation":  [0, 0, np.pi/6],
+                    "fixed_base": 1    
+                }
+        },
+        {
+            "type": "box",
+            "primitive_configs": {"w": .015, "l": .10, "h": .06},
+            "sim_object_configs": 
+                {
+                    "object_name": "left_inner_bend2",
+                    "position": [.69, -.29, .64],
+                    "orientation":  [0, 0, -np.pi/6],
+                    "fixed_base": 1    
+                }
+        },
+        {
+            "type": "box",
+            "primitive_configs": {"w": .015, "l": .35, "h": .06},
+            "sim_object_configs": 
+                {
+                    "object_name": "center_wall2",
+                    "position": [.74, 0, .64],
+                    "orientation":  [0, 0, 0],
+                    "fixed_base": 1    
+                }
+        },
+        ]
+    sim_context = SawyerSimContext(config)
     sim = sim_context.get_sim_instance()
     _ = sim_context.get_logger()
     scs = sim_context.get_state_space()
@@ -95,6 +186,17 @@ def main():
         # }
         
 
+         # Collect all joint configurations from all demonstration .json files.
+    configurations = []
+    data_directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data/sampling_bias")
+  
+    print("Running biased sampling test for {}".format(data_directory))
+    for json_file in os.listdir(data_directory):
+        filename = os.path.join(data_directory, json_file)
+        with open(filename, "r") as f:
+            data = json.load(f)
+            for entry in data:
+                configurations.append(entry['robot']['joint_angle'])
 
     n_samples = 5
     valid_samples = []
@@ -111,7 +213,7 @@ def main():
                        [(-.07, .07), (-.07, .07), (-.07, .07)])  # any rotation about z, with limited rotation about x, and y.
     tsr = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw,
               manipindex=0, bodyandlink=16)
-
+    time.sleep(5)
 
     # Disabled collisions during planning with certain eclusions in place.
     with DisabledCollisionsContext(sim, [], []):

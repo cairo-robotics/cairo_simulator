@@ -53,117 +53,117 @@ def main():
         {
             "object_name": "Table",
             "model_file_or_sim_id": ASSETS_PATH + 'table.sdf',
-            "position": [0.9, 0, .17],
+            "position": [0.6, 0, .1],
             "orientation":  [0, 0, 1.5708]
         },
     ]
     config["primitives"] = [
         {
             "type": "box",
-            "primitive_configs": {"w": .015, "l": .35, "h": .03},
+            "primitive_configs": {"w": .015, "l": .35, "h": .08},
             "sim_object_configs": 
                 {
                     "object_name": "center_wall",
-                    "position": [.74, 0, .7],
+                    "position": [.67, 0, .64],
                     "orientation":  [0, 0, 0],
                     "fixed_base": 1    
                 }
         },
         {
             "type": "box",
-            "primitive_configs": {"w": .015, "l": .2, "h": .03},
+            "primitive_configs": {"w": .015, "l": .2, "h": .08},
             "sim_object_configs": 
                 {
                     "object_name": "right_outer_bend",
-                    "position": [.86, .25, .7],
+                    "position": [.79, .25, .64],
                     "orientation":  [0, 0, -np.pi/6],
                     "fixed_base": 1    
                 }
         },
         {
             "type": "box",
-            "primitive_configs": {"w": .015, "l": .2, "h": .03},
+            "primitive_configs": {"w": .015, "l": .2, "h": .08},
             "sim_object_configs": 
                 {
                     "object_name": "right_outer_bend2",
-                    "position": [.69, .25, .7],
+                    "position": [.62, .25, .64],
                     "orientation":  [0, 0, np.pi/6],
                     "fixed_base": 1    
                 }
         },
          {
             "type": "box",
-            "primitive_configs": {"w": .015, "l": .10, "h": .03},
+            "primitive_configs": {"w": .015, "l": .10, "h": .08},
             "sim_object_configs": 
                 {
                     "object_name": "right_inner_bend",
-                    "position": [.80, .29, .7],
+                    "position": [.73, .29, .64],
                     "orientation":  [0, 0, -np.pi/6],
                     "fixed_base": 1    
                 }
         },
         {
             "type": "box",
-            "primitive_configs": {"w": .015, "l": .10, "h": .03},
+            "primitive_configs": {"w": .015, "l": .10, "h": .08},
             "sim_object_configs": 
                 {
                     "object_name": "right_inner_bend2",
-                    "position": [.76, .29, .7],
+                    "position": [.69, .29, .64],
                     "orientation":  [0, 0, np.pi/6],
                     "fixed_base": 1    
                 }
         },
         {
             "type": "box",
-            "primitive_configs": {"w": .015, "l": .2, "h": .03},
+            "primitive_configs": {"w": .015, "l": .2, "h": .08},
             "sim_object_configs": 
                 {
                     "object_name": "left_outer_bend",
-                    "position": [.86, -.25, .7],
+                    "position": [.79, -.25, .64],
                     "orientation":  [0, 0, np.pi/6],
                     "fixed_base": 1    
                 }
         },
         {
             "type": "box",
-            "primitive_configs": {"w": .015, "l": .2, "h": .03},
+            "primitive_configs": {"w": .015, "l": .2, "h": .08},
             "sim_object_configs": 
                 {
                     "object_name": "left_outer_bend2",
-                    "position": [.69, -.25, .7],
+                    "position": [.62, -.25, .64],
                     "orientation":  [0, 0, -np.pi/6],
                     "fixed_base": 1    
                 }
         },
          {
             "type": "box",
-            "primitive_configs": {"w": .015, "l": .10, "h": .03},
+            "primitive_configs": {"w": .015, "l": .10, "h": .08},
             "sim_object_configs": 
                 {
                     "object_name": "left_inner_bend",
-                    "position": [.80, -.29, .7],
+                    "position": [.73, -.29, .64],
                     "orientation":  [0, 0, np.pi/6],
                     "fixed_base": 1    
                 }
         },
         {
             "type": "box",
-            "primitive_configs": {"w": .015, "l": .10, "h": .03},
+            "primitive_configs": {"w": .015, "l": .10, "h": .08},
             "sim_object_configs": 
                 {
                     "object_name": "left_inner_bend2",
-                    "position": [.76, -.29, .7],
+                    "position": [.69, -.29, .64],
                     "orientation":  [0, 0, -np.pi/6],
                     "fixed_base": 1    
                 }
         },
         {
             "type": "box",
-            "primitive_configs": {"w": .015, "l": .35, "h": .03},
+            "primitive_configs": {"w": .015, "l": .35, "h": .08},
             "sim_object_configs": 
                 {
                     "object_name": "center_wall2",
-                    "position": [.81, 0, .7],
+                    "position": [.74, 0, .64],
                     "orientation":  [0, 0, 0],
                     "fixed_base": 1    
                 }
@@ -172,13 +172,13 @@ def main():
             
     config['tsr'] = {
             'degrees': False,
-            "T0_w": [0, 0, .9447, 0, 0, 0],
+            "T0_w": [.726, 0, .84, 0, 0, 0],
             "Tw_e": [0, 0, 0, np.pi, 0, np.pi/2],
-            "Bw": [[(-.64, .66), (-100, 100), (.0, .05)],  
-                    [(-.02, .02), (-.02, .02), (-.02, .02)]]
-        }
+            "Bw": [[(-.1, .1), (-100, 100), (0, .01)],  
+                    [(-.01, .01), (-.01, .01), (-.01, .01)]]
+    }
     
-     # Collect all joint configurations from all demonstration .json files.
+    # Collect all joint configurations from all demonstration .json files.
     configurations = []
     data_directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data/sampling_bias")
   
@@ -201,9 +201,9 @@ def main():
     sampler = DistributionSampler(distribution_model=model, fraction_uniform=config['sampling_bias']['fraction_uniform'])
     state_space = DistributionSpace(sampler=sampler)
 
-    start = [0.125078986054793, 0.41859559926388773, -1.5897914857750568, -0.06303452500621569, 1.5772040636322664, 1.124147043383583, -1.1443473974315577]
+    start = [0.4512693515323636, 0.578072751043309, -1.7085853204387587, 0.596159706024823, 1.9871449177039127, 1.2134687707559257, -1.569380122838989]
 
-    goal = [-0.9924664399121366, 0.560270353689794, -0.9706070749170251, -0.5557908545043405, 0.8236102518873979, 1.3593862702811987, -1.8700982808898086]
+    goal = [-0.5684057726305594, 0.5583954509945905, -1.5247855621059458, 0.7754717976826726, 1.901730705121558, 1.135705090297649, -2.8032179515916686]
 
     sim_context = SawyerBiasedTSRSimContext(configuration=config)
     sim = sim_context.get_sim_instance()
@@ -219,7 +219,7 @@ def main():
     
     sawyer_robot.set_joint_state(start)
     print(quat2rpy(sawyer_robot.solve_forward_kinematics(start)[0][1]))
-    time.sleep(1)
+    time.sleep(5)
     control = 'g'
 
     while control != 'q':
@@ -230,9 +230,9 @@ def main():
             # LazyPRM #
             #######
             # Use parametric linear interpolation with 5 steps between points.
-            interp = partial(parametric_lerp, steps=5)
+            interp = partial(parametric_lerp, steps=50)
             # See params for PRM specific parameters
-            cbirrt = CBiRRT2(sawyer_robot, state_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 5, 'q_step': .35, 'e_step': .25, 'iters': 20000})
+            cbirrt = CBiRRT2(sawyer_robot, state_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 5, 'q_step': .35, 'e_step': .25, 'iters': 100000, 'epsilon': .06})
             logger.info("Planning....")
             plan = cbirrt.plan(tsr, np.array(start), np.array(goal))
             path = cbirrt.get_path(plan)

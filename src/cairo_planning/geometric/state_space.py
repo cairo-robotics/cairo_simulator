@@ -80,7 +80,7 @@ class DistributionSpace():
 
 class SawyerTSRConstrainedSpace():
 
-    def __init__(self, sampler, svc, TSR, robot, limits=None):
+    def __init__(self, sampler, svc, TSR, robot, limits=None, epsilon=.1, e_step=.25):
         self.limits = [['right_j0', (-3.0503, 3.0503)],
                        ['right_j1', (-3.8095, 2.2736)],
                        ['right_j2', (-3.0426, 3.0426)],
@@ -95,6 +95,8 @@ class SawyerTSRConstrainedSpace():
         self.svc = svc
         self.TSR = TSR
         self.robot = robot
+        self.epsilon = epsilon
+        self.e_step = e_step
         self.sampler = sampler if sampler is not None else UniformSampler()
     
     def _get_limits(self, joint_names):
@@ -120,7 +122,7 @@ class SawyerTSRConstrainedSpace():
     def _project(self, sample):
         if self.svc.validate(sample):
             q_constrained = project_config(self.robot, self.TSR, np.array(
-                sample), np.array(sample), epsilon=.1, e_step=.25)
+                sample), np.array(sample), epsilon=self.epsilon, e_step=self.e_step)
             normalized_q_constrained = []
             if q_constrained is not None:
                 for value in q_constrained:

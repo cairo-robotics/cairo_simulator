@@ -412,14 +412,15 @@ class CPRM():
             self.n_samples, self.k, self.ball_radius))
 
     def preload(self, samples, graph):
+        self.samples = []
         self.graph = graph
         for sample in samples:
             if utils.val2idx(self.graph, sample) is not None:
                 try:
                     self.graph.vs[utils.val2idx(self.graph, sample)]['value'] = np.array(sample)
+                    self.samples.append(np.array(sample))
                 except TypeError as e:
                     print(e)
-        self.samples = samples
         self.preloaded = True
 
     def plan(self, q_start, q_goal):
@@ -435,12 +436,15 @@ class CPRM():
         self.log.debug("Finding feasible best path in graph if available...")
         self.log.debug(self._get_graph_path())
         vertex_sequence = self._get_graph_path()
-        if self.smooth_path:
-            self.log.debug("Smoothing path...")
-            vertex_sequence, path = self._smooth_path(vertex_sequence, self.smoothing_time)
-            return path
+        if len(vertex_sequence) > 1:
+            if self.smooth_path:
+                self.log.debug("Smoothing path...")
+                vertex_sequence, path = self._smooth_path(vertex_sequence, self.smoothing_time)
+                return path
+            else:
+                return [self.graph.vs[idx]['value'] for idx in self._get_graph_path()]
         else:
-            return [self.graph.vs[idx]['value'] for idx in self._get_graph_path()]
+            raise Exception("Failed to find a path.")
     
     def generate_roadmap(self, q_start, q_goal):
         # Initial sampling of roadmap and NN data structure.
@@ -507,8 +511,8 @@ class CPRM():
                 break
             # Get two random indeces from path
             center_idx = random.sample(range(0, len(vertex_sequence)), 1)[0]
-            lower_range = center_idx - 5 if center_idx - 5 >= 0 else 0
-            upper_range = center_idx + 5 if center_idx + 5 <= len(vertex_sequence) else len(vertex_sequence)
+            lower_range = center_idx - 6 if center_idx - 6 >= 0 else 0
+            upper_range = center_idx + 6 if center_idx + 6 <= len(vertex_sequence) else len(vertex_sequence)
             vertex_window = vertex_sequence[lower_range:upper_range]
             rand_idx1, rand_idx2 = random.sample(vertex_window, 2)
             if vertex_sequence.index(rand_idx1) > vertex_sequence.index(rand_idx2):
@@ -517,7 +521,7 @@ class CPRM():
             q_s = self.graph.vs[rand_idx2]['value']
 
             success, smoothed_path_values, _ = self._cbirrt2_connect(q_old, q_s,  add_points_to_samples=False, update_graph=False)
-            if success:
+            if success and len(smoothed_path_values) > 1:
                 curr_path_values = [self.graph.vs[idx]['value'] for idx in self._get_graph_path(rand_idx1, rand_idx2)]
                 smoothed_path_value_pairs = [(smoothed_path_values[i], smoothed_path_values[(i + 1) % len(smoothed_path_values)]) for i in range(len(smoothed_path_values))][:-1]
                 curr_path_values_pairs = [(curr_path_values[i], curr_path_values[(i + 1) % len(curr_path_values)]) for i in range(len(curr_path_values))][:-1]
@@ -573,6 +577,14 @@ class CPRM():
             self.goal_name = utils.val2str(q_goal)
             self.graph.vs[utils.val2idx(self.graph, q_goal)]['value'] = list(q_goal)
 
+    def remove_start_and_end(self):
+        if self.start_name is not None and utils.name2idx(self.graph, self.start_name) is not None:
+            self.graph.delete_vertices(self.start_name)
+            self.start_name = None
+        if self.goal_name is not None and utils.name2idx(self.graph, self.goal_name) is not None:
+            self.graph.delete_vertices(self.goal_name)
+            self.goal_name = None
+
     def _attach_start_and_end(self):
         q_start = self.graph.vs[utils.name2idx(self.graph, self.start_name)]['value']
         q_end = self.graph.vs[utils.name2idx(self.graph, self.goal_name)]['value']
@@ -581,15 +593,27 @@ class CPRM():
         for q_near in self._neighbors(q_start, k_override=15, within_ball=False):
             if utils.val2str(q_near) in self.graph.vs['name']:
                 if utils.val2idx(self.graph, q_near) != 0:
-                    successful, _, _ = self._cbirrt2_connect(q_start, q_near, add_points_to_samples=True)
-                    if successful:
+                    # check if point in graph already or if a point essentially serves as its equivalent:
+                    if not self._equal(q_start, q_near):
+                        successful, _, _ = self._cbirrt2_connect(q_start, q_near, add_points_to_samples=True)
+                        if successful:
+                            start_added = True
+                            break
+                    else:
+                        self.start_name = utils.val2str(q_near)
                         start_added = True
                         break
         for q_near in self._neighbors(q_end, k_override=15, within_ball=False):
             if utils.val2str(q_near) in self.graph.vs['name']:
                 if utils.val2idx(self.graph, q_near) != 1:
-                    successful, _, _ = self._cbirrt2_connect(q_near, q_end, add_points_to_samples=True)
-                    if successful:
+                     # check if point in graph already or if a point essentially serves as its equivalent:
+                    if not self._equal(q_start, q_near):
+                        successful, _, _ = self._cbirrt2_connect(q_near, q_end, add_points_to_samples=True)
+                        if successful:
+                            end_added = True
+                            break
+                    else:
+                        self.goal_name = utils.val2str(q_near)
                         end_added = True
                         break
         if not start_added or not end_added:
@@ -778,3 +802,8 @@ class CPRM():
 
     def _distance(self, q1, q2):
         return np.linalg.norm(np.array(q1) - np.array(q2))
+
+    def _equal(self, q1, q2):
+        if self._distance(q1, q2) <= .05:
+            return True
+        return False

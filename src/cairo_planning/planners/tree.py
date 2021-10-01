@@ -29,7 +29,7 @@ class CBiRRT2():
         self.smooth_path = params.get('smooth_path', False)
         self.q_step = params.get('q_step', .1)
         self.epsilon = params.get('epsilon', .1)
-        self.e_step = params.get('e_step', .1)
+        self.e_step = params.get('e_step', .25)
         self.iters = params.get('iters', 20000)
         self.smoothing_time = params.get('smoothing_time', 10)
         self.log =  logger if logger is not None else Logger(name="CBiRRT2", handlers=['logging'], level=params.get('log_level', 'debug'))
@@ -125,6 +125,7 @@ class CBiRRT2():
                     # or if the projection can no longer move closer along manifold
                     return qs_old, generated_values
                 prior_distance = self._distance(q_s, q_target)
+                # if q_s is valid AND all of the interpolated points between qs_old and q_s are valid, we add the edge.
                 if self._validate(q_s) and all([self._validate(p) for p in self.interp_fn(qs_old, q_s)]):
                     self._add_vertex(tree, q_s)
                     generated_values.append(q_s)
