@@ -511,8 +511,8 @@ class CPRM():
                 break
             # Get two random indeces from path
             center_idx = random.sample(range(0, len(vertex_sequence)), 1)[0]
-            lower_range = center_idx - 6 if center_idx - 6 >= 0 else 0
-            upper_range = center_idx + 6 if center_idx + 6 <= len(vertex_sequence) else len(vertex_sequence)
+            lower_range = center_idx - 10 if center_idx - 10 >= 0 else 0
+            upper_range = center_idx + 10 if center_idx + 10 <= len(vertex_sequence) else len(vertex_sequence)
             vertex_window = vertex_sequence[lower_range:upper_range]
             rand_idx1, rand_idx2 = random.sample(vertex_window, 2)
             if vertex_sequence.index(rand_idx1) > vertex_sequence.index(rand_idx2):
@@ -520,7 +520,9 @@ class CPRM():
             q_old = self.graph.vs[rand_idx1]['value']
             q_s = self.graph.vs[rand_idx2]['value']
 
-            success, smoothed_path_values, _ = self._cbirrt2_connect(q_old, q_s,  add_points_to_samples=False, update_graph=False)
+            # success, smoothed_path_values, _ = self._cbirrt2_connect(q_old, q_s,  add_points_to_samples=False, update_graph=False)
+            smoothed_path_values = self.interp_fn(np.array(q_old), np.array(q_s))
+            success = all([self._validate(sample) for sample in smoothed_path_values])
             if success and len(smoothed_path_values) > 1:
                 curr_path_values = [self.graph.vs[idx]['value'] for idx in self._get_graph_path(rand_idx1, rand_idx2)]
                 smoothed_path_value_pairs = [(smoothed_path_values[i], smoothed_path_values[(i + 1) % len(smoothed_path_values)]) for i in range(len(smoothed_path_values))][:-1]

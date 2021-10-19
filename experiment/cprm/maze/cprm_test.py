@@ -1,4 +1,5 @@
 import os
+import traceback
 import json
 import time
 from functools import partial
@@ -207,10 +208,10 @@ def main():
     # This is used to bias tree grwoth between two points when using CBiRRT2 as our local planner for a constrained PRM.
     tree_state_space = SawyerConfigurationSpace(sampler=HyperballSampler())
     # Use parametric linear interpolation with 10 steps between points.
-    interp = partial(parametric_lerp, steps=10)
+    interp = partial(parametric_lerp, steps=20)
     # See params for PRM specific parameters
     prm = CPRM(SawyerBiasedTSRSimContext, config, sawyer_robot, tsr, biased_state_space, tree_state_space, svc, interp, params={
-        'n_samples': 3000, 'k': 15, 'planning_attempts': 5, 'ball_radius': 10.0, 'smooth_path': True, 'smoothing_time':10}, tree_params={'iters': 1500, 'q_step': .2, 'epsilon': config['tsr']['epsilon'], 'e_step': config['tsr']['e_step']}, logger=logger)
+        'n_samples': 3000, 'k': 15, 'planning_attempts': 5, 'ball_radius': 10.0, 'smooth_path': True, 'smoothing_time': 20}, tree_params={'iters': 1500, 'q_step': .2, 'epsilon': config['tsr']['epsilon'], 'e_step': config['tsr']['e_step']}, logger=logger)
     logger.info("Preloading samples and model....")
     prm.preload(samples, graph)
 
@@ -243,7 +244,8 @@ def main():
             prm.remove_start_and_end()
         except Exception as e:
             prm.remove_start_and_end()
-            print(e)
+            traceback.print_tb(e.__traceback__)
+            logger.warn(e)
        
 
 if __name__ == "__main__":

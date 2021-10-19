@@ -172,10 +172,12 @@ def main():
             
     config['tsr'] = {
             'degrees': False,
-            "T0_w": [.726, 0, .84, 0, 0, 0],
+            'epsilon': .05,
+            'e_step': .25,
+            "T0_w": [.676, 0, .84, 0, 0, 0],
             "Tw_e": [0, 0, 0, np.pi, 0, np.pi/2],
-            "Bw": [[(-.1, .1), (-100, 100), (0, .01)],  
-                    [(-.01, .01), (-.01, .01), (-.01, .01)]]
+            "Bw": [[(-.1, .1), (-100, 100), (0, .005)],  
+                    [(-.001, .001), (-.001, .001), (-.001, .001)]]
     }
     
     # Collect all joint configurations from all demonstration .json files.
