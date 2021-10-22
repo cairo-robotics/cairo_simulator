@@ -128,7 +128,7 @@ if __name__ == "__main__":
         ####################################
         # SIMULATION AND PLANNING CONTEXTS #
         ####################################
-         with DisabledCollisionsContext(sim, [], [], disable_visualization=True):
+        with DisabledCollisionsContext(sim, [], [], disable_visualization=True):
             #######
             # LazyPRM #
             #######

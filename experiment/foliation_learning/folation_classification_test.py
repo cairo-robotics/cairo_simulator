@@ -21,7 +21,7 @@ from cairo_planning.local.curve import JointTrajectoryCurve
 from cairo_planning.planners import CBiRRT2
 from cairo_planning.geometric.state_space import DistributionSpace
 from cairo_planning.sampling.samplers import DistributionSampler
-from cairo_planning.geometric.distribution import KernelDensityDistribution
+from cairo_planning.constraints.foliation import VGMMFoliationClustering
 
 
 
@@ -83,7 +83,16 @@ def main():
             "Bw": [[(0, 100), (-100, 100), (-.1, 0)],  
                     [(-.07, .07), (-.07, .07), (-.07, .07)]]
         }
-        
+    
+    sim_context = SawyerBiasedTSRSimContext(configuration=config)
+    sim = sim_context.get_sim_instance()
+    logger = sim_context.get_logger()
+    # _ = sim_context.get_state_space()
+    sawyer_robot = sim_context.get_robot()
+    # _ = sawyer_robot.get_simulator_id()
+    tsr = sim_context.get_tsr()
+    _ = sim_context.get_sim_objects(['Ground'])[0]
+    svc = sim_context.get_state_validity()
 
     # Collect all joint configurations from all demonstration .json files.
     test_configurations = []
@@ -92,7 +101,7 @@ def main():
     with open(samples_file, "r") as f:
         data = json.load(f)
         samples = data['samples']
-
+    print(len(samples))
     test_points = []
     test_points_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_points.json")
   
@@ -101,14 +110,14 @@ def main():
         for entry in data:
             test_points.append(entry['robot']['joint_angle'])
 
-    model = GaussianMixture(n_components=2, covariance_type='full')
+    model = VGMMFoliationClustering(estimated_foliations=3)
     model.fit(np.array(samples))
 
     for point in test_points:
+        sawyer_robot.set_joint_state(point)
         print(model.predict(np.array([point])))
-    
-    print(model.weights_)
-    print(model.means_)
+        time.sleep(5)
+
 
     ##########################################################################
     # Let's use the above cluster to guide the choice of steering point.
