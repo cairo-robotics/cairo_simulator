@@ -160,16 +160,24 @@ class Manipulator(Robot):
         Returns:
             List: [(world_pos, world_ori), (local_pos, local_ori)]
         '''
-        fk_results = self.fk_chain.forward_kinematics(
-            joints=[0] * 2 + list(joint_configuration) + 3 * [0], full_kinematics=False)
+        # fk_results = self.fk_chain.forward_kinematics(
+        #     joints=[0] * 2 + list(joint_configuration) + 3 * [0], full_kinematics=False)
 
-        local_pos = list(fk_results[:3, 3])
-        local_ori = quaternion_from_matrix(fk_results[:3, :3])
-        base_pose, _ = p.getBasePositionAndOrientation(self._simulator_id)
+        # local_pos = list(fk_results[:3, 3])
+        # local_ori = quaternion_from_matrix(fk_results[:3, :3])
+        # base_pose, _ = p.getBasePositionAndOrientation(self._simulator_id)
 
-        world_pos = [sum(x) for x in zip(local_pos, base_pose)]
-        world_ori = local_ori
-        return ((world_pos, world_ori), (local_pos, local_ori))
+        # world_pos = [sum(x) for x in zip(local_pos, base_pose)]
+        # world_ori = local_ori
+        # return ((world_pos, world_ori), (local_pos, local_ori))
+        curr_config = self.get_current_joint_states()
+        self.set_joint_state(joint_configuration)
+        pyb_fk_results = p.getLinkState(self._simulator_id, self._end_effector_link_index, computeForwardKinematics=False)
+        pyb_world_pos, pyb_world_ori = list(pyb_fk_results[0]), list(pyb_fk_results[1]),
+        pyb_local_pos, pyb_local_ori = list(pyb_fk_results[2]), list(pyb_fk_results[3])
+        self.set_joint_state(curr_config)
+        return ((pyb_world_pos, pyb_world_ori), (pyb_local_pos, pyb_local_ori))
+        
 
     def get_joint_pose_in_world_frame(self, joint_index=None):
         '''
@@ -213,6 +221,7 @@ class Manipulator(Robot):
             rospy.logerr(
                 "Inverse Kinematics solver not initialized properly for robot %s: end effector link index not set!" % self._name)
             return
+        jd=[0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001,0.001]
 
         ik_solution = None
 
@@ -235,13 +244,16 @@ class Manipulator(Robot):
                 target_orientation = p.getQuaternionFromEuler(
                     target_orientation)
             ik_solution = p.calculateInverseKinematics(
-                self._simulator_id, self._end_effector_link_index, target_position, targetOrientation=target_orientation, maxNumIterations=120)
-
+                self._simulator_id, self._end_effector_link_index, target_position, targetOrientation=target_orientation, maxNumIterations=125)
+        # ikpy_ik =  self.fk_chain.inverse_kinematics(target_position, p.getEulerFromQuaternion(target_orientation), orientation_mode='all')
+        # print(ikpy_ik)
         # Return a configuration of only the arm's joints.
         arm_config = [0] * len(self._arm_ik_indices)
         for i, idx in enumerate(self._arm_ik_indices):
+            # why pybullet is maintaining a reference to the ik_solution value is crazy. What in god's name is going on...
+            # If you add this np.pi/2 offset, watch what happens to the return value of ik_solution from the p.calculateInverseKinematics.
             arm_config[i] = ik_solution[idx]
-
+            # arm_config[i] = ik_solution[idx]
         return arm_config
 
     def execute_trajectory(self, trajectory_data):
@@ -330,7 +342,7 @@ class Sawyer(Manipulator):
     Concrete Manipulator representing a Sawyer Robot in Simulation.
     """
 
-    def __init__(self, robot_name, position, orientation=[0, 0, 0, 1], fixed_base=0, publish_full_state=False):
+    def __init__(self, robot_name, position, urdf_file=None, orientation=[0, 0, 0, 1], fixed_base=0, publish_full_state=False):
         """
         Initialize a Sawyer Robot at coordinates (x,y,z) and add it to the simulator manager
 
@@ -343,8 +355,8 @@ class Sawyer(Manipulator):
             urdf_flags (int): Bitwise flags.
             publish_full_state (bool): True will publish more detailed state info., False will publish config/pose only.
         """
-        super().__init__(robot_name, ASSETS_PATH +
-                         'sawyer_description/urdf/sawyer_static.urdf', position, orientation, fixed_base)
+        urdf_file = ASSETS_PATH + 'sawyer_description/urdf/sawyer_static.urdf' if urdf_file is None else urdf_file
+        super().__init__(robot_name, urdf_file, position, orientation, fixed_base)
 
         if Simulator.using_ros():
             # Should the full robot state be published each cycle (pos/vel/force), or just joint positions
@@ -362,7 +374,7 @@ class Sawyer(Manipulator):
         gripper_tip_elements = get_chain_from_joints(urdf_file, joints=['right_arm_mount', 'right_j0', 'right_j1', 'right_j2',
                                                                         'right_j3', 'right_j4', 'right_j5', 'right_j6', 'right_hand', 'right_gripper_base_joint', 'right_gripper_tip_joint'])
         self.fk_chain = Chain.from_urdf_file(
-            urdf_file, base_elements=gripper_tip_elements, active_links_mask=[True] + 8 * [True] + 3 * [False])
+            urdf_file, base_elements=gripper_tip_elements, active_links_mask=[False]*2 + 7 * [True] + 3 * [False])
 
     def _init_joint_names(self):
         """
@@ -463,7 +475,7 @@ class Sawyer(Manipulator):
             target_velocity = self._extra_joint_default_velocity[0]
         p.setJointMotorControl2(self._simulator_id, self._extra_dof_indices[0], p.POSITION_CONTROL,
                                 target_position, target_velocity, maxVelocity=target_velocity)
-
+    
     @rosmethod
     def publish_state(self):
         """
@@ -548,6 +560,26 @@ class Sawyer(Manipulator):
         else:
             self.logger.warn(
                 "Invalid joint configuration provided for Sawyer %s. Needs to be 7 floats (arm) or 9 floats (arm+gripper)" % self._name)
+    
+    def set_joint_state(self, target_position):
+        list_tgt_position = list(target_position)
+        if len(target_position) == 7:
+            joint_dofs = self._arm_dof_indices + self._gripper_dof_indices
+            gripper_pos = p.getJointStates(
+                        self._simulator_id, self._gripper_dof_indices)
+            target_position = list_tgt_position + [val[0] for val in list(gripper_pos)]
+            # Set new configuration
+            for i, idx in enumerate(joint_dofs):
+                p.resetJointState(self._simulator_id, idx, targetValue=target_position[i], targetVelocity=0, physicsClientId=0)
+
+        elif len(target_position) == 9:
+            joint_dofs = self._arm_dof_indices + self._gripper_dof_indices
+            # Set new configuration
+            for i, idx in enumerate(joint_dofs):
+                p.resetJointState(self._simulator_id, idx, targetValue=target_position[i], targetVelocity=0, physicsClientId=0)
+        else:
+            self.logger.warn(
+                "Invalid joint configuration provided for Sawyer %s. Needs to be 7 floats (arm) or 9 floats (arm+gripper)" % self._name)
 
     def move_to_joint_pos_vel_callback(self, target_position_vel_float32array):
         """
@@ -609,7 +641,7 @@ class Sawyer(Manipulator):
 
         dynamics = p.calculateInverseDynamics(self._simulator_id, tgt_positions, tgt_velocities, [0]*len(tgt_positions))
         '''
-        # p.setJointMotorControlArray(self._simulator_id, joints_list[:len(target_positions)], p.POSITION_CONTROL, targetPositions=target_position, targetVelocities=target_velocity)
+        # p.setJointMotorControlArray(self._simulator_id, joints_list[:len(target_position)], p.POSITION_CONTROL, targetPositions=target_position, targetVelocities=target_velocity)
 
         for i, j_idx in enumerate(joints_list):
             p.setJointMotorControl2(self._simulator_id, j_idx, p.POSITION_CONTROL,
@@ -632,7 +664,10 @@ class Sawyer(Manipulator):
             p.setJointMotorControl2(self._simulator_id,
                                     j_idx,
                                     p.VELOCITY_CONTROL,
-                                    targetVelocity=target_velocity[i])
+                                    targetVelocity=target_velocity[i], force=500)
+    
+    def zero_joint_velocities(self):
+        self.move_with_joint_vel([0.] * len(self._arm_dof_indices))
 
     def get_current_joint_states(self):
         """
@@ -743,7 +778,7 @@ class Sawyer(Manipulator):
         sim.set_robot_trajectory(
             self._simulator_id, joint_positions, joint_velocities)
 
-    def check_if_at_position(self, pos, epsilon=0.35):
+    def check_if_at_position(self, pos, epsilon=0.1):
         '''
         Returns True if the robot's joints are within (epsilon) of pos, false otherwise
 

@@ -566,6 +566,7 @@ class Robot(ABC):
         self._state = None
         if Simulator.is_instantiated():
             self.logger = Simulator.get_logger()
+            print(urdf_file)
             self._simulator_id = p.loadURDF(urdf_file, basePosition=position,
                                             baseOrientation=orientation, useFixedBase=fixed_base, flags=urdf_flags)
             # Register with Simulator manager

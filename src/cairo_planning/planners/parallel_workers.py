@@ -60,7 +60,7 @@ def parallel_connect_worker(batches, interp_fn, distance_fn, sim_context_cls, si
                         [q_near, q_sample, distance_fn(local_path)])
         return connections
 
-def parallel_projection_worker(num_samples, sim_context_cls, sim_config, tsr):
+def parallel_projection_worker(num_samples, sim_context_cls, sim_config):
     sim_context = sim_context_cls(sim_config, setup=False)
     sim_context.setup(sim_overrides={"run_parallel": True, "use_gui": False})
     sim = sim_context.get_sim_instance()
@@ -92,12 +92,11 @@ def parallel_cbirrt_worker(point_pairs, sim_context_cls, sim_config, tsr, tree_s
     sim = sim_context.get_sim_instance()
     svc = sim_context.get_state_validity()
 
-    tree_params['log_level'] = 'info'
     cbirrt2 = CBiRRT2(sawyer_robot,tree_state_space,
                         svc, interp_fn, params=tree_params)
     paths = {}
     # Disabled collisions during planning with certain eclusions in place.
-    with DisabledCollisionsContext(sim, [], []):
+    with DisabledCollisionsContext(sim, [], [], disable_visualization=True):
         for pair in point_pairs:
             q_near = pair[0]
             q_target = pair[1]
@@ -113,14 +112,21 @@ def parallel_cbirrt_worker(point_pairs, sim_context_cls, sim_config, tsr, tree_s
             cbirrt2._random_config  = types.MethodType(_random_config, cbirrt2)
 
             graph_plan = cbirrt2.plan(tsr, q_near, q_target)
-            if graph_plan is not None:
+            if graph_plan is not None and len(graph_plan) > 2:
                 points = [cbirrt2.connected_tree.vs[idx]['value']
                             for idx in graph_plan]
                 edges = list(zip(points, points[1:]))
-                named_pair_tuple = (utils.val2str(q_near), utils.val2str(q_near))
-                paths[named_pair_tuple] = {
-                    "points": points,
-                    "edges": edges
-                }
+                if all([svc.validate(point) for point in points]):
+                    named_pair_tuple = (utils.val2str(q_near), utils.val2str(q_target))
+                    paths[named_pair_tuple] = {
+                        "points": points,
+                        "edges": edges
+                    }
+                else:
+                    print([svc.validate(point) for point in points])
+                    cbirrt2.log.info("State valudity invalidated path  between {} and {}".format(utils.val2str(q_near), utils.val2str(q_target)))
+            else:
+                cbirrt2.log.info("Could not generate a CBiRRT2 tree between {} and {}".format(utils.val2str(q_near), utils.val2str(q_target)))
+
         return paths
    

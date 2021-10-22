@@ -430,10 +430,15 @@ class LazyCPRM():
             self.n_samples, self.k, self.ball_radius, self.smooth_path, self.smoothing_time))
 
     def preload(self, samples, graph):
-        self.samples = samples
+        self.samples = []
         self.graph = graph
-        for sample in self.samples:
-            self.graph.vs[utils.val2idx(self.graph, sample)]['value'] = np.array(sample)
+        for sample in samples:
+            if utils.val2idx(self.graph, sample) is not None:
+                try:
+                    self.graph.vs[utils.val2idx(self.graph, sample)]['value'] = np.array(sample)
+                    self.samples.append(np.array(sample))
+                except TypeError as e:
+                    print(e)
         self.preloaded = True
 
     def plan(self, q_start, q_goal):
@@ -564,6 +569,11 @@ class LazyCPRM():
                     # first check if edge has been evaluated before ever running the expensive CBiRRT2
                     if self.graph.es[self.graph.get_eid(self.graph.vs['id'].index(from_id), self.graph.vs['id'].index(to_id))].attributes().get('validity', False):
                         valid = True
+
+                    # lets try for itnerpolation first before running the expensive CBiRRT2
+                    _, segment = self._extend(from_value, to_value)
+                    segment = list(segment)
+                    valid = subdivision_evaluate(self.svc.validate, segment)
                     if not valid:
                          # generate an local path using CBiRRT2 between 'from_value' and 'to_value'
                         success, segment = self._cbirrt2_connect(
@@ -716,7 +726,7 @@ class LazyCPRM():
         num_workers = mp.cpu_count()
         samples_per_worker = int(self.n_samples / num_workers)
         worker_fn = partial(
-            parallel_projection_worker, sim_context_cls=self.sim_context, sim_config=self.sim_config, tsr=self.tsr)
+            parallel_projection_worker, sim_context_cls=self.sim_context, sim_config=self.sim_config)
         with mp.get_context("spawn").Pool(num_workers) as p:
             results = p.map(worker_fn, [samples_per_worker] * num_workers)
             return list(itertools.chain.from_iterable(results))[0:self.n_samples]
@@ -810,6 +820,7 @@ class LazyCPRM():
         if not utils.val2str(q) in graph.vs['name']:
             if utils.val2str(q) != start_val2name and utils.val2str(q) != goal_val2name:
                 graph.add_vertex(utils.val2str(q), **{'value': q})
+                graph.vs[utils.val2idx(graph, q)]['id'] = utils.val2idx(graph, q)
     
     def _remove_edge(self, vidx1, vidx2):
         start_val2name = utils.val2str(self.graph.vs[utils.name2idx(self.graph, self.start_name)]['value'])

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This URDF was automatically created by SolidWorks to URDF Exporter! Originally created by Stephen Brawner (brawner@gmail.com) 
+     Commit Version: 1.5.1-0-g916b5db  Build Version: 1.5.7152.31018
+     For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
+<robot name="1in rectangular block_C.SLDPRT">
+  <link concave="yes" name="1in rectangular block_C.SLDPRT">
+    <inertial>
+      <origin
+        xyz="6.8012E-20 1.19697510403163E-18 0.0381"
+        rpy="0 0 0" />
+      <mass
+        value="0.049161" />
+      <inertia
+        ixx="2.6431E-05"
+        ixy="1.9595E-22"
+        ixz="1.0314E-22"
+        iyy="2.6431E-05"
+        iyz="-1.20140294454694E-21"
+        izz="5.2861E-06" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="1.5707963267949 0 0" />
+      <geometry>
+        <mesh
+          filename="package://1in rectangular block_C.SLDPRT/meshes/1in rectangular block_C.SLDPRT.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="1 0 0 1" />
+        <texture
+          filename="package://1in rectangular block_C.SLDPRT/textures/" />
+      </material>
+    </visual>
+    <collision concave="yes">
+      <origin
+        xyz="0 0 0"
+        rpy="1.5707963267949 0 0" />
+      <geometry>
+        <mesh
+          filename="package://1in rectangular block_C.SLDPRT/meshes/1in rectangular block_C.SLDPRT.STL" />
+      </geometry>
+    </collision>
+  </link>
+</robot>

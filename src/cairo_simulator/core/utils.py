@@ -65,16 +65,16 @@ def invert_3d_homogeneous_transform(T):
 
 
 def quaternion_from_matrix(rot_matrix):
-    """Given a rotation matrix, returns the quaternion represetnation: [w, x, y, z].
+    """Given a rotation matrix, returns the quaternion represetnation: [x, y, z, w].
 
     Args:
         rot_matrix ([int, int]): 3x3 rotation matrix as a list of lists or ndarray.
 
     Returns:
-        [int]: The quaternion. [w, x, y, z]
+        [int]: The quaternion. [x, y, z, w]
     """
     quat = Quaternion(matrix=rot_matrix)
-    return [quat[0], quat[1], quat[2], quat[3]]
+    return [quat[1], quat[2], quat[3], quat[0]]
 
 
 def multiply_quaternions(quaternion1, quaternion2):

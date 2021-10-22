@@ -128,8 +128,10 @@ class PrimitiveBuilder():
             'sphere': create_sphere
         }
     
-    def build(self, configs):
+    def build(self, configs, client=0):
         primitive_fn = self.primitive_type_fn_map[configs['type']]
+        configs['primitive_configs']['client'] = client
+        print(client)
         body_id = primitive_fn(**configs['primitive_configs'])
         return SimObject(**configs['sim_object_configs'], model_file_or_sim_id=body_id)
 

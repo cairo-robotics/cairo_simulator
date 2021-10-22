@@ -13,7 +13,6 @@ import networkx as nx
 
 from cairo_simulator.core.sim_context import SawyerSimContext
 from cairo_simulator.core.simulator import SimObject
-from cairo_planning.core.planning_context import SawyerPlanningContext
 from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.local.interpolation import parametric_lerp
 from cairo_planning.local.curve import JointTrajectoryCurve
