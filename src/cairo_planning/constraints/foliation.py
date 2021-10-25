@@ -1,6 +1,5 @@
 from sklearn.mixture import BayesianGaussianMixture
 
-
 class VGMMFoliationClustering():
 
     def __init__(self, estimated_foliations=2):
