@@ -11,9 +11,9 @@ if os.environ.get('ROS_DISTRO'):
 import numpy as np
 import networkx as nx
 
-from cairo_simulator.core.sim_context import SawyerSimContext
 from cairo_simulator.core.sim_context import SawyerBiasedTSRSimContext
 from cairo_planning.collisions import DisabledCollisionsContext
+from cairo_planning.constraints.foliation import VGMMFoliationClustering, winner_takes_all
 from cairo_planning.local.interpolation import parametric_lerp
 from cairo_planning.local.curve import JointTrajectoryCurve
 from cairo_planning.planners import CBiRRT2
@@ -44,12 +44,39 @@ if __name__ == "__main__":
     # getFoliation function calls given a set   #
     # of demonstration data                     #
     #############################################
+    # Collect all joint configurations from all demonstration .json files.
+    configurations = []
+    data_directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), "foliation_data")
+    for json_file in os.listdir(data_directory):
+        filename = os.path.join(data_directory, json_file)
+        with open(filename, "r") as f:
+            data = json.load(f)
+            for entry in data:
+                configurations.append(entry['robot']['joint_angle'])
+    
+    orientation_foliation_model = VGMMFoliationClustering(estimated_foliations=5)
+    orientation_foliation_model.fit(np.array(configurations ))
 
+
+    ####################################
+    # CONSTRAINT TO FOLIATION MAPPING  #
+    ####################################
+
+    c2f_map = {}
+    c2f_map[(1)] = orientation_foliation_model
+    c2f_map[(1, 2)] = orientation_foliation_model
+
+    ##############################
+    # CONSTRAINT TO TSR MAPPING  #
+    ##############################
+    # c2tsr_map = {}
+    # c2tsr_map[(1)] = TSR1
+    # c2tsr_map[(1, 2)] = TSR2
 
     #############################################
     #         Import Serialized LfD Graph       #
     #############################################
-    with open(os.path.dirname(os.path.abspath(__file__)) + "/serialization_test.json", "r") as f:
+    with open(os.path.dirname(os.path.abspath(__file__)) + "/lfd_data/lfd_model.json", "r") as f:
         serialized_data = json.load(f)
     config = serialized_data["config"]
     intermediate_trajectories = serialized_data["intermediate_trajectories"]
@@ -79,15 +106,31 @@ if __name__ == "__main__":
     # Build into distribution samplers.
     for keyframe_id, keyframe_data in reversed(keyframes.items()):
         if keyframe_data["keyframe_type"] == "constraint_transition" or keyframe_id == end_id:
-                                                                         
-            
-            
+            # Create the planning distributions etc,.
+
+            # TODO: The keyframe_id and prior_id and choice of inter_traj assignment might need adjustment if we backtrack.
             # Create keyframe distrubtion
             data = [obsv['robot']['joint_angle'] for obsv in keyframe_data["observations"]]
             keyframe_dist = KernelDensityDistribution()
             keyframe_dist.fit(data)
             # Let's use random keyframe observation point for planning.
             planning_G.add_nodes_from([(keyframe_id, {"model": keyframe_dist, "point": data[0]})])
+
+            # get the constraint IDs
+            constraint_ids = keyframe_data["applied_constraints"]
+            planning_G[keyframe_id]["constraint_ids"] = constraint_ids
+
+            # get the foliation model
+            foliation_model = c2f_map.get(tuple(constraint_ids), None)
+            planning_G[keyframe_id]["foliation_model"] = foliation_model
+
+            # Determine the foliation choice based on the keyframe data and assign in to the Pg node
+            foliation_value = winner_takes_all(data, foliation_model)
+            planning_G[keyframe_id]["foliation_value"] = foliation_value
+
+            # TODO: Get the TSRs associated with constraint ID combo.
+
+
             # Create intermediate trajectory distribution.
             inter_trajs = intermediate_trajectories[keyframe_id]
             inter_trajs_data = [[obsv['robot']['joint_angle'] for obsv in traj] for traj in inter_trajs]
@@ -108,7 +151,7 @@ if __name__ == "__main__":
 
 
     final_path = []
-    sim_context = SawyerSimContext(None, setup=False)
+    sim_context = SawyerBiasedTSRSimContext(None, setup=False)
     sim_context.setup(sim_overrides={"run_parallel": False})
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
