@@ -5,12 +5,14 @@ import os
 import sys
 from functools import partial
 import time
+import copy
 
 if os.environ.get('ROS_DISTRO'):
     import rospy
 import numpy as np
 import networkx as nx
 
+from cairo_simulator.core.utils import ASSETS_PATH
 from cairo_simulator.core.sim_context import SawyerBiasedTSRSimContext
 from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.constraints.foliation import VGMMFoliationClustering, winner_takes_all
@@ -21,7 +23,60 @@ from cairo_planning.geometric.state_space import DistributionSpace
 from cairo_planning.geometric.distribution import KernelDensityDistribution
 from cairo_planning.sampling.samplers import DistributionSampler
 
+from cairo_planning.geometric.transformation import quat2rpy
+from cairo_planning.constraints.projection import project_config
+from cairo_planning.geometric.utils import wrap_to_interval
+
+
 if __name__ == "__main__":
+    ######################################
+    #       PLANNING CONFIGURATION       #
+    ######################################
+    config = {}
+    config["sim"] = {
+            "use_real_time": False
+        }
+
+    config["logging"] = {
+            "handlers": ['logging'],
+            "level": "debug"
+        }
+
+    config["sawyer"] = {
+            "robot_name": "sawyer0",
+            'urdf_file': ASSETS_PATH + 'sawyer_description/urdf/sawyer_static_mug_combined.urdf',
+            "position": [0, 0, 0.9],
+            "fixed_base": True
+        }
+
+    config["sim_objects"] = [
+        {
+            "object_name": "Ground",
+            "model_file_or_sim_id": "plane.urdf",
+            "position": [0, 0, 0]
+        },
+        {
+            "object_name": "Table",
+            "model_file_or_sim_id": ASSETS_PATH + 'table.sdf',
+            "position": [0.6, 0, .1],
+            "orientation":  [0, 0, 1.5708]
+        },
+    ]
+    config["primitives"] = [
+        {
+            "type": "cylinder",
+            "primitive_configs": {"radius": .1, "height": .05},
+            "sim_object_configs": 
+                {
+                    "object_name": "cylinder",
+                    "position": [.8, -.5726, .6],
+                    "orientation":  [0, 0, 0],
+                    "fixed_base": 1    
+                }
+        }
+        ]
+
+
     #############################################
     #       Important Limits for Samplers       #
     #############################################
@@ -69,9 +124,37 @@ if __name__ == "__main__":
     ##############################
     # CONSTRAINT TO TSR MAPPING  #
     ##############################
-    # c2tsr_map = {}
-    # c2tsr_map[(1)] = TSR1
-    # c2tsr_map[(1, 2)] = TSR2
+
+    # Let's first define all TSR configurations for this task:
+
+    TSR1_config = {
+        'degrees': False,
+        "T0_w": [.7, 0, 0, 0, 0, 0],
+        "Tw_e": [-.2, 0, .739, np.pi/2, 0,  np.pi/2],
+        "Bw": [[(-100, 100), (-100, 100), (-100, 100)],  
+                [(-.05, .05), (-.05, .05), (-.05, .05)]]
+    }
+    # Orientation AND centering constraint
+    TSR2_config = {
+        'degrees': False,
+        "T0_w": [.7, 0, 0, 0, 0, 0],
+        "Tw_e": [.7968, -.5726, .739, np.pi/2, 0,  np.pi/2],
+        "Bw": [[(-.1, .1), (-.1, .1), (-100, 100)],  
+                [(-.05, .05), (-.05, .05), (-.05, .05)]]
+    }
+    TSR3_config = {
+        'degrees': False,
+        "T0_w": [.7, 0, 0, 0, 0, 0],
+        "Tw_e": [.7968, -.5726, .739, 3.09499115, 0.01804426, 1.59540829],
+        "Bw": [[(-.1, .1), (-.1, .1), (-100, 100)],  
+                [(-6.3, 6.3), (-6.3, 6.3), (-6.3, 6.3)]]
+    }
+
+
+    c2tsr_map = {}
+    c2tsr_map[(1)] = TSR1_config
+    c2tsr_map[(1, 2)] = TSR2_config
+    c2tsr_map[(2)] = TSR3_config
 
     #############################################
     #         Import Serialized LfD Graph       #
@@ -106,15 +189,21 @@ if __name__ == "__main__":
     # Build into distribution samplers.
     for keyframe_id, keyframe_data in reversed(keyframes.items()):
         if keyframe_data["keyframe_type"] == "constraint_transition" or keyframe_id == end_id:
-            # Create the planning distributions etc,.
 
             # TODO: The keyframe_id and prior_id and choice of inter_traj assignment might need adjustment if we backtrack.
+
+            # Copy the main planning config. This will be updated with specfic configurations for this planning segment (tsrs, biasing etc,.)
+            planning_config = copy.deepcopy(config)
+
             # Create keyframe distrubtion
             data = [obsv['robot']['joint_angle'] for obsv in keyframe_data["observations"]]
             keyframe_dist = KernelDensityDistribution()
             keyframe_dist.fit(data)
-            # Let's use random keyframe observation point for planning.
-            planning_G.add_nodes_from([(keyframe_id, {"model": keyframe_dist, "point": data[0]})])
+
+            # Let's create the node and add teh keyframe KDE model.
+            planning_G.add_nodes_from([(keyframe_id, {"model": keyframe_dist})])
+
+
 
             # get the constraint IDs
             constraint_ids = keyframe_data["applied_constraints"]
@@ -125,22 +214,30 @@ if __name__ == "__main__":
             planning_G[keyframe_id]["foliation_model"] = foliation_model
 
             # Determine the foliation choice based on the keyframe data and assign in to the Pg node
+            # TODO: Confirm that this value is the same as the upcoming foliation cluster/classification ID.
+            # TODO: If not the same, give a warning that the IPD-Relax cannot be gauranteed but proceed anyways?
             foliation_value = winner_takes_all(data, foliation_model)
             planning_G[keyframe_id]["foliation_value"] = foliation_value
 
-            # TODO: Get the TSRs associated with constraint ID combo.
+            # Get the TSR configurations so they can be appended to the  associated with constraint ID combo.
+            planning_config['tsr'] = c2tsr_map.get(tuple(constraint_ids), {})
 
 
             # Create intermediate trajectory distribution.
             inter_trajs = intermediate_trajectories[keyframe_id]
             inter_trajs_data = [[obsv['robot']['joint_angle'] for obsv in traj] for traj in inter_trajs]
-            inter_data = [item for sublist in inter_trajs_data for item in sublist]
-            inter_dist = KernelDensityDistribution()
-            inter_dist.fit(inter_data)
-            planning_G.add_edge(prior_id, keyframe_id)
-            planning_G[prior_id][keyframe_id].update({"model": inter_dist})
-            planning_space = DistributionSpace(sampler=DistributionSampler(inter_dist), limits=limits)
-            planning_G[prior_id][keyframe_id].update({"planning_space": planning_space})
+            
+            sampling_bias = {
+                'bandwidth': .1,
+                'fraction_uniform': .25,
+                'data': inter_trajs_data
+            }
+            planning_config['sampling_bias'] = sampling_bias
+
+            # Finally add the planning config to the planning graph edge. 
+            planning_G[keyframe_id][prior_id]['config'] = planning_config
+
+
             prior_id = keyframe_id
         if keyframe_id == start_id:
             data = [obsv['robot']['joint_angle'] for obsv in keyframe_data["observations"]]
@@ -151,22 +248,46 @@ if __name__ == "__main__":
 
 
     final_path = []
-    sim_context = SawyerBiasedTSRSimContext(None, setup=False)
-    sim_context.setup(sim_overrides={"run_parallel": False})
-    sim = sim_context.get_sim_instance()
-    logger = sim_context.get_logger()
-    sawyer_robot = sim_context.get_robot()
-    svc = sim_context.get_state_validity()
-    interp_fn = partial(parametric_lerp, steps=5)
+    
     # sim_obj = SimObject('test', 'r2d2.urdf', (.6, 0.0, .6), fixed_base=1)
 
 
-    initial_start_point = planning_G.nodes[list(planning_G.nodes)[0]]['point']
-    print(initial_start_point)
+    
     for edge in planning_G.edges():
+        config = edge['config']
+        sim_context = SawyerBiasedTSRSimContext(config, setup=False)
+        sim_context.setup(sim_overrides={"run_parallel": False})
+        sim = sim_context.get_sim_instance()
+        logger = sim_context.get_logger()
+        sawyer_robot = sim_context.get_robot()
+        svc = sim_context.get_state_validity()
+        tsr = sim_context.get_tsr()
+        interp_fn = partial(parametric_lerp, steps=5)
+        
+        # TODO: Given prior foliations and current foliation, lets generate a steering point using the projection/rejection step.
         start_point = planning_G.nodes[edge[0]]['point']
-        end_point = planning_G.nodes[edge[1]]['point']
+        
         state_space = planning_G.get_edge_data(*edge)['planning_space']
+        n_samples = 5
+        valid_samples = []
+        with DisabledCollisionsContext(sim, [], []):
+            while len(valid_samples) < n_samples:
+                sample = state_space.sample()
+                if sample is not None and svc.validate(sample):
+                    q_constrained = project_config(sawyer_robot, tsr, np.array(
+                    sample), np.array(sample), epsilon=.1, e_step=.25)
+                    normalized_q_constrained = []
+                    print(model.predict(np.array([q_constrained]))[0])
+                    print(model.predict(np.array([q_constrained]))[0] == 1)
+                    if q_constrained is not None and model.predict(np.array([q_constrained]))[0] == 1:
+                        for value in q_constrained:
+                            normalized_q_constrained.append(
+                                wrap_to_interval(value))
+                    else:
+                        continue
+                    if svc.validate(normalized_q_constrained):
+                        valid_samples.append(normalized_q_constrained
+        end_point = planning_G.nodes[edge[1]]['point']
 
         ####################################
         # SIMULATION AND PLANNING CONTEXTS #
