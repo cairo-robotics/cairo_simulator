@@ -32,24 +32,24 @@ if __name__ == "__main__":
     ######################################
     #       PLANNING CONFIGURATION       #
     ######################################
-    config = {}
-    config["sim"] = {
+    base_config = {}
+    base_config["sim"] = {
             "use_real_time": False
         }
 
-    config["logging"] = {
+    base_config["logging"] = {
             "handlers": ['logging'],
             "level": "debug"
         }
 
-    config["sawyer"] = {
+    base_config["sawyer"] = {
             "robot_name": "sawyer0",
             'urdf_file': ASSETS_PATH + 'sawyer_description/urdf/sawyer_static_mug_combined.urdf',
             "position": [0, 0, 0.9],
             "fixed_base": True
         }
 
-    config["sim_objects"] = [
+    base_config["sim_objects"] = [
         {
             "object_name": "Ground",
             "model_file_or_sim_id": "plane.urdf",
@@ -62,7 +62,7 @@ if __name__ == "__main__":
             "orientation":  [0, 0, 1.5708]
         },
     ]
-    config["primitives"] = [
+    base_config["primitives"] = [
         {
             "type": "cylinder",
             "primitive_configs": {"radius": .1, "height": .05},
@@ -75,7 +75,6 @@ if __name__ == "__main__":
                 }
         }
         ]
-
 
     #############################################
     #       Important Limits for Samplers       #
@@ -126,35 +125,72 @@ if __name__ == "__main__":
     ##############################
 
     # Let's first define all TSR configurations for this task:
-
-    TSR1_config = {
+    # Orientation only (1)
+    TSR_1_config = {
         'degrees': False,
-        "T0_w": [.7, 0, 0, 0, 0, 0],
-        "Tw_e": [-.2, 0, .739, np.pi/2, 0,  np.pi/2],
+        "T0_w": [0, 0, 0, 0, 0, 0],
+        "Tw_e": [.7968, -.5726, .15, np.pi/2, 0,  np.pi/2],
         "Bw": [[(-100, 100), (-100, 100), (-100, 100)],  
                 [(-.05, .05), (-.05, .05), (-.05, .05)]]
     }
-    # Orientation AND centering constraint
-    TSR2_config = {
+    # centering only (2)
+    TSR_2_config = {
         'degrees': False,
-        "T0_w": [.7, 0, 0, 0, 0, 0],
+        "T0_w": [0, 0, 0, 0, 0, 0],
+        "Tw_e": [.7968, -.5726, .15, np.pi/2, 0,  np.pi/2],
+        "Bw": [[(-.1, .1), (-.1, .1), (-100, 100)],  
+                [(-6.3, 6.3), (-6.3, 6.3), (-6.3, 6.3)]]
+    }
+    # height only (3)
+    TSR_3_config = {
+        'degrees': False,
+        "T0_w": [0, 0, 0, 0, 0, 0],
+        "Tw_e": [.7968, -.5726, .15, np.pi/2, 0,  np.pi/2],
+        "Bw": [[(-100, 100), (-100, 100), (0, 100)],  
+                [(-6.3, 6.3), (-6.3, 6.3), (-6.3, 6.3)]]
+    }
+    # Orientation AND centering constraint (1, 2)
+    TSR_12_config = {
+        'degrees': False,
+        "T0_w": [0, 0, 0, 0, 0, 0],
         "Tw_e": [.7968, -.5726, .739, np.pi/2, 0,  np.pi/2],
         "Bw": [[(-.1, .1), (-.1, .1), (-100, 100)],  
                 [(-.05, .05), (-.05, .05), (-.05, .05)]]
     }
-    TSR3_config = {
+    # orientation AND height constraint (1, 3)
+    TSR_13_config = {
         'degrees': False,
-        "T0_w": [.7, 0, 0, 0, 0, 0],
-        "Tw_e": [.7968, -.5726, .739, 3.09499115, 0.01804426, 1.59540829],
-        "Bw": [[(-.1, .1), (-.1, .1), (-100, 100)],  
+        "T0_w": [0, 0, 0, 0, 0, 0],
+        "Tw_e": [.7968, -.5726, .15, np.pi/2, 0,  np.pi/2],
+        "Bw": [[(-100, 100), (-100, 100), (0, 100)],  
+                [(-.05, .05), (-.05, .05), (-.05, .05)]]
+    }
+    # height AND centering constraint (2, 3)
+    TSR_23_config = {
+        'degrees': False,
+        "T0_w": [0, 0, 0, 0, 0, 0],
+        "Tw_e": [.7968, -.5726, .15, np.pi/2, 0,  np.pi/2],
+        "Bw": [[(-.1, .1), (-.1, .1), (0, 100)],  
                 [(-6.3, 6.3), (-6.3, 6.3), (-6.3, 6.3)]]
+    }
+    # orientation, centering, and height AND height constraint (1, 2, 3)
+    TSR_123_config = {
+        'degrees': False,
+        "T0_w": [0, 0, 0, 0, 0, 0],
+        "Tw_e": [.7968, -.5726, .15, np.pi/2, 0,  np.pi/2],
+        "Bw": [[(-.1, .1), (-.1, .1), (0, 100)],  
+                [(-.05, .05), (-.05, .05), (-.05, .05)]]
     }
 
 
     c2tsr_map = {}
-    c2tsr_map[(1)] = TSR1_config
-    c2tsr_map[(1, 2)] = TSR2_config
-    c2tsr_map[(2)] = TSR3_config
+    c2tsr_map[(1)] = TSR_1_config
+    c2tsr_map[(2)] = TSR_2_config
+    c2tsr_map[(3)] = TSR_3_config
+    c2tsr_map[(1, 2)] = TSR_12_config
+    c2tsr_map[(1, 3)] = TSR_13_config
+    c2tsr_map[(2, 3)] = TSR_23_config
+    c2tsr_map[(1, 2, 3)] = TSR_123_config
 
     #############################################
     #         Import Serialized LfD Graph       #
@@ -175,11 +211,11 @@ if __name__ == "__main__":
     # a steering point in the Omega set of the  #
     # solution path.                            #
     #############################################
-    
+    start_configuration = [0.4523310546875, 0.8259462890625, -1.3458369140625, 0.3512138671875, 1.7002646484375, -0.7999306640625, -1.324783203125]
     planning_G = nx.Graph()
 
-    start_id = next(iter(keyframes.keys()))
-    end_id = next(reversed(keyframes.keys()))
+    start_keyframe_id = next(iter(keyframes.keys()))
+    end_keyframe_id = next(reversed(keyframes.keys()))
 
     end_data = [obsv['robot']['joint_angle'] for obsv in keyframes[next(reversed(keyframes.keys()))]["observations"]]
     start_keyframe_dist = KernelDensityDistribution()
@@ -187,23 +223,26 @@ if __name__ == "__main__":
 
     # Create a distribution for each intermeditate trajectory set.
     # Build into distribution samplers.
-    for keyframe_id, keyframe_data in reversed(keyframes.items()):
-        if keyframe_data["keyframe_type"] == "constraint_transition" or keyframe_id == end_id:
+    upcoming_id = None
+    upcoming_foliation_value = None
+    reversed_keyframes = list(reversed(keyframes.items()))
+    for idx, item in enumerate(reversed_keyframes):
+        keyframe_id = item[0]
+        keyframe_data = item[1]
+        # We only use constraint transition, start, and end keyframes.
+        if keyframe_data["keyframe_type"] == "constraint_transition" or keyframe_id == start_keyframe_id or keyframe_id == end_keyframe_id:
 
-            # TODO: The keyframe_id and prior_id and choice of inter_traj assignment might need adjustment if we backtrack.
-
-            # Copy the main planning config. This will be updated with specfic configurations for this planning segment (tsrs, biasing etc,.)
-            planning_config = copy.deepcopy(config)
+            # Copy the base planning config. This will be updated with specfic configurations for this planning segment (tsrs, biasing etc,.)
+            planning_config = copy.deepcopy(base_config)
 
             # Create keyframe distrubtion
             data = [obsv['robot']['joint_angle'] for obsv in keyframe_data["observations"]]
             keyframe_dist = KernelDensityDistribution()
             keyframe_dist.fit(data)
+            keyframe_space = DistributionSpace(sampler=DistributionSampler(keyframe_dist), limits=limits)
 
-            # Let's create the node and add teh keyframe KDE model.
-            planning_G.add_nodes_from([(keyframe_id, {"model": keyframe_dist})])
-
-
+            # Let's create the node and add teh keyframe KDE model as a planning space to sample from....
+            planning_G.add_nodes_from([(keyframe_id, {"keyframe_space": keyframe_space})])
 
             # get the constraint IDs
             constraint_ids = keyframe_data["applied_constraints"]
@@ -214,16 +253,16 @@ if __name__ == "__main__":
             planning_G[keyframe_id]["foliation_model"] = foliation_model
 
             # Determine the foliation choice based on the keyframe data and assign in to the Pg node
-            # TODO: Confirm that this value is the same as the upcoming foliation cluster/classification ID.
-            # TODO: If not the same, give a warning that the IPD-Relax cannot be gauranteed but proceed anyways?
             foliation_value = winner_takes_all(data, foliation_model)
+
+            if foliation_value != upcoming_foliation_value:
+                print("Foliation values are not equivalent, cannot gaurantee planning feasibility but will proceed.")
             planning_G[keyframe_id]["foliation_value"] = foliation_value
 
             # Get the TSR configurations so they can be appended to the  associated with constraint ID combo.
             planning_config['tsr'] = c2tsr_map.get(tuple(constraint_ids), {})
 
-
-            # Create intermediate trajectory distribution.
+            # Create intermediate trajectory ditribution configuration.
             inter_trajs = intermediate_trajectories[keyframe_id]
             inter_trajs_data = [[obsv['robot']['joint_angle'] for obsv in traj] for traj in inter_trajs]
             
@@ -235,24 +274,18 @@ if __name__ == "__main__":
             planning_config['sampling_bias'] = sampling_bias
 
             # Finally add the planning config to the planning graph edge. 
-            planning_G[keyframe_id][prior_id]['config'] = planning_config
+            planning_G[keyframe_id][upcoming_id]['config'] = planning_config
 
+            upcoming_id = keyframe_id
+ 
 
-            prior_id = keyframe_id
-        if keyframe_id == start_id:
-            data = [obsv['robot']['joint_angle'] for obsv in keyframe_data["observations"]]
-            keyframe_dist = KernelDensityDistribution()
-            keyframe_dist.fit(data)
-            planning_G.add_nodes_from([(keyframe_id, {"model": keyframe_dist, "point": data[0]})])
-            prior_id = keyframe_id
-
-
+    # Let's insert the starting point:
+    planning_G.add_nodes_from([("start", {"point": start_configuration})])
+    planning_G.add_edge("start", start_keyframe_id)
+    
     final_path = []
     
-    # sim_obj = SimObject('test', 'r2d2.urdf', (.6, 0.0, .6), fixed_base=1)
 
-
-    
     for edge in planning_G.edges():
         config = edge['config']
         sim_context = SawyerBiasedTSRSimContext(config, setup=False)
@@ -261,47 +294,74 @@ if __name__ == "__main__":
         logger = sim_context.get_logger()
         sawyer_robot = sim_context.get_robot()
         svc = sim_context.get_state_validity()
-        tsr = sim_context.get_tsr()
         interp_fn = partial(parametric_lerp, steps=5)
         
-        # TODO: Given prior foliations and current foliation, lets generate a steering point using the projection/rejection step.
-        start_point = planning_G.nodes[edge[0]]['point']
-        
-        state_space = planning_G.get_edge_data(*edge)['planning_space']
-        n_samples = 5
-        valid_samples = []
-        with DisabledCollisionsContext(sim, [], []):
-            while len(valid_samples) < n_samples:
-                sample = state_space.sample()
-                if sample is not None and svc.validate(sample):
-                    q_constrained = project_config(sawyer_robot, tsr, np.array(
-                    sample), np.array(sample), epsilon=.1, e_step=.25)
-                    normalized_q_constrained = []
-                    print(model.predict(np.array([q_constrained]))[0])
-                    print(model.predict(np.array([q_constrained]))[0] == 1)
-                    if q_constrained is not None and model.predict(np.array([q_constrained]))[0] == 1:
-                        for value in q_constrained:
-                            normalized_q_constrained.append(
-                                wrap_to_interval(value))
-                    else:
-                        continue
-                    if svc.validate(normalized_q_constrained):
-                        valid_samples.append(normalized_q_constrained
-        end_point = planning_G.nodes[edge[1]]['point']
 
-        ####################################
-        # SIMULATION AND PLANNING CONTEXTS #
-        ####################################
+        # generate a starting point, and a steering point, according to constraints (if applicable). 
+        # check if points generated already:
+        if planning_G[edge[0]]['point'] is None:
+            state_space = planning_G[edge[0]]['keyframe_space']
+            tsr = planning_G[edge[0]]["tsr"]
+            foliation_model = planning_G[edge[0]]["foliation_model"]
+            foliation_value = planning_G[edge[0]]["foliation_value"]
+
+            with DisabledCollisionsContext(sim, [], []):
+                found = False
+                while not found:
+                    sample = state_space.sample()
+                    if sample is not None and svc.validate(sample):
+                        q_constrained = project_config(sawyer_robot, tsr, np.array(
+                        sample), np.array(sample), epsilon=.1, e_step=.25)
+                        normalized_q_constrained = []
+                        if q_constrained is not None and foliation_model.predict(np.array([q_constrained]))[0] == foliation_value:
+                            for value in q_constrained:
+                                normalized_q_constrained.append(
+                                    wrap_to_interval(value))
+                        else:
+                            continue
+                        if svc.validate(normalized_q_constrained):
+                            start = normalized_q_constrained
+                            found = True
+        else:
+            start = planning_G[edge[0]]['point']
+
+        if planning_G[edge[1]]['point'] is None:
+            state_space = planning_G[edge[1]]['keyframe_space']
+            tsr = planning_G[edge[1]]["tsr"]
+            foliation_model = planning_G[edge[1]]["foliation_model"]
+            foliation_value = planning_G[edge[1]]["foliation_value"]
+
+            with DisabledCollisionsContext(sim, [], []):
+                found = False
+                while not found:
+                    sample = state_space.sample()
+                    if sample is not None and svc.validate(sample):
+                        q_constrained = project_config(sawyer_robot, tsr, np.array(
+                        sample), np.array(sample), epsilon=.1, e_step=.25)
+                        normalized_q_constrained = []
+                        if q_constrained is not None and foliation_model.predict(np.array([q_constrained]))[0] == foliation_value:
+                            for value in q_constrained:
+                                normalized_q_constrained.append(
+                                    wrap_to_interval(value))
+                        else:
+                            continue
+                        if svc.validate(normalized_q_constrained):
+                            start = normalized_q_constrained
+                            found = True
+        else:
+            end = planning_G[edge[1]]['point']
+            
+
         with DisabledCollisionsContext(sim, [], [], disable_visualization=True):
-            #######
-            # LazyPRM #
-            #######
+            ###########
+            # CBiRRT2 #
+            ###########
             # Use parametric linear interpolation with 10 steps between points.
             interp = partial(parametric_lerp, steps=10)
-            # See params for PRM specific parameters
+            # See params for PRM specific parameters 
             cbirrt = CBiRRT2(sawyer_robot, state_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 10, 'q_step': .1, 'e_step': .25, 'iters': 20000})
             logger.info("Planning....")
-            plan = cbirrt.plan(tsr, np.array(start), np.array(goal))
+            plan = cbirrt.plan(tsr, np.array(start), np.array(end))
             path = cbirrt.get_path(plan)
         if len(path) == 0:
             logger.info("Planning failed....")
@@ -313,22 +373,19 @@ if __name__ == "__main__":
         logger.info("Length of path: {}".format(len(path)))
         final_path = final_path + path
 
-    sawyer_robot.move_to_joint_pos(initial_start_point)
-    time.sleep(3)
-    while sawyer_robot.check_if_at_position(initial_start_point, 0.5) is False:
-        time.sleep(0.1)
-        sim.step()
+               
 
     key = input("Press any key to excute plan.")
 
-    if len(path) > 0:
+    if len(final_path) > 0:
         # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
         jtc = JointTrajectoryCurve()
         traj = jtc.generate_trajectory(final_path, move_time=10)
-        sawyer_robot.execute_trajectory(traj)
         try:
-            while True:
-                sim.step()
+            for i, point in enumerate(traj):
+                sawyer_robot.set_joint_state(point[1])
+                time.sleep(point[0] - prior_time)
+                prior_time = point[0]
         except KeyboardInterrupt:
             sys.exit(0)
     else:
