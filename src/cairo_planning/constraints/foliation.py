@@ -20,5 +20,5 @@ class VGMMFoliationClustering():
 def winner_takes_all(X, foliation_model):
     results = []
     for x in X:
-        results.append(foliation_model.predict(x))
+        results.append(foliation_model.predict([x])[0])
     return max(set(results), key = results.count)
