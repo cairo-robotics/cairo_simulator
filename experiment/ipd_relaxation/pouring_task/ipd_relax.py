@@ -30,9 +30,12 @@ from cairo_planning.sampling.samplers import DistributionSampler
 
 
 if __name__ == "__main__":
-    ######################################
-    #       PLANNING CONFIGURATION       #
-    ######################################
+    ###########################################
+    #       BASE PLANNING CONFIGURATION       #
+    ###########################################
+    # Provides consistent baseline configs    #
+    # for planning contexts.                  #
+    ###########################################
     base_config = {}
     base_config["sim"] = {
             "use_real_time": False
@@ -76,6 +79,8 @@ if __name__ == "__main__":
                 }
         }
     ]
+    
+    # For the mug-based URDF of sawyer, we need to exclude links that are in constant self collision for the SVC
     base_config["state_validity"] = {
         "self_collision_exclusions": [("mug", "right_gripper_l_finger"), ("mug", "right_gripper_r_finger")]
     }
@@ -109,14 +114,16 @@ if __name__ == "__main__":
             for entry in data:
                 configurations.append(entry['robot']['joint_angle'])
     
-    orientation_foliation_model = VGMMFoliationClustering(estimated_foliations=5)
+    # We create a Variational GMM for learning foliations. 
+    orientation_foliation_model = VGMMFoliationClustering(estimated_foliations=10)
     orientation_foliation_model.fit(np.array(configurations ))
 
 
     ####################################
     # CONSTRAINT TO FOLIATION MAPPING  #
     ####################################
-
+    # Esssentially the only foliations of concern are the orientation, which can dictate whether or not 
+    # the skill remains centered. 
     c2f_map = {}
     c2f_map[(1)] = orientation_foliation_model
     c2f_map[(1, 2)] = orientation_foliation_model
@@ -220,17 +227,22 @@ if __name__ == "__main__":
     # a steering point in the Omega set of the  #
     # solution path.                            #
     #############################################
+    
+    # The start configuration. For this pouring task, we let the keyframe model / sampling dicate the ending point (but this is not strictly required)
     start_configuration = [0.4523310546875, 0.8259462890625, -1.3458369140625, 0.3512138671875, 1.7002646484375, -0.7999306640625, -1.324783203125]
     planning_G = nx.Graph()
 
-    start_keyframe_id = next(iter(keyframes.keys()))
-    end_keyframe_id = next(reversed(keyframes.keys()))
+    # Starting and ending keyframe ids
+    start_keyframe_id = list(keyframes.keys())[0]
+    end_keyframe_id = list(keyframes.keys())[-1]
 
     # let's insert the last keyframe into the graph
-    end_data = [obsv['robot']['joint_angle'] for obsv in keyframes[next(reversed(keyframes.keys()))]["observations"]]
+    # We will build a keyframe dsitribution using KDE from which to sample for steering points / viapoints. 
+    end_data = [obsv['robot']['joint_angle'] for obsv in keyframes[end_keyframe_id]["observations"]]
     keyframe_dist = KernelDensityDistribution()
     keyframe_dist.fit(end_data)
     keyframe_space = DistributionSpace(sampler=DistributionSampler(keyframe_dist), limits=limits)
+    # we cast the keyframe ids to int for networkx node dereferencing as keyframe ids are output as strings from CAIRO LfD 
     planning_G.add_nodes_from([int(end_keyframe_id)], keyframe_space=keyframe_space)
 
     # get the constraint IDs
@@ -239,10 +251,13 @@ if __name__ == "__main__":
 
     # get the foliation model
     foliation_model = c2f_map.get(tuple(sorted(constraint_ids)), None)
+    
+    # there's a possibility that the ending keyframe is not constrained and thus might not provide a foliation model to use
     if foliation_model is not None:
         planning_G.nodes[int(end_keyframe_id)]["foliation_model"] = foliation_model
 
-        # Determine the foliation choice based on the keyframe data and assign in to the Pg node
+        # Determine the foliation choice based on the keyframe data and assign in to the planning graph node
+        # Winner takes all essentially chooses the most common foliation value base on classifying each data point
         foliation_value = winner_takes_all(data, foliation_model)
         upcoming_foliation_value = foliation_value
     
@@ -250,30 +265,37 @@ if __name__ == "__main__":
     else:
         upcoming_foliation_value = None
 
+    # the end id will be the first upcoming ID
     upcoming_id = int(end_keyframe_id)
-
+        
+        
     reversed_keyframes = list(reversed(keyframes.items()))[1:]
-    # use to keep track of sequence of constraint transition keyframe ids
+    # use to keep track of sequence of constraint transition, start, and end keyframe ids as
+    # not all keyframes in the lfd model will be used
     keyframe_planning_order = []
     keyframe_planning_order.insert(0, int(end_keyframe_id))
+    
+    # iteration over the list of keyframes in reverse order ecluding the last keyframe ID which has been handled above
     for idx, item in enumerate(reversed_keyframes):
         keyframe_id = int(item[0])
         keyframe_data = item[1]
-        # We only use constraint transition, start, and end keyframes.
+        # We only use constraint transition, start, and end keyframes (which has already been accounted for above).
         if keyframe_data["keyframe_type"] == "constraint_transition" or keyframe_id == int(start_keyframe_id):
+            
+            # We keep track of the sequence of keyframe ids in order to established a static ordering of keyframe pairs to plan between
             keyframe_planning_order.insert(0, keyframe_id)
 
             # Copy the base planning config. This will be updated with specfic configurations for this planning segment (tsrs, biasing etc,.)
             planning_config = copy.deepcopy(base_config)
 
-            # Create keyframe distrubtion
+            # Create KDE distrubtion for the current keyframe.
             data = [obsv['robot']['joint_angle'] for obsv in keyframe_data["observations"]]
             keyframe_dist = KernelDensityDistribution()
             keyframe_dist.fit(data)
             keyframe_space = DistributionSpace(sampler=DistributionSampler(keyframe_dist), limits=limits)
 
-            # Let's create the node and add teh keyframe KDE model as a planning space to sample from....
-            planning_G.add_nodes_from([int(keyframe_id)], keyframe_space=keyframe_space)
+            # Let's create the node and add teh keyframe KDE model as a planning space.
+            planning_G.add_nodes_from([keyframe_id], keyframe_space=keyframe_space)
 
             # get the constraint IDs
             constraint_ids = keyframe_data["applied_constraints"]
@@ -281,15 +303,22 @@ if __name__ == "__main__":
             # get the foliation model
             foliation_model = c2f_map.get(tuple(sorted(constraint_ids)), None)
             if foliation_model is not None:
+                # Assign the foliation model to the planning graph node for the current keyframe.
                 planning_G.nodes[keyframe_id]["foliation_model"] = foliation_model
-
                 # Determine the foliation choice based on the keyframe data and assign in to the Pg node
                 foliation_value = winner_takes_all(data, foliation_model)
                 print(foliation_value)
+                # We want the current foliation value / component to be equivalent to the upcoming foliation value
+                # TODO: Integrate equivalency set information so that based on trajectories, we have some confidence if to 
+                # foliation values are actually from the same foliation value. 
                 if foliation_value != upcoming_foliation_value and upcoming_foliation_value is not None:
                     print("Foliation values are not equivalent, cannot gaurantee planning feasibility but will proceed.")
                 planning_G.nodes[keyframe_id]["foliation_value"] = foliation_value
                 upcoming_foliation_value = foliation_value
+            # If the current keyframe doesn't have a constraint with an associated model then we dont care to hold 
+            # onto the upcoming foliation value any longer
+            else:
+                upcoming_foliation_value = None
 
             # Get the TSR configurations so they can be appended to the  associated with constraint ID combo.
             planning_config['tsr'] = c2tsr_map.get(tuple(sorted(constraint_ids)), {})
@@ -301,6 +330,7 @@ if __name__ == "__main__":
                 for traj in inter_trajs:
                     inter_trajs_data = inter_trajs_data + [obsv['robot']['joint_angle'] for obsv in traj]
                 
+                # this information will be used to create a biasing distribution for sampling during planning between steering points.
                 sampling_bias = {
                     'bandwidth': .1,
                     'fraction_uniform': .25,
@@ -312,22 +342,30 @@ if __name__ == "__main__":
             # Finally add the planning config to the planning graph edge. 
             planning_G.edges[keyframe_id, upcoming_id]['config'] = planning_config
 
+            # update the upcoming keyframe id with the current id
             upcoming_id = keyframe_id
  
 
     # Let's insert the starting point:
+    # We populat ethe "point" attribute of the planning graph node which will indicate that we do not need to sample from this node
+    # We also use a basic keyframe space -> TODO: is this necessary?
     planning_G.add_nodes_from([(0, {"point": start_configuration, "keyframe_space": SawyerConfigurationSpace(limits=limits)})])
-    # let's connect the starting point
+    # let's connect the starting point to the node associated with the starting keyframe
     planning_G.add_edge(0, int(start_keyframe_id))
     keyframe_planning_order.insert(0, 0)
+    
+    # A list to append path segments in order to create one continuous path
     final_path = []
     
-    
+    # Here we use the keyframe planning order, creating a sequential pairing of keyframe ids.
     for edge in list(zip(keyframe_planning_order, keyframe_planning_order[1:])):
         e1 = edge[0]
         e2 = edge[1]
         edge_data = planning_G.edges[e1, e2]
+        # lets ge the planning config from the edge or use the generic base config defined above
         config = edge_data.get('config', base_config)
+        
+        # We create a Sim context from the config for planning. 
         sim_context = SawyerBiasedTSRSimContext(config, setup=False)
         sim_context.setup(sim_overrides={"use_gui": False, "run_parallel": False})
         sim = sim_context.get_sim_instance()
@@ -342,17 +380,17 @@ if __name__ == "__main__":
         # print(get_joint_info(sim_id, 24))
         # print(get_joint_info(sim_id, 27))
         
-        # generate a starting point, and a steering point, according to constraints (if applicable). 
-        # check if points generated already:
+        # Create the TSR object
         tsr_config =  planning_G.nodes[e1].get("tsr", unconstrained_TSR)
         T0_w = xyzrpy2trans(tsr_config['T0_w'], degrees=tsr_config['degrees'])
         Tw_e = xyzrpy2trans(tsr_config['Tw_e'], degrees=tsr_config['degrees'])
         Bw = bounds_matrix(tsr_config['Bw'][0], tsr_config['Bw'][1])
-        tsr = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw, bodyandlink=0, manipindex=16)
-
-        # we plan with the starting tsr, starting planning space.
-        planning_tsr = tsr
+        # we plan with the current edges first/starting node's tsr and planning space.
+        planning_tsr = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw, bodyandlink=0, manipindex=16)
         planning_state_space = planning_G.nodes[e1]['keyframe_space']
+        
+        # generate a starting point, and a steering point, according to constraints (if applicable). 
+        # check if the starting point has generated already:
         if  planning_G.nodes[e1].get('point', None) is None:
             foliation_model =  planning_G.nodes[e1].get("foliation_model", None)
             foliation_value =  planning_G.nodes[e1].get("foliation_value", None)
@@ -362,35 +400,42 @@ if __name__ == "__main__":
                 while not found:
                     sample = planning_state_space.sample()
                     if sample is not None and svc.validate(sample):
-                        q_constrained = project_config(sawyer_robot, tsr, np.array(
+                        q_constrained = project_config(sawyer_robot, planning_tsr, np.array(
                         sample), np.array(sample), epsilon=.1, e_step=.25)
                         normalized_q_constrained = []
-                        # If there is a foliation model, then we must perform rejection sampling until the projected sample is classified to the foliation value
-                        if foliation_model is not None:
-                            if q_constrained is not None and foliation_model.predict(np.array([q_constrained]))[0] == foliation_value:
+                        # If there is a foliation model, then we must perform rejection sampling until the projected sample is classified 
+                        # to the node's foliation value
+                        if q_constrained is not None:
+                            if foliation_model is not None:
+                                # This is the rejection sampling step to enforce the foliation choice
+                                if foliation_model.predict(np.array([q_constrained]))[0] == foliation_value:
+                                    for value in q_constrained:
+                                        normalized_q_constrained.append(
+                                            wrap_to_interval(value))
+                                else:
+                                    continue
+                            else:
                                 for value in q_constrained:
-                                    normalized_q_constrained.append(
-                                        wrap_to_interval(value))
-                        elif q_constrained is not None:
-                            for value in q_constrained:
-                                    normalized_q_constrained.append(
-                                        wrap_to_interval(value))
+                                        normalized_q_constrained.append(
+                                            wrap_to_interval(value))
                         else:
                             continue
                         if svc.validate(normalized_q_constrained):
                             start = normalized_q_constrained
+                            # We've generated a point so lets use it moving forward for all other planning segments. 
                             planning_G.nodes[e1]['point'] = start
                             found = True
+        # if the point steering/start point is available already, then we simply use it 
         else:
             start = planning_G.nodes[e1]['point']
 
         if  planning_G.nodes[e2].get('point', None) is None:
             state_space =  planning_G.nodes[e2]['keyframe_space']
             tsr_config =  planning_G.nodes[e2].get("tsr", unconstrained_TSR)
-            T0_w = xyzrpy2trans(tsr_config['T0_w'], degrees=tsr_config['degrees'])
-            Tw_e = xyzrpy2trans(tsr_config['Tw_e'], degrees=tsr_config['degrees'])
-            Bw = bounds_matrix(tsr_config['Bw'][0], tsr_config['Bw'][1])
-            tsr = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw, bodyandlink=0, manipindex=16)
+            T0_w2 = xyzrpy2trans(tsr_config['T0_w'], degrees=tsr_config['degrees'])
+            Tw_e2 = xyzrpy2trans(tsr_config['Tw_e'], degrees=tsr_config['degrees'])
+            Bw2 = bounds_matrix(tsr_config['Bw'][0], tsr_config['Bw'][1])
+            tsr = TSR(T0_w=T0_w2, Tw_e=Tw_e2, Bw=Bw2, bodyandlink=0, manipindex=16)
             foliation_model =  planning_G.nodes[e2].get("foliation_model", None)
             foliation_value =  planning_G.nodes[e2].get("foliation_value", None)
 
@@ -402,23 +447,28 @@ if __name__ == "__main__":
                         q_constrained = project_config(sawyer_robot, tsr, np.array(
                         sample), np.array(sample), epsilon=.1, e_step=.25)
                         normalized_q_constrained = []
-                        if foliation_model is not None:
-                            if q_constrained is not None and foliation_model.predict(np.array([q_constrained]))[0] == foliation_value:
+                        if q_constrained is not None:
+                            if foliation_model is not None:
+                                # This is the rejection sampling step to enforce the foliation choice
+                                if foliation_model.predict(np.array([q_constrained]))[0] == foliation_value:
+                                    for value in q_constrained:
+                                        normalized_q_constrained.append(
+                                            wrap_to_interval(value))
+                                else:
+                                    continue
+                            else:
                                 for value in q_constrained:
-                                    normalized_q_constrained.append(
-                                        wrap_to_interval(value))
-                        elif q_constrained is not None:
-                            for value in q_constrained:
-                                    normalized_q_constrained.append(
-                                        wrap_to_interval(value))
+                                        normalized_q_constrained.append(
+                                            wrap_to_interval(value))
                         else:
                             continue
                         if svc.validate(normalized_q_constrained):
                             end = normalized_q_constrained
+                            # We've generated a point so lets use it moving forward for all other planning segments. 
                             planning_G.nodes[e2]['point'] = end
                             found = True
         else:
-            end =  planning_G.nodes[e2]['point']
+            end = planning_G.nodes[e2]['point']
             
 
         with DisabledCollisionsContext(sim, [], [], disable_visualization=True):
@@ -427,8 +477,8 @@ if __name__ == "__main__":
             ###########
             # Use parametric linear interpolation with 10 steps between points.
             interp = partial(parametric_lerp, steps=10)
-            # See params for PRM specific parameters 
-            cbirrt = CBiRRT2(sawyer_robot, planning_state_space, svc, interp, params={'smooth_path': False, 'smoothing_time': 10, 'q_step': .1, 'e_step': .25, 'iters': 20000})
+            # See params for CBiRRT2 specific parameters 
+            cbirrt = CBiRRT2(sawyer_robot, planning_state_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 3, 'q_step': .1, 'e_step': .25, 'iters': 20000})
             logger.info("Planning....")
             plan = cbirrt.plan(planning_tsr, np.array(start), np.array(end))
             path = cbirrt.get_path(plan)
@@ -437,8 +487,7 @@ if __name__ == "__main__":
             sys.exit(1)
         logger.info("Plan found....")
 
-        # splinging uses numpy so needs to be converted
-        path = [np.array(p) for p in path]
+        # splining uses numpy so needs to be converted
         print(path[0], path[-1])
         logger.info("Length of path: {}".format(len(path)))
         final_path = final_path + path
@@ -459,10 +508,7 @@ if __name__ == "__main__":
     planning_path = [np.array(p) for p in final_path]
     # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
     jtc = JointTrajectoryCurve()
-    traj = jtc.generate_trajectory(planning_path, move_time=5)
-    for i, point in enumerate(traj):
-        if not svc.validate(point[1]):
-            print("Invalid point: {}".format(point[1]))
+    traj = jtc.generate_trajectory(planning_path, move_time=20)
     try:
         prior_time = 0
         for i, point in enumerate(traj):
