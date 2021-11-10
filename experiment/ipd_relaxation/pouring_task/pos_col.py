@@ -7,7 +7,7 @@ if os.environ.get('ROS_DISTRO'):
     import rospy
 import numpy as np
 
-from cairo_simulator.core.sim_context import SawyerTSRSimContext
+from cairo_simulator.core.sim_context import SawyerBiasedSimContext
 from cairo_simulator.core.utils import ASSETS_PATH
 from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.geometric.transformation import quat2rpy
@@ -61,13 +61,17 @@ def main():
                     "fixed_base": 1    
                 }
         }
-        ]
-            
+    ]
+    # For the mug-based URDF of sawyer, we need to exclude links that are in constant self collision for the SVC
+    config["state_validity"] = {
+        "self_collision_exclusions": [("mug", "right_gripper_l_finger"), ("mug", "right_gripper_r_finger")]
+    }
+
 
     start = [-1.3873709693792482, 0.6889105515036634, -1.3040140417968091, -0.6337524498504346, -0.412876815322056, -0.6817950614592864, -3.3164909766471973]
     
 
-    sim_context = SawyerTSRSimContext(configuration=config)
+    sim_context = SawyerBiasedSimContext(configuration=config)
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
     # _ = sim_context.get_state_space()

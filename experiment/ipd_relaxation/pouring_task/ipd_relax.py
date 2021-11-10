@@ -13,7 +13,7 @@ import numpy as np
 import networkx as nx
 
 from cairo_simulator.core.utils import ASSETS_PATH
-from cairo_simulator.core.sim_context import SawyerBiasedTSRSimContext
+from cairo_simulator.core.sim_context import SawyerBiasedSimContext
 
 from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.constraints.foliation import VGMMFoliationClustering, winner_takes_all
@@ -126,7 +126,7 @@ if __name__ == "__main__":
     # Esssentially the only foliations of concern are the orientation, which can dictate whether or not 
     # the skill remains centered. 
     c2f_map = {}
-    c2f_map[(1)] = orientation_foliation_model
+    c2f_map[(1,)] = orientation_foliation_model
     c2f_map[(1, 2)] = orientation_foliation_model
     c2f_map[(1, 3)] = orientation_foliation_model
     c2f_map[(1, 2, 3)] = orientation_foliation_model
@@ -201,9 +201,9 @@ if __name__ == "__main__":
     }
 
     c2tsr_map = {}
-    c2tsr_map[(1)] = TSR_1_config
-    c2tsr_map[(2)] = TSR_2_config
-    c2tsr_map[(3)] = TSR_3_config
+    c2tsr_map[(1,)] = TSR_1_config
+    c2tsr_map[(2,)] = TSR_2_config
+    c2tsr_map[(3,)] = TSR_3_config
     c2tsr_map[(1, 2)] = TSR_12_config
     c2tsr_map[(1, 3)] = TSR_13_config
     c2tsr_map[(2, 3)] = TSR_23_config
@@ -237,7 +237,10 @@ if __name__ == "__main__":
     start_keyframe_id = list(keyframes.keys())[0]
     end_keyframe_id = list(keyframes.keys())[-1]
 
-    # let's insert the last keyframe into the graph
+    ###############################################################################
+    # Insert last keyframe into planning graph before looping over keyframe model #
+    ###############################################################################
+    
     # We will build a keyframe dsitribution using KDE from which to sample for steering points / viapoints. 
     end_data = [obsv['robot']['joint_angle'] for obsv in keyframes[end_keyframe_id]["observations"]]
     keyframe_dist = KernelDensityDistribution()
@@ -248,10 +251,11 @@ if __name__ == "__main__":
 
     # get the constraint IDs
     constraint_ids = keyframes[end_keyframe_id]["applied_constraints"]
+    foliation_constraint_ids = list(set(keyframes[end_keyframe_id]["applied_constraints"] + keyframes[list(keyframes.keys())[-2]]["applied_constraints"]))
     planning_G.nodes[int(end_keyframe_id)]["constraint_ids"] = constraint_ids
-
+    
     # get the foliation model
-    foliation_model = c2f_map.get(tuple(sorted(constraint_ids)), None)
+    foliation_model = c2f_map.get(tuple(sorted(foliation_constraint_ids)), None)
     
     # there's a possibility that the ending keyframe is not constrained and thus might not provide a foliation model to use
     if foliation_model is not None:
@@ -266,10 +270,17 @@ if __name__ == "__main__":
     else:
         upcoming_foliation_value = None
 
+    # Get the TSR configurations so they can be appended to the  associated with constraint ID combo.
+    planning_G.nodes[int(end_keyframe_id)]['tsr'] = c2tsr_map.get(tuple(sorted(constraint_ids)), unconstrained_TSR)
+    
     # the end id will be the first upcoming ID
     upcoming_id = int(end_keyframe_id)
         
         
+    ############################################################################
+    # Reverse iteration over the keyframe model to populate our planning graph #
+    ############################################################################
+    
     reversed_keyframes = list(reversed(keyframes.items()))[1:]
     # use to keep track of sequence of constraint transition, start, and end keyframe ids as
     # not all keyframes in the lfd model will be used
@@ -300,15 +311,25 @@ if __name__ == "__main__":
 
             # get the constraint IDs
             constraint_ids = keyframe_data["applied_constraints"]
+            
+            # The foliation constraint ids combines both start and end keyframes of the planning segment. In other words, we need to 
+            # ensure the start point and ending steering point are in the same foliation, so we utilize the constraints from both keyframes.
+            foliation_constraint_ids = list(set(keyframe_data["applied_constraints"] + keyframes[str(upcoming_id)]["applied_constraints"]))
+
+        
             planning_G.nodes[keyframe_id]["constraint_ids"] = constraint_ids
+            
+            # Get the TSR configurations so they can be appended to both the keyframe and the edge between associated with constraint ID combo.
+            planning_G.nodes[keyframe_id]['tsr'] = c2tsr_map.get(tuple(sorted(constraint_ids)), unconstrained_TSR)
+            planning_config['tsr'] = c2tsr_map.get(tuple(sorted(constraint_ids)), unconstrained_TSR)
+            
             # get the foliation model
-            foliation_model = c2f_map.get(tuple(sorted(constraint_ids)), None)
+            foliation_model = c2f_map.get(tuple(sorted(foliation_constraint_ids)), None)
             if foliation_model is not None:
                 # Assign the foliation model to the planning graph node for the current keyframe.
                 planning_G.nodes[keyframe_id]["foliation_model"] = foliation_model
                 # Determine the foliation choice based on the keyframe data and assign in to the Pg node
                 foliation_value = winner_takes_all(data, foliation_model)
-                print(foliation_value)
                 # We want the current foliation value / component to be equivalent to the upcoming foliation value
                 # TODO: Integrate equivalency set information so that based on trajectories, we have some confidence if to 
                 # foliation values are actually from the same foliation value. 
@@ -321,9 +342,7 @@ if __name__ == "__main__":
             else:
                 upcoming_foliation_value = None
 
-            # Get the TSR configurations so they can be appended to the  associated with constraint ID combo.
-            planning_config['tsr'] = c2tsr_map.get(tuple(sorted(constraint_ids)), {})
-
+            
             if keyframe_id != int(start_keyframe_id):
                 # Create intermediate trajectory ditribution configuration.
                 inter_trajs = intermediate_trajectories[str(keyframe_id)]
@@ -348,15 +367,30 @@ if __name__ == "__main__":
  
 
     # Let's insert the starting point:
+    # Copy the base planning config. This will be updated with specfic configurations for this planning segment (tsrs, biasing etc,.)
+    planning_config = copy.deepcopy(base_config)
     # We populat ethe "point" attribute of the planning graph node which will indicate that we do not need to sample from this node
     # We also use a basic keyframe space -> TODO: is this necessary?
     planning_G.add_nodes_from([(0, {"point": start_configuration, "keyframe_space": SawyerConfigurationSpace(limits=limits)})])
+    planning_G.nodes[0]['tsr'] = TSR_1_config
     # let's connect the starting point to the node associated with the starting keyframe
     planning_G.add_edge(0, int(start_keyframe_id))
     keyframe_planning_order.insert(0, 0)
-    
+    planning_config['tsr'] = TSR_1_config
+    # Add the lanning config to the planning graph edge. 
+    planning_G.edges[0, int(start_keyframe_id)]['config'] = planning_config
     # A list to append path segments in order to create one continuous path
     final_path = []
+    
+    
+    ###################################################
+    #           SEQUENTIAL MANIFOLD PLANNING          #
+    ###################################################
+    # Now that we've defined our planning problem     #
+    # withing a planning graph, which defines our SMP #
+    # problem. We perform IPD relaxation and actual   #
+    # planning.                                       #
+    ###################################################
     
     # Here we use the keyframe planning order, creating a sequential pairing of keyframe ids.
     for edge in list(zip(keyframe_planning_order, keyframe_planning_order[1:])):
@@ -367,19 +401,15 @@ if __name__ == "__main__":
         config = edge_data.get('config', base_config)
         
         # We create a Sim context from the config for planning. 
-        sim_context = SawyerBiasedTSRSimContext(config, setup=False)
+        sim_context = SawyerBiasedSimContext(config, setup=False)
         sim_context.setup(sim_overrides={"use_gui": False, "run_parallel": False})
+        planning_state_space = sim_context.get_state_space() # The biased state space for sampling points according to intermediate trajectories.
         sim = sim_context.get_sim_instance()
         logger = sim_context.get_logger()
         sawyer_robot = sim_context.get_robot()
-        svc = sim_context.get_state_validity()
-        interp_fn = partial(parametric_lerp, steps=5)
-        
-        # from cairo_simulator.core.link import get_movable_links, get_fixed_links, get_joint_info
-        # sim_id = sim_context.get_robot().get_simulator_id()
-        # print(get_joint_info(sim_id, 22))
-        # print(get_joint_info(sim_id, 24))
-        # print(get_joint_info(sim_id, 27))
+        svc = sim_context.get_state_validity() # the SVC is the same for all contexts so we will use this one in our planner.
+        interp_fn = partial(parametric_lerp, steps=20)
+
         
         # Create the TSR object
         tsr_config =  planning_G.nodes[e1].get("tsr", unconstrained_TSR)
@@ -388,7 +418,7 @@ if __name__ == "__main__":
         Bw = bounds_matrix(tsr_config['Bw'][0], tsr_config['Bw'][1])
         # we plan with the current edges first/starting node's tsr and planning space.
         planning_tsr = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw, bodyandlink=0, manipindex=16)
-        planning_state_space = planning_G.nodes[e1]['keyframe_space']
+        keyframe_space_e1 = planning_G.nodes[e1]['keyframe_space']
         
         # generate a starting point, and a steering point, according to constraints (if applicable). 
         # check if the starting point has generated already:
@@ -399,10 +429,10 @@ if __name__ == "__main__":
             with DisabledCollisionsContext(sim, [], []):
                 found = False
                 while not found:
-                    sample = planning_state_space.sample()
+                    sample = keyframe_space_e1.sample()
                     if sample is not None and svc.validate(sample):
                         q_constrained = project_config(sawyer_robot, planning_tsr, np.array(
-                        sample), np.array(sample), epsilon=.05, e_step=.25)
+                        sample), np.array(sample), epsilon=.1, e_step=.25)
                         normalized_q_constrained = []
                         # If there is a foliation model, then we must perform rejection sampling until the projected sample is classified 
                         # to the node's foliation value
@@ -431,7 +461,7 @@ if __name__ == "__main__":
             start = planning_G.nodes[e1]['point']
 
         if  planning_G.nodes[e2].get('point', None) is None:
-            state_space =  planning_G.nodes[e2]['keyframe_space']
+            keyframe_space_e2 =  planning_G.nodes[e2]['keyframe_space']
             tsr_config =  planning_G.nodes[e2].get("tsr", unconstrained_TSR)
             T0_w2 = xyzrpy2trans(tsr_config['T0_w'], degrees=tsr_config['degrees'])
             Tw_e2 = xyzrpy2trans(tsr_config['Tw_e'], degrees=tsr_config['degrees'])
@@ -443,10 +473,10 @@ if __name__ == "__main__":
             with DisabledCollisionsContext(sim, [], []):
                 found = False
                 while not found:
-                    sample = state_space.sample()
+                    sample = keyframe_space_e2.sample()
                     if sample is not None and svc.validate(sample):
                         q_constrained = project_config(sawyer_robot, tsr, np.array(
-                        sample), np.array(sample), epsilon=.05, e_step=.25)
+                        sample), np.array(sample), epsilon=.1, e_step=.25)
                         normalized_q_constrained = []
                         if q_constrained is not None:
                             if foliation_model is not None:
@@ -476,11 +506,12 @@ if __name__ == "__main__":
             ###########
             # CBiRRT2 #
             ###########
-            # Use parametric linear interpolation with 10 steps between points.
-            interp = partial(parametric_lerp, steps=10)
+            # Use parametric linear interpolation with 20 steps between points.
+            interp = partial(parametric_lerp, steps=20)
             # See params for CBiRRT2 specific parameters 
-            cbirrt = CBiRRT2(sawyer_robot, planning_state_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 3, 'epsilon': .05, 'q_step': .1, 'e_step': .25, 'iters': 20000})
+            cbirrt = CBiRRT2(sawyer_robot, planning_state_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 3, 'epsilon': .1, 'q_step': .1, 'e_step': .25, 'iters': 20000})
             logger.info("Planning....")
+            logger.info("Constraints: {}".format(planning_G.nodes[e1].get('constraint_ids', None)))
             plan = cbirrt.plan(planning_tsr, np.array(start), np.array(end))
             path = cbirrt.get_path(plan)
         if len(path) == 0:
@@ -495,13 +526,13 @@ if __name__ == "__main__":
         sim_context.delete_context()
                
    
-    sim_context = SawyerBiasedTSRSimContext(config, setup=False)
+    sim_context = SawyerBiasedSimContext(config, setup=False)
     sim_context.setup(sim_overrides={"use_gui": True, "run_parallel": False})
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
     sawyer_robot = sim_context.get_robot()
     svc = sim_context.get_state_validity()
-    interp_fn = partial(parametric_lerp, steps=5)
+    interp_fn = partial(parametric_lerp, steps=20)
     sawyer_robot.set_joint_state(start_configuration)
     key = input("Press any key to excute plan.")
 
