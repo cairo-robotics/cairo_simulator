@@ -243,7 +243,7 @@ if __name__ == "__main__":
     
     # We will build a keyframe dsitribution using KDE from which to sample for steering points / viapoints. 
     end_data = [obsv['robot']['joint_angle'] for obsv in keyframes[end_keyframe_id]["observations"]]
-    keyframe_dist = KernelDensityDistribution()
+    keyframe_dist = KernelDensityDistribution(bandwidth=.01)
     keyframe_dist.fit(end_data)
     keyframe_space = DistributionSpace(sampler=DistributionSampler(keyframe_dist), limits=limits)
     # we cast the keyframe ids to int for networkx node dereferencing as keyframe ids are output as strings from CAIRO LfD 
@@ -302,7 +302,7 @@ if __name__ == "__main__":
 
             # Create KDE distrubtion for the current keyframe.
             data = [obsv['robot']['joint_angle'] for obsv in keyframe_data["observations"]]
-            keyframe_dist = KernelDensityDistribution()
+            keyframe_dist = KernelDensityDistribution(bandwidth=.01)
             keyframe_dist.fit(data)
             keyframe_space = DistributionSpace(sampler=DistributionSampler(keyframe_dist), limits=limits)
 
@@ -316,7 +316,7 @@ if __name__ == "__main__":
             # ensure the start point and ending steering point are in the same foliation, so we utilize the constraints from both keyframes.
             foliation_constraint_ids = list(set(keyframe_data["applied_constraints"] + keyframes[str(upcoming_id)]["applied_constraints"]))
 
-        
+            print(foliation_constraint_ids)
             planning_G.nodes[keyframe_id]["constraint_ids"] = constraint_ids
             
             # Get the TSR configurations so they can be appended to both the keyframe and the edge between associated with constraint ID combo.
@@ -377,11 +377,11 @@ if __name__ == "__main__":
     planning_G.add_edge(0, int(start_keyframe_id))
     keyframe_planning_order.insert(0, 0)
     planning_config['tsr'] = TSR_1_config
+    planning_G.nodes[int(start_keyframe_id)]['tsr'] = TSR_1_config
     # Add the lanning config to the planning graph edge. 
     planning_G.edges[0, int(start_keyframe_id)]['config'] = planning_config
     # A list to append path segments in order to create one continuous path
     final_path = []
-    
     
     ###################################################
     #           SEQUENTIAL MANIFOLD PLANNING          #
@@ -512,6 +512,7 @@ if __name__ == "__main__":
             cbirrt = CBiRRT2(sawyer_robot, planning_state_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 3, 'epsilon': .1, 'q_step': .1, 'e_step': .25, 'iters': 20000})
             logger.info("Planning....")
             logger.info("Constraints: {}".format(planning_G.nodes[e1].get('constraint_ids', None)))
+            print(tsr)
             plan = cbirrt.plan(planning_tsr, np.array(start), np.array(end))
             path = cbirrt.get_path(plan)
         if len(path) == 0:
