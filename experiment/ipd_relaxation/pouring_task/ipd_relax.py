@@ -63,7 +63,8 @@ if __name__ == "__main__":
             "object_name": "Table",
             "model_file_or_sim_id": ASSETS_PATH + 'table.sdf',
             "position": [0.6, 0, .1],
-            "orientation":  [0, 0, 1.5708]
+            "orientation":  [0, 0, 1.5708],
+            "fixed_base": 1
         },
     ]
     base_config["primitives"] = [
@@ -401,14 +402,14 @@ if __name__ == "__main__":
                     sample = planning_state_space.sample()
                     if sample is not None and svc.validate(sample):
                         q_constrained = project_config(sawyer_robot, planning_tsr, np.array(
-                        sample), np.array(sample), epsilon=.1, e_step=.25)
+                        sample), np.array(sample), epsilon=.05, e_step=.25)
                         normalized_q_constrained = []
                         # If there is a foliation model, then we must perform rejection sampling until the projected sample is classified 
                         # to the node's foliation value
                         if q_constrained is not None:
                             if foliation_model is not None:
                                 # This is the rejection sampling step to enforce the foliation choice
-                                if foliation_model.predict(np.array([q_constrained]))[0] == foliation_value:
+                                if foliation_model.predict(np.array([q_constrained])) == foliation_value:
                                     for value in q_constrained:
                                         normalized_q_constrained.append(
                                             wrap_to_interval(value))
@@ -445,12 +446,12 @@ if __name__ == "__main__":
                     sample = state_space.sample()
                     if sample is not None and svc.validate(sample):
                         q_constrained = project_config(sawyer_robot, tsr, np.array(
-                        sample), np.array(sample), epsilon=.1, e_step=.25)
+                        sample), np.array(sample), epsilon=.05, e_step=.25)
                         normalized_q_constrained = []
                         if q_constrained is not None:
                             if foliation_model is not None:
                                 # This is the rejection sampling step to enforce the foliation choice
-                                if foliation_model.predict(np.array([q_constrained]))[0] == foliation_value:
+                                if foliation_model.predict(np.array([q_constrained])) == foliation_value:
                                     for value in q_constrained:
                                         normalized_q_constrained.append(
                                             wrap_to_interval(value))
@@ -478,7 +479,7 @@ if __name__ == "__main__":
             # Use parametric linear interpolation with 10 steps between points.
             interp = partial(parametric_lerp, steps=10)
             # See params for CBiRRT2 specific parameters 
-            cbirrt = CBiRRT2(sawyer_robot, planning_state_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 3, 'q_step': .1, 'e_step': .25, 'iters': 20000})
+            cbirrt = CBiRRT2(sawyer_robot, planning_state_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 3, 'epsilon': .05, 'q_step': .1, 'e_step': .25, 'iters': 20000})
             logger.info("Planning....")
             plan = cbirrt.plan(planning_tsr, np.array(start), np.array(end))
             path = cbirrt.get_path(plan)
