@@ -8,7 +8,7 @@ if os.environ.get('ROS_DISTRO'):
     import rospy
 import numpy as np
 
-from cairo_simulator.core.sim_context import SawyerSimContext
+from cairo_simulator.core.sim_context import SawyerBiasedSimContext
 
 from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.local.interpolation import parametric_lerp
@@ -17,7 +17,7 @@ from cairo_planning.planners import LazyPRM
 
 
 def main():
-    sim_context = SawyerSimContext()
+    sim_context = SawyerBiasedSimContext()
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
     state_space = sim_context.get_state_space()
@@ -28,7 +28,11 @@ def main():
 
     sawyer_robot.move_to_joint_pos([0, 0, 0, 0, 0, 0, 0])
     time.sleep(1)
- 
+    
+    start = [-0.9495556257254272, 0.4642959698443643, -1.363564110824227, 0.2034916086440406, -0.13093966503057342, -1.3925977942257137, -0.2781434525989681] 
+    end = [-1.308358671699429, 0.6967113296390992, -1.2503978032875767, -0.6960306042779365, -0.492062438070457, -0.6745904098030175, 2.8850870012999232]
+    
+    sawyer_robot.set_joint_state(start)
     with DisabledCollisionsContext(sim, [], []):
         #######
         # LazyPRM #
@@ -39,8 +43,7 @@ def main():
         prm = LazyPRM(state_space, svc, interp, params={
                   'n_samples': 4000, 'k': 8, 'ball_radius': 2.5})
         logger.info("Planning....")
-        plan = prm.plan(np.array([0, 0, 0, 0, 0, 0, 0]), np.array([1.5262755737449423, -0.1698540226273928,
-                                                                   2.7788151824762055, 2.4546623466066135, 0.7146948867821279, 2.7671787952787184, 2.606128412644311]))
+        plan = prm.plan(np.array(start), np.array(end))
         # get_path() reuses the interp function to get the path between vertices of a successful plan
         path = prm.get_path(plan)
     if len(path) == 0:
@@ -53,16 +56,19 @@ def main():
     # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
     jtc = JointTrajectoryCurve()
     traj = jtc.generate_trajectory(path, move_time=2)
-    sawyer_robot.execute_trajectory(traj)
-
     key = input("Press any key to excute plan.")
 
     try:
-        while True:
-            sim.step()
+        prior_time = 0
+        for i, point in enumerate(traj):
+            if not svc.validate(point[1]):
+                print("Invalid point: {}".format(point[1]))
+                continue
+            sawyer_robot.set_joint_state(point[1])
+            time.sleep(point[0] - prior_time)
+            prior_time = point[0]
     except KeyboardInterrupt:
-        p.disconnect()
-        sys.exit(0)
+        pass
 
 
 if __name__ == "__main__":

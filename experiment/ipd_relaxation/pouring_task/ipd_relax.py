@@ -243,7 +243,7 @@ if __name__ == "__main__":
     
     # We will build a keyframe dsitribution using KDE from which to sample for steering points / viapoints. 
     end_data = [obsv['robot']['joint_angle'] for obsv in keyframes[end_keyframe_id]["observations"]]
-    keyframe_dist = KernelDensityDistribution(bandwidth=.1)
+    keyframe_dist = KernelDensityDistribution(bandwidth=.025)
     keyframe_dist.fit(end_data)
     keyframe_space = DistributionSpace(sampler=DistributionSampler(keyframe_dist, fraction_uniform=0), limits=limits)
     # we cast the keyframe ids to int for networkx node dereferencing as keyframe ids are output as strings from CAIRO LfD 
@@ -303,7 +303,7 @@ if __name__ == "__main__":
 
             # Create KDE distrubtion for the current keyframe.
             data = [obsv['robot']['joint_angle'] for obsv in keyframe_data["observations"]]
-            keyframe_dist = KernelDensityDistribution(bandwidth=.1)
+            keyframe_dist = KernelDensityDistribution(bandwidth=.025)
             keyframe_dist.fit(data)
             keyframe_space = DistributionSpace(sampler=DistributionSampler(keyframe_dist), limits=limits)
 
@@ -353,8 +353,8 @@ if __name__ == "__main__":
                 
                 # this information will be used to create a biasing distribution for sampling during planning between steering points.
                 sampling_bias = {
-                    'bandwidth': .1,
-                    'fraction_uniform': .25,
+                    'bandwidth': .05,
+                    'fraction_uniform': .10,
                     'data': inter_trajs_data
                 }
                 planning_config['sampling_bias'] = sampling_bias
@@ -497,8 +497,6 @@ if __name__ == "__main__":
                     sample = []
                     for value in raw_sample:
                         sample.append(wrap_to_interval(value))
-                    if e2 == 33 or e2 == '33':
-                        print(sample)
                     # If the sample is already constraint compliant, no need to project. Thanks LfD!
                     xyz, quat = sawyer_robot.solve_forward_kinematics(sample)[0]
                     pose = list(xyz) + list(quat2rpy(quat))

@@ -173,8 +173,6 @@ class TSR(object):
         @return check a (3,) vector of True if within and False if outside
         """
         # Check bounds condition on XYZ component.
-        for i, x in enumerate(xyz):
-            print((x + EPSILON), (x + EPSILON), Bw[i, 0], Bw[i, 1])
         xyzcheck = [((x + EPSILON) >= Bw[i, 0]) and
                     ((x - EPSILON) <= Bw[i, 1])
                     for i, x in enumerate(xyz)]
