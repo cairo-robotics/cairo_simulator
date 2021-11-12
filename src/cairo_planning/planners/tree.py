@@ -156,7 +156,9 @@ class CBiRRT2():
         smoothing_tree['name'] = 'smoothing'
         start_time = time.time()
 
-
+        if len(graph_path) <= 2:
+            return self._extract_graph_path()
+ 
         while True:
             current_time = time.time()
             elapsed_time = current_time - start_time

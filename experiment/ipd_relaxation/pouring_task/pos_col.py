@@ -11,7 +11,8 @@ from cairo_simulator.core.sim_context import SawyerBiasedSimContext
 from cairo_simulator.core.utils import ASSETS_PATH
 from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.geometric.transformation import quat2rpy
-
+from cairo_planning.geometric.transformation import xyzrpy2trans, bounds_matrix
+from cairo_planning.geometric.tsr import TSR
 
 global dist, inc
 inc = 3
@@ -62,14 +63,28 @@ def main():
                 }
         }
     ]
+    config["tsr"] = {
+        'degrees': False,
+        "T0_w": [0, 0, 0, 0, 0, 0],
+        "Tw_e": [.6437, -.5772, .15, np.pi/2, 0,  np.pi/2],
+        "Bw": [[(-.1, .1), (-.1, .1), (-100, 100)],  
+                [(-6.3, 6.3), (-6.3, 6.3), (-6.3, 6.3)]]
+    }
     # For the mug-based URDF of sawyer, we need to exclude links that are in constant self collision for the SVC
     config["state_validity"] = {
         "self_collision_exclusions": [("mug", "right_gripper_l_finger"), ("mug", "right_gripper_r_finger")]
     }
 
-
-    start = [-1.3873709693792482, 0.6889105515036634, -1.3040140417968091, -0.6337524498504346, -0.412876815322056, -0.6817950614592864, -3.3164909766471973]
     
+    tsr_config = config["tsr"]
+    T0_w2 = xyzrpy2trans(tsr_config['T0_w'], degrees=tsr_config['degrees'])
+    Tw_e2 = xyzrpy2trans(tsr_config['Tw_e'], degrees=tsr_config['degrees'])
+    Bw2 = bounds_matrix(tsr_config['Bw'][0], tsr_config['Bw'][1])
+    tsr = TSR(T0_w=T0_w2, Tw_e=Tw_e2, Bw=Bw2, bodyandlink=0, manipindex=16)
+    
+
+    start = [-1.1108130407859762, 0.4965879606196175, -1.2310530721526143, 0.227445108841267, -0.1420524815937485, -1.2745916997576694, -0.29403957270099523] 
+    end = [-1.302827212266834, 0.8962617079151478, -1.3361590959468101, -0.697111793773578, -0.5405455420304057, -0.5175079812572942, 2.9589766063932155]
 
     sim_context = SawyerBiasedSimContext(configuration=config)
     sim = sim_context.get_sim_instance()
@@ -80,8 +95,13 @@ def main():
     _ = sim_context.get_sim_objects(['Ground'])[0]
     svc = sim_context.get_state_validity()
 
+    print("Moving to start")
     sawyer_robot.set_joint_state(start)
     time.sleep(5)
+    print("Moving to end")
+    sawyer_robot.set_joint_state(end)
+    time.sleep(5)
+    sawyer_robot.set_joint_state(start)
 
     key_u = ord('u') #y up
     key_h = ord('h') #x down
@@ -126,36 +146,42 @@ def main():
                 xyz = [xcurrent, ycurrent, zcurrent]
                 joint_config = sawyer_robot.solve_inverse_kinematics(xyz, orientation)
                 sawyer_robot.move_to_joint_pos(joint_config)
+                print("TSR VALID: {}".format(tsr.is_valid(xyz+list(quat2rpy(orientation)))))
                 print_info(joint_config)
             if key_u in keys and keys[key_u] & p.KEY_WAS_TRIGGERED:
                 xcurrent-=dist
                 xyz = [xcurrent, ycurrent, zcurrent]
                 joint_config = sawyer_robot.solve_inverse_kinematics(xyz, orientation)
                 sawyer_robot.move_to_joint_pos(joint_config)
+                print("TSR VALID: {}".format(tsr.is_valid(xyz+list(quat2rpy(orientation)))))
                 print_info(joint_config)
             if key_h in keys and keys[key_h] & p.KEY_WAS_TRIGGERED:
                 ycurrent-=dist
                 xyz = [xcurrent, ycurrent, zcurrent]
                 joint_config = sawyer_robot.solve_inverse_kinematics(xyz, orientation)
                 sawyer_robot.move_to_joint_pos(joint_config)
+                print("TSR VALID: {}".format(tsr.is_valid(xyz+list(quat2rpy(orientation)))))
                 print_info(joint_config)
             if key_j in keys and keys[key_j] & p.KEY_WAS_TRIGGERED:
                 xcurrent+=dist
                 xyz = [xcurrent, ycurrent, zcurrent]
                 joint_config = sawyer_robot.solve_inverse_kinematics(xyz, orientation)
                 sawyer_robot.move_to_joint_pos(joint_config)
+                print("TSR VALID: {}".format(tsr.is_valid(xyz+list(quat2rpy(orientation)))))
                 print_info(joint_config)
             if key_o in keys and keys[key_o] & p.KEY_WAS_TRIGGERED:
                 zcurrent+=dist
                 xyz = [xcurrent, ycurrent, zcurrent]
                 joint_config = sawyer_robot.solve_inverse_kinematics(xyz, orientation)
                 sawyer_robot.move_to_joint_pos(joint_config)
+                print("TSR VALID: {}".format(tsr.is_valid(xyz+list(quat2rpy(orientation)))))
                 print_info(joint_config)
             if key_l in keys and keys[key_l] & p.KEY_WAS_TRIGGERED:
                 zcurrent-=dist
                 xyz = [xcurrent, ycurrent, zcurrent]
                 joint_config = sawyer_robot.solve_inverse_kinematics(xyz, orientation)
                 sawyer_robot.move_to_joint_pos(joint_config)
+                print("TSR VALID: {}".format(tsr.is_valid(xyz+list(quat2rpy(orientation)))))
                 print_info(joint_config)
             if key_d in keys and keys[key_d] & p.KEY_WAS_TRIGGERED:
                 set_distance()

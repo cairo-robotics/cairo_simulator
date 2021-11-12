@@ -42,9 +42,10 @@ from itertools import product
 import numpy as np
 
 from cairo_planning.geometric.transformation import pose2trans, pseudoinverse, analytic_xyz_jacobian, quat2rpy, rot2rpy
+from cairo_planning.geometric.utils import wrap_to_interval as w2i
 
 
-def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25, iter_count=10000):
+def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25, iter_count=10000, wrap_to_interval=False):
     """
     This function projects a sampled configuration point down to a constraint manifold defined implicitly by a 
     Task Space Region representation. http://cs.brown.edu/courses/csci2951-k/papers/berenson12.pdf
@@ -90,8 +91,14 @@ def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25,
         q_s = q_s - e_step * q_error
         # if the displacement of the current projected configuration relative to q_old (could be q_near etc)
         # is any larger than twice the step size q_step, we discard the projection. 
+        if wrap_to_interval:
+            q_s_new = []
+            for val in q_s:
+                q_s_new.appen(w2i(val))
+            q_s = q_s_new
         if np.linalg.norm(q_s - q_old) > 2 * q_step or not within_joint_limits(manipulator, q_s):
-            return None
+                return None
+
         # if not within_joint_limits(manipulator, q_s):
         #     return None
 
