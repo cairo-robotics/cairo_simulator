@@ -544,13 +544,13 @@ if __name__ == "__main__":
             print(config)
             time.sleep(10)
             prm = CPRM(SawyerBiasedTSRSimContext, config, sawyer_robot, planning_tsr, planning_state_space, tree_state_space, svc, interp, params={
-                'n_samples': 2000, 'k': 15, 'planning_attempts': 5, 'ball_radius': 10.0, 'smooth_path': True, 'cbirrt2_sampling_space': 'hyperball', 'smoothing_time': 5}, tree_params={'iters': 200, 'q_step': .48, 'e_step': .25})
+                'n_samples': 300, 'k': 15, 'planning_attempts': 5, 'ball_radius': 10.0, 'smooth_path': True, 'cbirrt2_sampling_space': 'hyperball', 'smoothing_time': 5}, tree_params={'iters': 200, 'q_step': .48, 'e_step': .25})
             logger.info("Planning....")
             ptime1 = time.process_time()
             path = prm.generate_roadmap(np.array(start), np.array(end))
             # Dump the samples and configuration
             dump_model(sim_context.config, prm, os.path.dirname(os.path.abspath(__file__)), directory_name="{}_{}-".format(int(e1), int(e2)))
 
-            sim_context.delete_context()
+        
                 
 
