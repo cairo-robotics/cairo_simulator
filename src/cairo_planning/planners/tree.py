@@ -142,7 +142,7 @@ class CBiRRT2():
     def _constrain_config(self, qs_old, q_s, tsr):
         # these functions can be very problem specific. For now we'll just assume the most very basic form.
         # futre implementations might favor injecting the constrain_config function 
-        q_constrained = project_config(self.robot, tsr, q_s=q_s, q_old=qs_old, epsilon=self.epsilon, q_step=self.q_step, e_step=self.e_step, iter_count=10000)
+        q_constrained = project_config(self.robot, tsr, q_s=q_s, q_old=qs_old, epsilon=self.epsilon, q_step=self.q_step, e_step=self.e_step, iter_count=10000, wrap_to_interval=True)
         if q_constrained is None:
             return None
         if self.svc.validate(q_constrained):
