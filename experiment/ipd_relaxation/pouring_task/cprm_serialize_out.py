@@ -13,7 +13,7 @@ import numpy as np
 import networkx as nx
 
 from cairo_simulator.core.utils import ASSETS_PATH
-from cairo_simulator.core.sim_context import SawyerBiasedSimContext
+from cairo_simulator.core.sim_context import SawyerBiasedSimContext, SawyerBiasedTSRSimContext
 
 from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.constraints.foliation import VGMMFoliationClustering, winner_takes_all
@@ -24,10 +24,9 @@ from cairo_planning.geometric.tsr import TSR
 from cairo_planning.geometric.state_space import DistributionSpace, SawyerConfigurationSpace
 from cairo_planning.geometric.distribution import KernelDensityDistribution
 from cairo_planning.local.interpolation import parametric_lerp
-from cairo_planning.local.curve import JointTrajectoryCurve
-from cairo_planning.planners import CBiRRT2
-from cairo_planning.sampling.samplers import DistributionSampler
-
+from cairo_planning.sampling.samplers import HyperballSampler, DistributionSampler
+from cairo_planning.core.serialization import dump_model
+from cairo_planning.planners import CPRM
 
 if __name__ == "__main__":
     ###########################################
@@ -353,8 +352,8 @@ if __name__ == "__main__":
                 
                 # this information will be used to create a biasing distribution for sampling during planning between steering points.
                 sampling_bias = {
-                    'bandwidth': .05,
-                    'fraction_uniform': .05,
+                    'bandwidth': .1,
+                    'fraction_uniform': .1,
                     'data': inter_trajs_data
                 }
                 planning_config['sampling_bias'] = sampling_bias
@@ -402,7 +401,7 @@ if __name__ == "__main__":
         config = edge_data.get('config', base_config)
         
         # We create a Sim context from the config for planning. 
-        sim_context = SawyerBiasedSimContext(config, setup=False)
+        sim_context = SawyerBiasedTSRSimContext(config, setup=False)
         sim_context.setup(sim_overrides={"use_gui": False, "run_parallel": False})
         planning_state_space = sim_context.get_state_space() # The biased state space for sampling points according to intermediate trajectories.
         sim = sim_context.get_sim_instance()
@@ -532,60 +531,26 @@ if __name__ == "__main__":
         else:
             end = planning_G.nodes[e2]['point']
         print("DISTANCE: ", np.linalg.norm(np.array(start) - np.array(end)))
-        if np.linalg.norm(np.array(start) - np.array(end)) > .75:
-            with DisabledCollisionsContext(sim, [], [], disable_visualization=True):
-                ###########
-                # CBiRRT2 #
-                ###########
-                # Use parametric linear interpolation with 20 steps between points.
-                interp = partial(parametric_lerp, steps=20)
-                # See params for CBiRRT2 specific parameters 
-                cbirrt = CBiRRT2(sawyer_robot, planning_state_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 3, 'epsilon': .1, 'q_step': .35, 'e_step': .25, 'iters': 20000})
-                logger.info("Planning....")
-                print(start, end)
-                logger.info("Constraints: {}".format(planning_G.nodes[e1].get('constraint_ids', None)))
-                plan = cbirrt.plan(planning_tsr, np.array(start), np.array(end))
-                path = cbirrt.get_path(plan)
-            if len(path) == 0:
-                logger.info("Planning failed....")
-                sys.exit(1)
-            logger.info("Plan found....")
-        else:
-            # sometimes the start point is really, really close to the a keyframe so we just inerpolate, since really close points are challenging the CBiRRT2 given the growth parameters
-            path = [list(val) for val in interp_fn(np.array(start), np.array(end))]
+        with DisabledCollisionsContext(sim, [], []):
+            ###########
+            # CPRM #
+            ###########
+            # The specific space we sample from is the Hyberball centered at the midpoint between two candidate points.
+            # This is used to bias tree grwoth between two points when using CBiRRT2 as our local planner for a constrained PRM.
+            tree_state_space = SawyerConfigurationSpace(sampler=HyperballSampler())
+            # Use parametric linear interpolation with 10 steps between points.
+            interp = partial(parametric_lerp, steps=10)
+            # See params for PRM specific parameters
+            print(config)
+            time.sleep(10)
+            prm = CPRM(SawyerBiasedTSRSimContext, config, sawyer_robot, planning_tsr, planning_state_space, tree_state_space, svc, interp, params={
+                'n_samples': 2000, 'k': 15, 'planning_attempts': 5, 'ball_radius': 10.0, 'smooth_path': True, 'cbirrt2_sampling_space': 'hyperball', 'smoothing_time': 5}, tree_params={'iters': 200, 'q_step': .48, 'e_step': .25})
+            logger.info("Planning....")
+            ptime1 = time.process_time()
+            path = prm.generate_roadmap(np.array(start), np.array(end))
+            # Dump the samples and configuration
+            dump_model(sim_context.config, prm, os.path.dirname(os.path.abspath(__file__)), directory_name="{}_{}-".format(int(e1), int(e2)))
 
-        # splining uses numpy so needs to be converted
-        print(path[0], path[-1])
-        logger.info("Length of path: {}".format(len(path)))
-        final_path = final_path + path
-        sim_context.delete_context()
-               
-   
-    sim_context = SawyerBiasedSimContext(config, setup=False)
-    sim_context.setup(sim_overrides={"use_gui": True, "run_parallel": False})
-    sim = sim_context.get_sim_instance()
-    logger = sim_context.get_logger()
-    sawyer_robot = sim_context.get_robot()
-    svc = sim_context.get_state_validity()
-    interp_fn = partial(parametric_lerp, steps=20)
-    sawyer_robot.set_joint_state(start_configuration)
-    key = input("Press any key to excute plan.")
-
-    # splining uses numpy so needs to be converted
-    planning_path = [np.array(p) for p in final_path]
-    # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
-    jtc = JointTrajectoryCurve()
-    traj = jtc.generate_trajectory(planning_path, move_time=20)
-    try:
-        prior_time = 0
-        for i, point in enumerate(traj):
-            if not svc.validate(point[1]):
-                print("Invalid point: {}".format(point[1]))
-                continue
-            sawyer_robot.set_joint_state(point[1])
-            time.sleep(point[0] - prior_time)
-            prior_time = point[0]
-    except KeyboardInterrupt:
-        exit(1)
-
+            sim_context.delete_context()
+                
 

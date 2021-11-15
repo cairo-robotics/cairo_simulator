@@ -40,9 +40,11 @@ POSSIBILITY OF SUCH DAMAGE.
 from itertools import product
 
 import numpy as np
+from numpy import linalg
 
 from cairo_planning.geometric.transformation import pose2trans, pseudoinverse, analytic_xyz_jacobian, quat2rpy, rot2rpy
 from cairo_planning.geometric.utils import wrap_to_interval as w2i
+from numpy.core.numeric import identity
 
 
 def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25, iter_count=10000, wrap_to_interval=False):
@@ -74,8 +76,6 @@ def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25,
         T0_s = pose2trans(np.hstack([trans + quat]))
         # generates the task space distance and error/displacement vector
         min_distance_new, x_err = distance_from_TSR(T0_s, tsr)
-        # print(min_distance_new)
-        # print(x_err)
         if min_distance_new < epsilon:
             return q_s  # we've reached the manifold within epsilon error
         elif count > iter_count:
@@ -86,17 +86,23 @@ def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25,
         # obtain the analytic jacobian
         J_rpy = analytic_xyz_jacobian(J[3:6, :], quat2rpy(quat))
         Ja = np.vstack([np.array(J_t), np.array(J_rpy)])
-        J_cross = pseudoinverse(Ja)
+        # J_cross = pseudoinverse(Ja)
+        delta=.25
+        try:
+            J_cross = np.dot(Ja.T, np.linalg.inv(np.dot(Ja, Ja.T) + np.dot(delta**2, np.identity(np.shape(Ja)[0]))))
+        except np.linalg.linalg.LinAlgError:
+            # likely a singular matrix error...
+            return None
         q_error = np.dot(J_cross, x_err)
         q_s = q_s - e_step * q_error
         # if the displacement of the current projected configuration relative to q_old (could be q_near etc)
         # is any larger than twice the step size q_step, we discard the projection. 
-        if wrap_to_interval:
-            q_s_new = []
-            for val in q_s:
-                q_s_new.append(w2i(val))
-            q_s = np.array(q_s_new)
-        if np.linalg.norm(q_s - np.array(q_old)) > 2 * q_step or not within_joint_limits(manipulator, q_s):
+        # if wrap_to_interval:
+        #     q_s_new = []
+        #     for val in q_s:
+        #         q_s_new.append(w2i(val))
+        #     q_s = np.array(q_s_new)
+        if np.linalg.norm(q_s - np.array(q_old)) > 4 * q_step or not within_joint_limits(manipulator, q_s):
                 return None
 
         # if not within_joint_limits(manipulator, q_s):

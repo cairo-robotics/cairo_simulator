@@ -442,7 +442,8 @@ class SawyerTSRSimContext(AbstractSimContext):
             [primitive_builder.build(config) for config in primitive_configs]
         # Turn rendering back on
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
-        self._setup_state_validity(self.sawyer_robot)
+
+        self._setup_state_validity(self.sawyer_robot, state_validity_configs)
         self._setup_tsr(tsr_config)
         # self._setup_collision_exclusions()
 
@@ -488,7 +489,7 @@ class SawyerTSRSimContext(AbstractSimContext):
             "excluded_body_link_pairs": excluded_body_link_pairs
         }
 
-    def _setup_self_collision_fn(self, sawyer_robot):
+    def _setup_self_collision_fn(self, sawyer_robot, excluded_self_collision_pairs):
         sawyer_id = self.sawyer_robot.get_simulator_id()
         excluded_pairs = [(get_joint_info_by_name(sawyer_id, 'right_l6').idx,
                            get_joint_info_by_name(sawyer_id, 'right_connector_plate_base').idx)]

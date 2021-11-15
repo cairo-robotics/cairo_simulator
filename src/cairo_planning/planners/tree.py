@@ -8,6 +8,7 @@ import numpy as np
 import igraph as ig
 
 from cairo_planning.constraints.projection import project_config
+from cairo_planning.geometric.transformation import quat2rpy
 
 from cairo_planning.planners import utils
 from cairo_simulator.core.log import Logger
@@ -114,7 +115,11 @@ class CBiRRT2():
             # What this update step does is it moves qs off the manifold towards q_target. And then this is projected back down onto the manifold.
             q_s = q_s + min([self.q_step, self._distance(q_target, q_s)]) * (q_target - q_s) / self._distance(q_target, q_s)
             # More problem sepcific versions of constrained_extend use constraint value information 
-            # constraints = self._get_constraint_values(tree, qs_old) 
+            # constraints = self._get_constraint_values(tree, qs_old)
+            # xyz, quat = self.robot.solve_forward_kinematics(q_s)[0]
+            # pose = list(xyz) + list(quat2rpy(quat))
+            # if not all(tsr.is_valid(pose)):
+            #     q_s = self._constrain_config(qs_old=qs_old, q_s=q_s, tsr=tsr)
             q_s = self._constrain_config(qs_old=qs_old, q_s=q_s, tsr=tsr)
             if q_s is not None:
                 # this function will occasionally osscilate between to projection values.
@@ -378,10 +383,6 @@ class CBiRRT2():
     def _add_edge(self, tree, q_from, q_to, weight):
         q_from_idx = utils.name2idx(tree, utils.val2str(q_from))
         q_to_idx = utils.name2idx(tree, utils.val2str(q_to))
-        if q_from_idx is None:
-            print("GRR")
-        if q_to_idx is None:
-            print("GRR")
         if utils.val2str(q_from) == self.start_name and utils.val2str(q_to) == self.goal_name:
             tree.add_edge(q_from_idx, q_to_idx, **{'weight': weight})
         elif tuple(sorted([q_from_idx, q_to_idx])) not in set([tuple(sorted(edge.tuple)) for edge in tree.es]):

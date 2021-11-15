@@ -3,6 +3,7 @@ import multiprocessing as mp
 from functools import partial
 
 import numpy as np
+from cairo_planning.geometric.transformation import quat2rpy
 
 
 from cairo_planning.sampling.samplers import UniformSampler
@@ -121,19 +122,28 @@ class SawyerTSRConstrainedSpace():
 
     def _project(self, sample):
         if self.svc.validate(sample):
-            q_constrained = project_config(self.robot, self.TSR, np.array(
-                sample), np.array(sample), epsilon=self.epsilon, e_step=self.e_step)
-            normalized_q_constrained = []
-            if q_constrained is not None:
-                for value in q_constrained:
-                    normalized_q_constrained.append(
-                        wrap_to_interval(value))
-                if self.svc.validate(normalized_q_constrained):
-                    return normalized_q_constrained
+            xyz, quat = self.robot.solve_forward_kinematics(sample)[0]
+            pose = xyz + list(quat2rpy(quat))
+            if not all(self.TSR.is_valid(pose)):
+                q_constrained = project_config(self.robot, self.TSR, np.array(
+                    sample), np.array(sample), epsilon=self.epsilon, e_step=self.e_step)
+                normalized_q_constrained = []
+                if q_constrained is not None:
+                    for value in q_constrained:
+                        normalized_q_constrained.append(
+                            wrap_to_interval(value))
+                    if self.svc.validate(normalized_q_constrained):
+                        return normalized_q_constrained
+                    else:
+                        return None
                 else:
                     return None
             else:
-                return None
+                normalized_sample = []
+                for value in sample:
+                        normalized_sample.append(
+                            wrap_to_interval(value))
+                return normalized_sample
 
 
 class ParallelSawyerTSRConstrainedSpace():
