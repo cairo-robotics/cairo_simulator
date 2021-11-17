@@ -28,6 +28,16 @@ from cairo_planning.local.curve import JointTrajectoryCurve
 from cairo_planning.planners import CBiRRT2
 from cairo_planning.sampling.samplers import DistributionSampler
 
+from cairo_planning.geometric.transformation import pose2trans, pseudoinverse, analytic_xyz_jacobian, quat2rpy, rot2rpy
+from cairo_planning.constraints.projection import distance_from_TSR
+
+def distance_to_TSR_config(manipulator, q_s, tsr):
+    world_pose, _ = manipulator.solve_forward_kinematics(q_s)
+    trans, quat = world_pose[0], world_pose[1]
+    T0_s = pose2trans(np.hstack([trans + quat]))
+    # generates the task space distance and error/displacement vector
+    min_distance_new, x_err = distance_from_TSR(T0_s, tsr)
+    return min_distance_new, x_err
 
 if __name__ == "__main__":
     ###########################################
@@ -243,7 +253,7 @@ if __name__ == "__main__":
     
     # We will build a keyframe dsitribution using KDE from which to sample for steering points / viapoints. 
     end_data = [obsv['robot']['joint_angle'] for obsv in keyframes[end_keyframe_id]["observations"]]
-    keyframe_dist = KernelDensityDistribution(bandwidth=.025)
+    keyframe_dist = KernelDensityDistribution(bandwidth=.05)
     keyframe_dist.fit(end_data)
     keyframe_space = DistributionSpace(sampler=DistributionSampler(keyframe_dist, fraction_uniform=0), limits=limits)
     # we cast the keyframe ids to int for networkx node dereferencing as keyframe ids are output as strings from CAIRO LfD 
@@ -303,7 +313,7 @@ if __name__ == "__main__":
 
             # Create KDE distrubtion for the current keyframe.
             data = [obsv['robot']['joint_angle'] for obsv in keyframe_data["observations"]]
-            keyframe_dist = KernelDensityDistribution(bandwidth=.025)
+            keyframe_dist = KernelDensityDistribution(bandwidth=.05)
             keyframe_dist.fit(data)
             # We want to fully bias sampling from keyframe distributions.
             keyframe_space = DistributionSpace(sampler=DistributionSampler(keyframe_dist, fraction_uniform=0), limits=limits)
@@ -353,8 +363,8 @@ if __name__ == "__main__":
                 
                 # this information will be used to create a biasing distribution for sampling during planning between steering points.
                 sampling_bias = {
-                    'bandwidth': .05,
-                    'fraction_uniform': .05,
+                    'bandwidth': .15,
+                    'fraction_uniform': .1,
                     'data': inter_trajs_data
                 }
                 planning_config['sampling_bias'] = sampling_bias
@@ -409,7 +419,7 @@ if __name__ == "__main__":
         logger = sim_context.get_logger()
         sawyer_robot = sim_context.get_robot()
         svc = sim_context.get_state_validity() # the SVC is the same for all contexts so we will use this one in our planner.
-        interp_fn = partial(parametric_lerp, steps=20)
+        interp_fn = partial(parametric_lerp, steps=10)
 
         # Create the TSR object
         planning_tsr_config =  planning_G.nodes[e1].get("tsr", unconstrained_TSR)
@@ -437,41 +447,40 @@ if __name__ == "__main__":
                     # If the sample is already constraint compliant, no need to project. Thanks LfD!
                     xyz, rpy = sawyer_robot.solve_forward_kinematics(sample)[0]
                     pose = list(xyz) + list(quat2rpy(quat))
-                    if not all(planning_tsr.is_valid(pose)) and svc.validate(sample):
-                        if sample is not None and svc.validate(sample):
-                            q_constrained = project_config(sawyer_robot, planning_tsr, np.array(
-                            sample), np.array(sample), epsilon=.1, e_step=.35, q_step=100)
-                            normalized_q_constrained = []
-                            # If there is a foliation model, then we must perform rejection sampling until the projected sample is classified 
-                            # to the node's foliation value
-                            if q_constrained is not None:
-                                if foliation_model is not None:
-                                    # This is the rejection sampling step to enforce the foliation choice
-                                    if foliation_model.predict(np.array([q_constrained])) == foliation_value:
-                                        for value in q_constrained:
-                                            normalized_q_constrained.append(
-                                                wrap_to_interval(value))
-                                    else:
-                                        continue
-                                else:
-                                    for value in q_constrained:
-                                            normalized_q_constrained.append(
-                                                wrap_to_interval(value))
-                            else:
-                                continue
-                            if svc.validate(normalized_q_constrained):
-                                start = normalized_q_constrained
-                                # We've generated a point so lets use it moving forward for all other planning segments. 
-                                planning_G.nodes[e1]['point'] = start
-                                found = True
-                    else:
+                    if all(planning_tsr.is_valid(pose)) and svc.validate(sample):
                         start = sample
                         planning_G.nodes[e1]['point'] = start
                         found = True
+                    elif svc.validate(sample):
+                       
+                        q_constrained = project_config(sawyer_robot, planning_tsr, np.array(
+                        sample), np.array(sample), epsilon=.1, e_step=.35, q_step=100)
+                        normalized_q_constrained = []
+                        # If there is a foliation model, then we must perform rejection sampling until the projected sample is classified 
+                        # to the node's foliation value
+                        if q_constrained is not None:
+                            if foliation_model is not None:
+                                # This is the rejection sampling step to enforce the foliation choice
+                                if foliation_model.predict(np.array([q_constrained])) == foliation_value:
+                                    for value in q_constrained:
+                                        normalized_q_constrained.append(
+                                            wrap_to_interval(value))
+                                else:
+                                    continue
+                            else:
+                                for value in q_constrained:
+                                    normalized_q_constrained.append(
+                                        wrap_to_interval(value))
+                        else:
+                            continue
+                        if svc.validate(normalized_q_constrained):
+                            start = normalized_q_constrained
+                            # We've generated a point so lets use it moving forward for all other planning segments. 
+                            planning_G.nodes[e1]['point'] = start
+                            found = True
         # if the point steering/start point is available already, then we simply use it 
         else:
             start = planning_G.nodes[e1]['point']
-            print("Using stored e1 point")
             print(start)
 
         if e2 == 33 or e2 == '33':
@@ -497,50 +506,54 @@ if __name__ == "__main__":
                     for value in raw_sample:
                         sample.append(wrap_to_interval(value))
                     # If the sample is already constraint compliant, no need to project. Thanks LfD!
+                    print(sawyer_robot.solve_forward_kinematics(sample)[0][0], quat2rpy(sawyer_robot.solve_forward_kinematics(sample)[0][1]))
+                    print(sawyer_robot.solve_forward_kinematics(sample)[1][0], quat2rpy(sawyer_robot.solve_forward_kinematics(sample)[1][1]))
                     xyz, quat = sawyer_robot.solve_forward_kinematics(sample)[0]
                     pose = list(xyz) + list(quat2rpy(quat))
-                    if not all(planning_tsr.is_valid(pose)) and svc.validate(sample):
-                        if sample is not None and svc.validate(sample):
-                            # We use a large q_step since we're not using project_config for cbirrt2 but instead just trying to project as ingle point. We don't care about how far we're stepping w.r.t tree growth
-                            q_constrained = project_config(sawyer_robot, tsr, np.array(
-                            sample), np.array(sample), epsilon=.1, e_step=.25, q_step=100)
-                            normalized_q_constrained = []
-                            if q_constrained is not None:
-                                if foliation_model is not None:
-                                    # This is the rejection sampling step to enforce the foliation choice
-                                    if foliation_model.predict(np.array([q_constrained])) == foliation_value:
-                                        for value in q_constrained:
-                                            normalized_q_constrained.append(
-                                                wrap_to_interval(value))
-                                    else:
-                                        continue
-                                else:
-                                    for value in q_constrained:
-                                            normalized_q_constrained.append(
-                                                wrap_to_interval(value))
-                            else:
-                                continue
-                            if svc.validate(normalized_q_constrained):
-                                end = normalized_q_constrained
-                                # We've generated a point so lets use it moving forward for all other planning segments. 
-                                planning_G.nodes[e2]['point'] = end
-                                found = True
-                    else:
+                    if all(tsr.is_valid(pose)) and svc.validate(sample):
                         end = sample
                         planning_G.nodes[e2]['point'] = end
                         found = True
+                    elif svc.validate(sample):
+                        # We use a large q_step since we're not using project_config for cbirrt2 but instead just trying to project as ingle point. We don't care about how far we're stepping w.r.t tree growth
+                        q_constrained = project_config(sawyer_robot, tsr, np.array(
+                        sample), np.array(sample), epsilon=.05, e_step=.25, q_step=100)
+                        normalized_q_constrained = []
+                        if q_constrained is not None:
+                            if foliation_model is not None:
+                                # This is the rejection sampling step to enforce the foliation choice
+                                if foliation_model.predict(np.array([q_constrained])) == foliation_value:
+                                    for value in q_constrained:
+                                        normalized_q_constrained.append(
+                                            wrap_to_interval(value))
+                                else:
+                                    continue
+                            else:
+                                for value in q_constrained:
+                                    normalized_q_constrained.append(
+                                        wrap_to_interval(value))
+                        else:
+                            continue
+                        if svc.validate(normalized_q_constrained):
+                            end = normalized_q_constrained
+                            # We've generated a point so lets use it moving forward for all other planning segments. 
+                            planning_G.nodes[e2]['point'] = end
+                            found = True
         else:
             end = planning_G.nodes[e2]['point']
-        print("DISTANCE: ", np.linalg.norm(np.array(start) - np.array(end)))
-        if np.linalg.norm(np.array(start) - np.array(end)) > .75:
+        print("\n\nSTART AND END\n")
+        print(start, end)
+        print(np.linalg.norm(np.array(start) - np.array(end)))
+        print("\n\n")
+        if np.linalg.norm(np.array(start) - np.array(end)) > .15:
             with DisabledCollisionsContext(sim, [], [], disable_visualization=True):
                 ###########
                 # CBiRRT2 #
                 ###########
-                # Use parametric linear interpolation with 20 steps between points.
-                interp = partial(parametric_lerp, steps=20)
+                # Use parametric linear interpolation with 10 steps between points.
+                interp = partial(parametric_lerp, steps=10)
                 # See params for CBiRRT2 specific parameters 
-                cbirrt = CBiRRT2(sawyer_robot, planning_state_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 3, 'epsilon': .1, 'q_step': .35, 'e_step': .25, 'iters': 20000})
+                cbirrt = CBiRRT2(sawyer_robot, planning_state_space, svc, interp, params={'smooth_path': False, 'smoothing_time': 3, 'epsilon': .1, 'q_step': .35, 'e_step': .25, 'iters': 20000})
                 logger.info("Planning....")
                 print(start, end)
                 logger.info("Constraints: {}".format(planning_G.nodes[e1].get('constraint_ids', None)))
@@ -567,7 +580,7 @@ if __name__ == "__main__":
     logger = sim_context.get_logger()
     sawyer_robot = sim_context.get_robot()
     svc = sim_context.get_state_validity()
-    interp_fn = partial(parametric_lerp, steps=20)
+    interp_fn = partial(parametric_lerp, steps=10)
     sawyer_robot.set_joint_state(start_configuration)
     key = input("Press any key to excute plan.")
 

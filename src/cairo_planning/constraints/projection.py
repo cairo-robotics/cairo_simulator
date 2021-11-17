@@ -87,7 +87,7 @@ def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25,
         J_rpy = analytic_xyz_jacobian(J[3:6, :], quat2rpy(quat))
         Ja = np.vstack([np.array(J_t), np.array(J_rpy)])
         # J_cross = pseudoinverse(Ja)
-        delta=.25
+        delta=.75
         try:
             J_cross = np.dot(Ja.T, np.linalg.inv(np.dot(Ja, Ja.T) + np.dot(delta**2, np.identity(np.shape(Ja)[0]))))
         except np.linalg.linalg.LinAlgError:

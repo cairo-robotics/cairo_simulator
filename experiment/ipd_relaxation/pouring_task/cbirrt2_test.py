@@ -71,12 +71,15 @@ def main():
                 }
         }
     ]
+    config["state_validity"] = {
+        "self_collision_exclusions": [("mug", "right_gripper_l_finger"), ("mug", "right_gripper_r_finger")]
+    }
     config['tsr'] = {
         'degrees': False,
         "T0_w": [0, 0, 0, 0, 0, 0],
-        "Tw_e": [.6437, -.5772, .15, np.pi/2, 0,  np.pi/2],
-        "Bw": [[(-.1, .1), (-.1, .1), (-100, 100)],  
-                [(-6.3, 6.3), (-6.3, 6.3), (-6.3, 6.3)]]
+        "Tw_e": [.7968, -.5772, .15, np.pi/2, 0,  np.pi/2],
+        "Bw": [[(-100, 100), (-100, 100), (-100, 100)],  
+                [(-.05, .05), (-.05, .05), (-.05, .05)]]
     }
     
     # # Collect all joint configurations from all demonstration .json files.
@@ -102,8 +105,8 @@ def main():
     # sampler = DistributionSampler(distribution_model=model, fraction_uniform=config['sampling_bias']['fraction_uniform'])
     # state_space = DistributionSpace(sampler=sampler)
 
-    start = [-0.9728240987858863, 0.4737483836425844, -1.489164294972514, -0.13801144009056276, 0.021170605942310683, -1.1109377608846391, -0.26443568795534933] 
-    goal = [-1.2302336171984662, 0.7072747247450906, -1.2304051694556453, -0.7612293865505593, -0.5097969995737537, -0.6128168087862829, 2.9398205086659974]
+    start = [0.46917899636184135, 0.7324873409041617, -1.340360338770083, 0.42669072747478065, 1.6990909037680328, -0.754200738207615, -1.300427536562272] 
+    goal = [0.5387514797177877, 0.43033446000318687, -1.3287458908393595, 0.4918576652036437, 1.6721428778990362, -0.4938551931947299, -1.4847674624219398]
 
     sim_context = SawyerBiasedTSRSimContext(configuration=config)
     sim = sim_context.get_sim_instance()
@@ -129,8 +132,8 @@ def main():
             #######
             # LazyPRM #
             #######
-            # Use parametric linear interpolation with 5 steps between points.
-            interp = partial(parametric_lerp, steps=50)
+            # Use parametric linear interpolation with 10 steps between points.
+            interp = partial(parametric_lerp, steps=10)
             # See params for PRM specific parameters
             cbirrt = CBiRRT2(sawyer_robot, state_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 5, 'q_step': .35, 'e_step': .25, 'iters': 100000, 'epsilon': .06})
             logger.info("Planning....")
