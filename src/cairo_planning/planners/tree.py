@@ -49,6 +49,7 @@ class CBiRRT2():
         self._initialize_trees(start_q, goal_q)
         self.log.debug("Running Constrained Bidirectional RRT...")
         self.tree = self.cbirrt(tsr)
+        print("Size of tree: {}".format(len(self.tree.vs)))
         if self.tree is not None:
             self.log.debug("Extracting path through graph...")
             graph_path = self._extract_graph_path()
@@ -116,10 +117,8 @@ class CBiRRT2():
             q_s = q_s + min([self.q_step, self._distance(q_target, q_s)]) * (q_target - q_s) / self._distance(q_target, q_s)
             # More problem sepcific versions of constrained_extend use constraint value information 
             # constraints = self._get_constraint_values(tree, qs_old)
-            # xyz, quat = self.robot.solve_forward_kinematics(q_s)[0]
-            # pose = list(xyz) + list(quat2rpy(quat))
-            # if not all(tsr.is_valid(pose)):
-            #     q_s = self._constrain_config(qs_old=qs_old, q_s=q_s, tsr=tsr)
+            
+       
             q_s = self._constrain_config(qs_old=qs_old, q_s=q_s, tsr=tsr)
             if q_s is not None:
                 # this function will occasionally osscilate between to projection values.
@@ -131,7 +130,8 @@ class CBiRRT2():
                     return qs_old, generated_values
                 prior_distance = self._distance(q_s, q_target)
                 # if q_s is valid AND all of the interpolated points between qs_old and q_s are valid, we add the edge.
-                if self._validate(q_s) and all([self._validate(p) for p in self.interp_fn(qs_old, q_s)]):
+                interp = self.interp_fn(qs_old, q_s)
+                if self._validate(q_s) and all([self._validate(p) for p in interp]):
                     self._add_vertex(tree, q_s)
                     generated_values.append(q_s)
                     if tree['name'] == 'forwards' or tree['name'] == 'smoothing':
@@ -261,6 +261,7 @@ class CBiRRT2():
             qb_idx = utils.name2idx(B, qb_name)
             B.vs[qb_idx]['name'] = qf_name
             B.vs[qb_idx]['value'] = qf_value
+            return B
         
         if len(F.vs) > 1 and len(B.vs) == 1:
             qb_name = utils.val2str(qb)
@@ -271,6 +272,7 @@ class CBiRRT2():
             qf_idx = utils.name2idx(F, qf_name)
             F.vs[qf_idx]['name'] = qb_name
             F.vs[qf_idx]['value'] = qb_value
+            return F
             
 
 
@@ -339,9 +341,11 @@ class CBiRRT2():
         # ig.plot(tree, **visual_style)
         return tree
 
-    def _neighbors(self, tree, q_s):
+    def _neighbors(self, tree, q_s, fraction_random=.1):
         if len(tree.vs) == 1:
             return [v for v in tree.vs][0]['value']
+        if random.random() <= fraction_random:
+            return random.choice([v for v in tree.vs])['value']
         return sorted([v for v in tree.vs], key= lambda vertex: self._distance(vertex['value'], q_s))[0]['value']
 
     def _random_config(self):
@@ -364,6 +368,11 @@ class CBiRRT2():
         if self._distance(q1, q2) <= .05:
             return True
         return False
+
+    def _within_manifold(self, q_s, tsr):
+        xyz, quat = self.robot.solve_forward_kinematics(q_s)[0]
+        pose = list(xyz) + list(quat2rpy(quat))
+        return all(tsr.is_valid(q_s))
 
     def _validate(self, sample):
         return self.svc.validate(sample)
