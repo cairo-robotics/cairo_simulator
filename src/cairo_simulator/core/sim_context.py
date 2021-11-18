@@ -93,7 +93,10 @@ class SawyerSimContext(AbstractSimContext):
              "model_file_or_sim_id": "plane.urdf",
              "position": [0, 0, 0]
              }])
+        
         self.config["sim_objects"] = sim_obj_configs
+                
+        state_validity_configs = self.config.get("state_validity", {})
 
         primitive_configs = self.config.get("primitives", [])
 
@@ -120,7 +123,7 @@ class SawyerSimContext(AbstractSimContext):
             config, client=self.sim.get_client_id()) for config in primitive_configs]
         # Turn rendering back on
         p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
-        # self._setup_state_validity(self.sawyer_robot)
+        self._setup_state_validity(self.sawyer_robot, state_validity_configs)
         # self._setup_collision_exclusions()
 
     def _setup_state_validity(self, sawyer_robot, state_validity_configs):
@@ -155,12 +158,11 @@ class SawyerSimContext(AbstractSimContext):
             "excluded_body_link_pairs": excluded_body_link_pairs
         }
 
-    def _setup_self_collision_fn(self, sawyer_robot):
+    def _setup_self_collision_fn(self, sawyer_robot, excluded_pairs):
         sawyer_id = self.sawyer_robot.get_simulator_id()
-        excluded_pairs = [(get_joint_info_by_name(sawyer_id, 'right_l6').idx,
-                           get_joint_info_by_name(sawyer_id, 'right_connector_plate_base').idx)]
         link_pairs = get_link_pairs(sawyer_id, excluded_pairs=excluded_pairs)
         return partial(self_collision_test, robot=sawyer_robot, link_pairs=link_pairs, client_id=self.sim.get_client_id())
+
 
     def _setup_collision_fn(self, sawyer_robot):
         collision_body_ids = self.sim.get_collision_bodies()
@@ -188,7 +190,6 @@ class SawyerSimContext(AbstractSimContext):
         return self.sawyer_robot
 
     def get_state_validity(self):
-        self._setup_state_validity(self.sawyer_robot)
         return self.svc
 
     def get_state_space(self):

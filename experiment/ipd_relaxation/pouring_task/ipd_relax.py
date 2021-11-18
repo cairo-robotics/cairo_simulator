@@ -147,65 +147,65 @@ if __name__ == "__main__":
     # Generic, unconstrained TSR:
     unconstrained_TSR = {
         'degrees': False,
-        "T0_w": [0, 0, 0, 0, 0, 0],
-        "Tw_e": [.7968, -.5772, .15, np.pi/2, 0,  np.pi/2],
+        "T0_w":  [.7968, -.5772, 1.05, np.pi/2, 0,  np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-100, 100), (-100, 100), (-100, 100)],  
-                [(-6.3, 6.3), (-6.3, 6.3), (-6.3, 6.3)]]
+                [(-100, 100), (-100, 100), (-100, 100)]]
     }
     # Let's first define all TSR configurations for this task:
     # Orientation only (1)
     TSR_1_config = {
         'degrees': False,
-        "T0_w": [0, 0, 0, 0, 0, 0],
-        "Tw_e": [.7968, -.5772, .15, np.pi/2, 0,  np.pi/2],
+        "T0_w":  [.7968, -.5772, 1.05, np.pi/2, 0,  np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-100, 100), (-100, 100), (-100, 100)],  
                 [(-.05, .05), (-.05, .05), (-.05, .05)]]
     }
     # centering only (2)
     TSR_2_config = {
         'degrees': False,
-        "T0_w": [0, 0, 0, 0, 0, 0],
-        "Tw_e": [.7968, -.5772, .15, np.pi/2, 0,  np.pi/2],
+        "T0_w":  [.7968, -.5772, 1.05, np.pi/2, 0,  np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-.1, .1), (-.1, .1), (-100, 100)],  
-                [(-6.3, 6.3), (-6.3, 6.3), (-6.3, 6.3)]]
+                [(-100, 100), (-100, 100), (-100, 100)]]
     }
     # height only (3)
     TSR_3_config = {
         'degrees': False,
-        "T0_w": [0, 0, 0, 0, 0, 0],
-        "Tw_e": [.7968, -.5772, .15, np.pi/2, 0,  np.pi/2],
+        "T0_w":  [.7968, -.5772, 1.05, np.pi/2, 0,  np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-100, 100), (-100, 100), (0, 100)],  
-                [(-6.3, 6.3), (-6.3, 6.3), (-6.3, 6.3)]]
+                 [(-100, 100), (-100, 100), (-100, 100)]]
     }
     # Orientation AND centering constraint (1, 2)
     TSR_12_config = {
         'degrees': False,
-        "T0_w": [0, 0, 0, 0, 0, 0],
-        "Tw_e": [.7968, -.5772, .739, np.pi/2, 0,  np.pi/2],
+        "T0_w":  [.7968, -.5772, 1.05, np.pi/2, 0,  np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-.1, .1), (-.1, .1), (-100, 100)],  
                 [(-.05, .05), (-.05, .05), (-.05, .05)]]
     }
     # orientation AND height constraint (1, 3)
     TSR_13_config = {
         'degrees': False,
-        "T0_w": [0, 0, 0, 0, 0, 0],
-        "Tw_e": [.7968, -.5772, .15, np.pi/2, 0,  np.pi/2],
+        "T0_w":  [.7968, -.5772, 1.05, np.pi/2, 0,  np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-100, 100), (-100, 100), (0, 100)],  
                 [(-.05, .05), (-.05, .05), (-.05, .05)]]
     }
     # height AND centering constraint (2, 3)
     TSR_23_config = {
         'degrees': False,
-        "T0_w": [0, 0, 0, 0, 0, 0],
-        "Tw_e": [.7968, -.5772, .15, np.pi/2, 0,  np.pi/2],
+        "T0_w":  [.7968, -.5772, 1.05, np.pi/2, 0,  np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-.1, .1), (-.1, .1), (0, 100)],  
-                [(-6.3, 6.3), (-6.3, 6.3), (-6.3, 6.3)]]
+                [(-100, 100), (-100, 100), (-100, 100)]]
     }
     # orientation, centering, and height AND height constraint (1, 2, 3)
     TSR_123_config = {
         'degrees': False,
-        "T0_w": [0, 0, 0, 0, 0, 0],
-        "Tw_e": [.7968, -.5772, .15, np.pi/2, 0,  np.pi/2],
+        "T0_w":  [.7968, -.5772, 1.05, np.pi/2, 0,  np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-.1, .1), (-.1, .1), (0, 100)],  
                 [(-.05, .05), (-.05, .05), (-.05, .05)]]
     }
@@ -253,7 +253,7 @@ if __name__ == "__main__":
     
     # We will build a keyframe dsitribution using KDE from which to sample for steering points / viapoints. 
     end_data = [obsv['robot']['joint_angle'] for obsv in keyframes[end_keyframe_id]["observations"]]
-    keyframe_dist = KernelDensityDistribution(bandwidth=.05)
+    keyframe_dist = KernelDensityDistribution(bandwidth=.25)
     keyframe_dist.fit(end_data)
     keyframe_space = DistributionSpace(sampler=DistributionSampler(keyframe_dist, fraction_uniform=0), limits=limits)
     # we cast the keyframe ids to int for networkx node dereferencing as keyframe ids are output as strings from CAIRO LfD 
@@ -313,7 +313,7 @@ if __name__ == "__main__":
 
             # Create KDE distrubtion for the current keyframe.
             data = [obsv['robot']['joint_angle'] for obsv in keyframe_data["observations"]]
-            keyframe_dist = KernelDensityDistribution(bandwidth=.05)
+            keyframe_dist = KernelDensityDistribution(bandwidth=.25)
             keyframe_dist.fit(data)
             # We want to fully bias sampling from keyframe distributions.
             keyframe_space = DistributionSpace(sampler=DistributionSampler(keyframe_dist, fraction_uniform=0), limits=limits)
@@ -363,8 +363,8 @@ if __name__ == "__main__":
                 
                 # this information will be used to create a biasing distribution for sampling during planning between steering points.
                 sampling_bias = {
-                    'bandwidth': .15,
-                    'fraction_uniform': .1,
+                    'bandwidth': .25,
+                    'fraction_uniform': .01,
                     'data': inter_trajs_data
                 }
                 planning_config['sampling_bias'] = sampling_bias
@@ -419,7 +419,7 @@ if __name__ == "__main__":
         logger = sim_context.get_logger()
         sawyer_robot = sim_context.get_robot()
         svc = sim_context.get_state_validity() # the SVC is the same for all contexts so we will use this one in our planner.
-        interp_fn = partial(parametric_lerp, steps=10)
+        interp_fn = partial(parametric_lerp, steps=30)
 
         # Create the TSR object
         planning_tsr_config =  planning_G.nodes[e1].get("tsr", unconstrained_TSR)
@@ -445,9 +445,8 @@ if __name__ == "__main__":
                     for value in raw_sample:
                         sample.append(wrap_to_interval(value))
                     # If the sample is already constraint compliant, no need to project. Thanks LfD!
-                    xyz, rpy = sawyer_robot.solve_forward_kinematics(sample)[0]
-                    pose = list(xyz) + list(quat2rpy(quat))
-                    if all(planning_tsr.is_valid(pose)) and svc.validate(sample):
+                    err, _ = distance_to_TSR_config(sawyer_robot, sample, planning_tsr)
+                    if err < .1 and svc.validate(sample):
                         start = sample
                         planning_G.nodes[e1]['point'] = start
                         found = True
@@ -494,7 +493,7 @@ if __name__ == "__main__":
             Bw2 = bounds_matrix(tsr_config['Bw'][0], tsr_config['Bw'][1])
             tsr = TSR(T0_w=T0_w2, Tw_e=Tw_e2, Bw=Bw2, bodyandlink=0, manipindex=16)
             
-            print("Constraints {}: {}".format(e2, planning_G.nodes[e1].get("constraint_ids", [])))
+            print("Constraints {}: {}".format(e2, planning_G.nodes[e2].get("constraint_ids", [])))
             foliation_model =  planning_G.nodes[e2].get("foliation_model", None)
             foliation_value =  planning_G.nodes[e2].get("foliation_value", None)
 
@@ -506,11 +505,10 @@ if __name__ == "__main__":
                     for value in raw_sample:
                         sample.append(wrap_to_interval(value))
                     # If the sample is already constraint compliant, no need to project. Thanks LfD!
-                    print(sawyer_robot.solve_forward_kinematics(sample)[0][0], quat2rpy(sawyer_robot.solve_forward_kinematics(sample)[0][1]))
-                    print(sawyer_robot.solve_forward_kinematics(sample)[1][0], quat2rpy(sawyer_robot.solve_forward_kinematics(sample)[1][1]))
-                    xyz, quat = sawyer_robot.solve_forward_kinematics(sample)[0]
-                    pose = list(xyz) + list(quat2rpy(quat))
-                    if all(tsr.is_valid(pose)) and svc.validate(sample):
+                    # print(sawyer_robot.solve_forward_kinematics(sample)[0][0], quat2rpy(sawyer_robot.solve_forward_kinematics(sample)[0][1]))
+                    err, _ = distance_to_TSR_config(sawyer_robot, sample, tsr)
+                    # print(err)
+                    if err < .1 and svc.validate(sample):
                         end = sample
                         planning_G.nodes[e2]['point'] = end
                         found = True
@@ -535,6 +533,8 @@ if __name__ == "__main__":
                         else:
                             continue
                         if svc.validate(normalized_q_constrained):
+                            err, _ = distance_to_TSR_config(sawyer_robot, normalized_q_constrained, tsr)
+                            print(err)
                             end = normalized_q_constrained
                             # We've generated a point so lets use it moving forward for all other planning segments. 
                             planning_G.nodes[e2]['point'] = end
@@ -545,13 +545,13 @@ if __name__ == "__main__":
         print(start, end)
         print(np.linalg.norm(np.array(start) - np.array(end)))
         print("\n\n")
-        if np.linalg.norm(np.array(start) - np.array(end)) > .15:
+        if np.linalg.norm(np.array(start) - np.array(end)) > .1:
             with DisabledCollisionsContext(sim, [], [], disable_visualization=True):
                 ###########
                 # CBiRRT2 #
                 ###########
-                # Use parametric linear interpolation with 10 steps between points.
-                interp = partial(parametric_lerp, steps=10)
+                # Use parametric linear interpolation with 30 steps between points.
+                interp = partial(parametric_lerp, steps=30)
                 # See params for CBiRRT2 specific parameters 
                 cbirrt = CBiRRT2(sawyer_robot, planning_state_space, svc, interp, params={'smooth_path': False, 'smoothing_time': 3, 'epsilon': .1, 'q_step': .35, 'e_step': .25, 'iters': 20000})
                 logger.info("Planning....")
@@ -580,7 +580,7 @@ if __name__ == "__main__":
     logger = sim_context.get_logger()
     sawyer_robot = sim_context.get_robot()
     svc = sim_context.get_state_validity()
-    interp_fn = partial(parametric_lerp, steps=10)
+    interp_fn = partial(parametric_lerp, steps=30)
     sawyer_robot.set_joint_state(start_configuration)
     key = input("Press any key to excute plan.")
 
