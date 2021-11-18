@@ -42,7 +42,7 @@ from itertools import product
 import numpy as np
 from numpy import linalg
 
-from cairo_planning.geometric.transformation import pose2trans, pseudoinverse, analytic_xyz_jacobian, quat2rpy, rot2rpy
+from cairo_planning.geometric.transformation import pose2trans, pseudoinverse, analytic_xyz_jacobian, quat2rpy, rot2rpy, transform_inv
 from cairo_planning.geometric.utils import wrap_to_interval as w2i
 from numpy.core.numeric import identity
 
@@ -76,6 +76,7 @@ def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25,
         T0_s = pose2trans(np.hstack([trans + quat]))
         # generates the task space distance and error/displacement vector
         min_distance_new, x_err = distance_from_TSR(T0_s, tsr)
+        # print(min_distance_new, x_err)
         if min_distance_new < epsilon:
             return q_s  # we've reached the manifold within epsilon error
         elif count > iter_count:
@@ -86,9 +87,8 @@ def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25,
         # obtain the analytic jacobian
         J_rpy = analytic_xyz_jacobian(J[3:6, :], quat2rpy(quat))
         Ja = np.vstack([np.array(J_t), np.array(J_rpy)])
-        # J_cross = pseudoinverse(Ja)
-        delta=.75
         try:
+            delta=.1
             J_cross = np.dot(Ja.T, np.linalg.inv(np.dot(Ja, Ja.T) + np.dot(delta**2, np.identity(np.shape(Ja)[0]))))
         except np.linalg.linalg.LinAlgError:
             # likely a singular matrix error...
@@ -146,9 +146,10 @@ def distance_from_TSR(T0_s, tsr):
         float, ndarray: The min distance from a TSR and the corresponding task space error vector.
     """
     # pose of the grasp location or the pose of the object held by the hand in world coordinates
-    T0_sp = np.dot(T0_s, np.linalg.inv(tsr.Tw_e))
+    #T0_sp = np.dot(transform_inv(tsr.Tw_e), T0_s)
+    T0_sp = np.dot(T0_s, transform_inv(tsr.Tw_e))
     # T0_sp in terms of the coordinates of the target frame w given by the Task Space Region tsr.
-    Tw_sp = np.dot(np.linalg.inv(tsr.T0_w), T0_sp)
+    Tw_sp = np.dot(transform_inv(tsr.T0_w), T0_sp)
     # Generate the displacement vector of Tw_sp. Displacement represents the error given T0_s relative to Tw_e transform.
     disp = displacement(Tw_sp)
     # Since there are equivalent angle displacements for rpy, generate those equivalents by added +/- PI.
@@ -174,7 +175,7 @@ def displacement(Tm):
     Returns:
         ndarray: The displacement vector.
     """
-    Tv = Tm[0:3, 3]
+    Tv = [-Tm[0:3, 3][2], -Tm[0:3, 3][0], -Tm[0:3, 3][1]]
     Rt = Tm[0:3, 0:3]
     rpy = rot2rpy(Rt)
     return np.hstack([Tv, rpy[0], rpy[1], rpy[2]])

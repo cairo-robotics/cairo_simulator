@@ -165,3 +165,22 @@ def bounds_matrix(translation_limits, rotation_limits):
     pitch_limits = np.array(rotation_limits[1])
     yaw_limits = np.array(rotation_limits[2])
     return np.vstack([x_limits, y_limits, z_limits, roll_limits, pitch_limits, yaw_limits])
+
+def transform_inv(Tm):
+    """
+    Given a full transform matrix rotation and translation, computes the inverse transform
+
+    Args:
+        Tm (ndarray): 4x4 Transformation matrix
+
+
+    Returns:
+        ndarray: THe inverted transformation matrix,
+    """
+    Tv = Tm[0:3, 3]
+    Rt = Tm[0:3, 0:3]
+    Rtinv = Rt.T
+    Tvinv = -Tv
+    Rtinv_full = np.vstack([np.hstack([Rtinv, np.array([0, 0, 0]).reshape(3, 1)]), np.array((0, 0, 0, 1))])
+    Tvinv_full = np.vstack([np.hstack([np.eye(3, 3), np.array(Tvinv).reshape(3, 1)]), np.array((0, 0, 0, 1))])
+    return np.dot(Rtinv_full, Tvinv_full)
