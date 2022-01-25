@@ -89,7 +89,7 @@ def pose2trans(xyzxyzw):
     to a transformation matrix.
 
     Args:
-        xyzxyzw (array-like): The pose vector. Quatnernion in wxyz form.
+        xyzxyzw (array-like): The pose vector. Quatnernion in xyzw form.
 
     Returns:
         ndarray: Trasnformation matrix.

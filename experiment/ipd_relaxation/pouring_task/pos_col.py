@@ -61,13 +61,24 @@ def main():
                     "orientation":  [0, 0, 0],
                     "fixed_base": 1    
                 }
+        },
+        {
+            "type": "box",
+            "primitive_configs": {"w": .25, "l": .25, "h": .25},
+            "sim_object_configs": 
+                {
+                    "object_name": "box",
+                    "position": [.84, -.34, .7],
+                    "orientation":  [0, 0, 0],
+                    "fixed_base": 1    
+                }
         }
     ]
     config["tsr"] = {
         'degrees': False,
-        "T0_w": [0, 0, 0, 0, 0, 0],
-        "Tw_e": [.7968, -.5772, .15, np.pi/2, 0,  np.pi/2],
-        "Bw": [[(-.1, .1), (-.1, .1), (-100, 100)],  
+        "T0_w": [.7968, -.5772, 1.05, np.pi/2, 0,  np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0],
+        "Bw": [[(-.05, .05), (-.05, .05), (-100, -.2)],  
                 [(-6.3, 6.3), (-6.3, 6.3), (-6.3, 6.3)]]
     }
     # For the mug-based URDF of sawyer, we need to exclude links that are in constant self collision for the SVC
@@ -80,11 +91,11 @@ def main():
     T0_w2 = xyzrpy2trans(tsr_config['T0_w'], degrees=tsr_config['degrees'])
     Tw_e2 = xyzrpy2trans(tsr_config['Tw_e'], degrees=tsr_config['degrees'])
     Bw2 = bounds_matrix(tsr_config['Bw'][0], tsr_config['Bw'][1])
-    tsr = TSR(T0_w=T0_w2, Tw_e=Tw_e2, Bw=Bw2, bodyandlink=0, manipindex=16)
+    tsr = TSR(T0_w=T0_w2, Tw_e=Tw_e2, Bw=Bw2)
     
 
-    start = [0.4523310546875, 0.8259462890625, -1.3458369140625, 0.3512138671875, 1.7002646484375, -0.7999306640625, -1.324783203125] 
-    end = [0.4744602681883867, 0.8285360399837387, -1.3611745029355262, 0.46573801578937424, 1.698253951930024, -0.8977778204281606, -1.2917659789676281]
+    start = [-1.0930450232101965, 0.442265466150249, -1.3717861567014207, -0.039296632642075835, -0.15583571437966048, -1.3894321974110178, -0.24840396138506593] 
+    end = [-1.3508387,   0.55236681, -1.179219,   -0.77012876, -0.41494029, -0.66105278, -3.42548387]
 
     sim_context = SawyerBiasedSimContext(configuration=config)
     sim = sim_context.get_sim_instance()

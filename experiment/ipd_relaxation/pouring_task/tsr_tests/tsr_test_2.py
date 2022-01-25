@@ -21,7 +21,6 @@ from cairo_planning.constraints.projection import distance_from_TSR
 def distance_to_TSR_config(manipulator, q_s, tsr):
     world_pose, _ = manipulator.solve_forward_kinematics(q_s)
     trans, quat = world_pose[0], world_pose[1]
-    print(trans, quat2rpy(quat))
     T0_s = pose2trans(np.hstack([trans + quat]))
     # generates the task space distance and error/displacement vector
     min_distance_new, x_err = distance_from_TSR(T0_s, tsr)
@@ -104,6 +103,10 @@ def main():
 
     
     sample = [-1.2935242817684087, 0.6871494889588692, -1.1435452680721492, -0.7077175889750391, -0.571226569472242, -0.6229696369014182, 2.8631755973215913]
+    world_pose, _ = sawyer_robot.solve_forward_kinematics(sample)
+    trans, quat = world_pose[0], world_pose[1]
+    print(trans, quat2rpy(quat))
+    print(tsr_config["T0_w"][0] - trans[0], tsr_config["T0_w"][1] - trans[1], tsr_config["T0_w"][2] - trans[2])
     sawyer_robot.set_joint_state(sample)
     # Disabled collisions during planning with certain eclusions in place.
     with DisabledCollisionsContext(sim, [], []):

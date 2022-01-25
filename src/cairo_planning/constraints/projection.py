@@ -89,7 +89,7 @@ def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25,
         Ja = np.vstack([np.array(J_t), np.array(J_rpy)])
         try:
             delta=.1
-            J_cross = np.dot(Ja.T, np.linalg.inv(np.dot(Ja, Ja.T) + np.dot(delta**2, np.identity(np.shape(Ja)[0]))))
+            J_cross = np.dot(Ja.T, np.linalg.inv(np.dot(Ja, Ja.T)))
         except np.linalg.linalg.LinAlgError:
             # likely a singular matrix error...
             return None
@@ -102,7 +102,7 @@ def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25,
         #     for val in q_s:
         #         q_s_new.append(w2i(val))
         #     q_s = np.array(q_s_new)
-        if np.linalg.norm(q_s - np.array(q_old)) > 4 * q_step or not within_joint_limits(manipulator, q_s):
+        if np.linalg.norm(q_s - np.array(q_old)) > 2 * q_step or not within_joint_limits(manipulator, q_s):
                 return None
 
         # if not within_joint_limits(manipulator, q_s):
@@ -175,7 +175,8 @@ def displacement(Tm):
     Returns:
         ndarray: The displacement vector.
     """
-    Tv = [-Tm[0:3, 3][2], -Tm[0:3, 3][0], -Tm[0:3, 3][1]]
+    # Tv = [-Tm[0:3, 3][2], -Tm[0:3, 3][0], -Tm[0:3, 3][1]]
+    Tv = Tm[0:3, 3]
     Rt = Tm[0:3, 0:3]
     rpy = rot2rpy(Rt)
     return np.hstack([Tv, rpy[0], rpy[1], rpy[2]])
