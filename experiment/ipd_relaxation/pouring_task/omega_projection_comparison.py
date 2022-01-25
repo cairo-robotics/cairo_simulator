@@ -18,7 +18,7 @@ from cairo_simulator.core.sim_context import SawyerBiasedSimContext
 from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.constraints.foliation import VGMMFoliationClustering, winner_takes_all
 from cairo_planning.constraints.projection import project_config
-from cairo_planning.geometric.transformation import xyzrpy2trans, bounds_matrix
+from cairo_planning.geometric.transformation import xyzrpy2trans, bounds_matrix, quat2rpy
 from cairo_planning.geometric.utils import wrap_to_interval
 from cairo_planning.geometric.tsr import TSR
 from cairo_planning.geometric.state_space import DistributionSpace, SawyerConfigurationSpace
@@ -28,6 +28,16 @@ from cairo_planning.local.curve import JointTrajectoryCurve
 from cairo_planning.planners import CBiRRT2
 from cairo_planning.sampling.samplers import DistributionSampler
 
+from cairo_planning.geometric.transformation import pose2trans, pseudoinverse, analytic_xyz_jacobian, quat2rpy, rot2rpy
+from cairo_planning.constraints.projection import distance_from_TSR
+
+def distance_to_TSR_config(manipulator, q_s, tsr):
+    world_pose, _ = manipulator.solve_forward_kinematics(q_s)
+    trans, quat = world_pose[0], world_pose[1]
+    T0_s = pose2trans(np.hstack([trans + quat]))
+    # generates the task space distance and error/displacement vector
+    min_distance_new, x_err = distance_from_TSR(T0_s, tsr)
+    return min_distance_new, x_err
 
 if __name__ == "__main__":
     ###########################################
@@ -62,7 +72,7 @@ if __name__ == "__main__":
         {
             "object_name": "Table",
             "model_file_or_sim_id": ASSETS_PATH + 'table.sdf',
-            "position": [0.6, 0, .1],
+            "position": [0.75, 0, .1],
             "orientation":  [0, 0, 1.5708],
             "fixed_base": 1
         },
@@ -74,7 +84,18 @@ if __name__ == "__main__":
             "sim_object_configs": 
                 {
                     "object_name": "cylinder",
-                    "position": [.8, -.5726, .6],
+                    "position": [.9, -.57, .6],
+                    "orientation":  [0, 0, 0],
+                    "fixed_base": 1    
+                }
+        },
+        {
+            "type": "box",
+            "primitive_configs": {"w": .25, "l": .25, "h": .25},
+            "sim_object_configs": 
+                {
+                    "object_name": "box",
+                    "position": [.84, -.34, .7],
                     "orientation":  [0, 0, 0],
                     "fixed_base": 1    
                 }
@@ -137,66 +158,66 @@ if __name__ == "__main__":
     # Generic, unconstrained TSR:
     unconstrained_TSR = {
         'degrees': False,
-        "T0_w": [0, 0, 0, 0, 0, 0],
-        "Tw_e": [.7968, -.5726, .15, np.pi/2, 0,  np.pi/2],
+        "T0_w":  [.7968, -.5772, 1.05, np.pi/2, 0,  np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-100, 100), (-100, 100), (-100, 100)],  
-                [(-6.3, 6.3), (-6.3, 6.3), (-6.3, 6.3)]]
+                [(-100, 100), (-100, 100), (-100, 100)]]
     }
     # Let's first define all TSR configurations for this task:
     # Orientation only (1)
     TSR_1_config = {
         'degrees': False,
-        "T0_w": [0, 0, 0, 0, 0, 0],
-        "Tw_e": [.7968, -.5726, .15, np.pi/2, 0,  np.pi/2],
+        "T0_w":  [.7968, -.5772, 1.05, np.pi/2, 0,  np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-100, 100), (-100, 100), (-100, 100)],  
                 [(-.05, .05), (-.05, .05), (-.05, .05)]]
     }
     # centering only (2)
     TSR_2_config = {
         'degrees': False,
-        "T0_w": [0, 0, 0, 0, 0, 0],
-        "Tw_e": [.7968, -.5726, .15, np.pi/2, 0,  np.pi/2],
-        "Bw": [[(-.1, .1), (-.1, .1), (-100, 100)],  
-                [(-6.3, 6.3), (-6.3, 6.3), (-6.3, 6.3)]]
+        "T0_w":  [.7968, -.5772, 1.05, np.pi/2, 0,  np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0],
+        "Bw": [[(-.05, .05), (-.05, .05), (-100, -0.2)],  
+                [(-100, 100), (-100, 100), (-100, 100)]]
     }
     # height only (3)
     TSR_3_config = {
         'degrees': False,
-        "T0_w": [0, 0, 0, 0, 0, 0],
-        "Tw_e": [.7968, -.5726, .15, np.pi/2, 0,  np.pi/2],
+        "T0_w":  [.7968, -.5772, 1.05, np.pi/2, 0,  np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-100, 100), (-100, 100), (0, 100)],  
-                [(-6.3, 6.3), (-6.3, 6.3), (-6.3, 6.3)]]
+                 [(-100, 100), (-100, 100), (-100, 100)]]
     }
     # Orientation AND centering constraint (1, 2)
     TSR_12_config = {
         'degrees': False,
-        "T0_w": [0, 0, 0, 0, 0, 0],
-        "Tw_e": [.7968, -.5726, .739, np.pi/2, 0,  np.pi/2],
-        "Bw": [[(-.1, .1), (-.1, .1), (-100, 100)],  
+        "T0_w":  [.7968, -.5772, 1.05, np.pi/2, 0,  np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0],
+        "Bw": [[(-.05, .05), (-.05, .05), (-100, 100)],  
                 [(-.05, .05), (-.05, .05), (-.05, .05)]]
     }
     # orientation AND height constraint (1, 3)
     TSR_13_config = {
         'degrees': False,
-        "T0_w": [0, 0, 0, 0, 0, 0],
-        "Tw_e": [.7968, -.5726, .15, np.pi/2, 0,  np.pi/2],
+        "T0_w":  [.7968, -.5772, 1.05, np.pi/2, 0,  np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-100, 100), (-100, 100), (0, 100)],  
                 [(-.05, .05), (-.05, .05), (-.05, .05)]]
     }
     # height AND centering constraint (2, 3)
     TSR_23_config = {
         'degrees': False,
-        "T0_w": [0, 0, 0, 0, 0, 0],
-        "Tw_e": [.7968, -.5726, .15, np.pi/2, 0,  np.pi/2],
-        "Bw": [[(-.1, .1), (-.1, .1), (0, 100)],  
-                [(-6.3, 6.3), (-6.3, 6.3), (-6.3, 6.3)]]
+        "T0_w":  [.7968, -.5772, 1.05, np.pi/2, 0,  np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0],
+        "Bw": [[(-.05, .05), (-.05, .05), (0, 100)],  
+                [(-100, 100), (-100, 100), (-100, 100)]]
     }
     # orientation, centering, and height AND height constraint (1, 2, 3)
     TSR_123_config = {
         'degrees': False,
-        "T0_w": [0, 0, 0, 0, 0, 0],
-        "Tw_e": [.7968, -.5726, .15, np.pi/2, 0,  np.pi/2],
-        "Bw": [[(-.1, .1), (-.1, .1), (0, 100)],  
+        "T0_w":  [.7968, -.5772, 1.05, np.pi/2, 0,  np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0],
+        "Bw": [[(-.05, .05), (-.05, .05), (0, 100)],  
                 [(-.05, .05), (-.05, .05), (-.05, .05)]]
     }
 
@@ -245,7 +266,7 @@ if __name__ == "__main__":
     end_data = [obsv['robot']['joint_angle'] for obsv in keyframes[end_keyframe_id]["observations"]]
     keyframe_dist = KernelDensityDistribution(bandwidth=.05)
     keyframe_dist.fit(end_data)
-    keyframe_space = DistributionSpace(sampler=DistributionSampler(keyframe_dist), limits=limits)
+    keyframe_space = DistributionSpace(sampler=DistributionSampler(keyframe_dist, fraction_uniform=0), limits=limits)
     # we cast the keyframe ids to int for networkx node dereferencing as keyframe ids are output as strings from CAIRO LfD 
     planning_G.add_nodes_from([int(end_keyframe_id)], keyframe_space=keyframe_space)
 
@@ -282,7 +303,8 @@ if __name__ == "__main__":
     ############################################################################
     
     reversed_keyframes = list(reversed(keyframes.items()))[1:]
-    # use to keep track of sequence of constraint transition, start, and end keyframe ids as
+    
+    # used to keep track of sequence of constraint transition, start, and end keyframe ids as
     # not all keyframes in the lfd model will be used
     keyframe_planning_order = []
     keyframe_planning_order.insert(0, int(end_keyframe_id))
@@ -304,19 +326,19 @@ if __name__ == "__main__":
             data = [obsv['robot']['joint_angle'] for obsv in keyframe_data["observations"]]
             keyframe_dist = KernelDensityDistribution(bandwidth=.05)
             keyframe_dist.fit(data)
+            # We want to fully bias sampling from keyframe distributions.
             keyframe_space = DistributionSpace(sampler=DistributionSampler(keyframe_dist, fraction_uniform=0), limits=limits)
 
             # Let's create the node and add teh keyframe KDE model as a planning space.
             planning_G.add_nodes_from([keyframe_id], keyframe_space=keyframe_space)
 
             # get the constraint IDs
-            constraint_ids = []
+            constraint_ids = keyframe_data["applied_constraints"]
             
             # The foliation constraint ids combines both start and end keyframes of the planning segment. In other words, we need to 
             # ensure the start point and ending steering point are in the same foliation, so we utilize the constraints from both keyframes.
-            foliation_constraint_ids = []
+            foliation_constraint_ids = list(set(keyframe_data["applied_constraints"] + keyframes[str(upcoming_id)]["applied_constraints"]))
 
-            print(foliation_constraint_ids)
             planning_G.nodes[keyframe_id]["constraint_ids"] = constraint_ids
             
             # Get the TSR configurations so they can be appended to both the keyframe and the edge between associated with constraint ID combo.
@@ -353,7 +375,7 @@ if __name__ == "__main__":
                 # this information will be used to create a biasing distribution for sampling during planning between steering points.
                 sampling_bias = {
                     'bandwidth': .1,
-                    'fraction_uniform': .25,
+                    'fraction_uniform': .1,
                     'data': inter_trajs_data
                 }
                 planning_config['sampling_bias'] = sampling_bias
@@ -383,26 +405,179 @@ if __name__ == "__main__":
     # A list to append path segments in order to create one continuous path
     final_path = []
     
+    ###################################################
+    #           SEQUENTIAL MANIFOLD PLANNING          #
+    ###################################################
+    # Now that we've defined our planning problem     #
+    # withing a planning graph, which defines our SMP #
+    # problem. We perform IPD relaxation and actual   #
+    # planning.                                       #
+    ###################################################
     
-    # We create a Sim context from the config for planning. 
-    sim_context = SawyerBiasedSimContext(base_config, setup=False)
+    # Here we use the keyframe planning order, creating a sequential pairing of keyframe ids.
+    for edge in list(zip(keyframe_planning_order, keyframe_planning_order[1:])):
+        epsilon = .1
+        e1 = edge[0]
+        e2 = edge[1]
+        edge_data = planning_G.edges[e1, e2]
+        # lets ge the planning config from the edge or use the generic base config defined above
+        config = edge_data.get('config', base_config)
+        
+        # We create a Sim context from the config for planning. 
+        sim_context = SawyerBiasedSimContext(config, setup=False)
+        sim_context.setup(sim_overrides={"use_gui": False, "run_parallel": False})
+        planning_state_space = sim_context.get_state_space() # The biased state space for sampling points according to intermediate trajectories.
+        sim = sim_context.get_sim_instance()
+        logger = sim_context.get_logger()
+        sawyer_robot = sim_context.get_robot()
+        svc = sim_context.get_state_validity() # the SVC is the same for all contexts so we will use this one in our planner.
+        interp_fn = partial(parametric_lerp, steps=10)
+      
+        if planning_G.nodes[e1].get("omega_pairs", None) is None:
+            # Create the TSR object
+            planning_tsr_config =  planning_G.nodes[e1].get("tsr", unconstrained_TSR)
+            T0_w = xyzrpy2trans(planning_tsr_config['T0_w'], degrees=planning_tsr_config['degrees'])
+            Tw_e = xyzrpy2trans(planning_tsr_config['Tw_e'], degrees=planning_tsr_config['degrees'])
+            Bw = bounds_matrix(planning_tsr_config['Bw'][0], planning_tsr_config['Bw'][1])
+            # we plan with the current edges first/starting node's tsr and planning space.
+            planning_tsr = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw, bodyandlink=0, manipindex=16)
+            
+            print("Constraints {}: {}".format(e1, planning_G.nodes[e1].get("constraint_ids", [])))
+            foliation_model =  planning_G.nodes[e1].get("foliation_model", None)
+            foliation_value =  planning_G.nodes[e1].get("foliation_value", None)
+
+            keyframe_space_e1 = planning_G.nodes[e1]['keyframe_space']
+            omega_pairs = []
+            with DisabledCollisionsContext(sim, [], [], disable_visualization=True):
+                count = 0
+                while count < 10:
+                    raw_sample = keyframe_space_e1.sample()
+                    sample = []
+                    for value in raw_sample:
+                        sample.append(wrap_to_interval(value))
+                    # If the sample is already constraint compliant, no need to project. Thanks LfD!
+                    err, _ = distance_to_TSR_config(sawyer_robot, sample, planning_tsr)
+                    if planning_G.nodes[e1].get("constraint_ids", []) == []:
+                        omega_pairs.append((sample, sample))
+                        count+=1
+                    elif err < epsilon and svc.validate(sample):
+                        omega_pairs.append((sample, sample))
+                        count+=1
+                    elif svc.validate(sample):
+                        q_constrained = project_config(sawyer_robot, planning_tsr, np.array(
+                        sample), np.array(sample), epsilon=epsilon, e_step=.35, q_step=100)
+                        normalized_q_constrained = []
+                        # If there is a foliation model, then we must perform rejection sampling until the projected sample is classified 
+                        # to the node's foliation value
+                        if q_constrained is not None:
+                            if foliation_model is not None:
+                                # This is the rejection sampling step to enforce the foliation choice
+                                if foliation_model.predict(np.array([q_constrained])) == foliation_value:
+                                    for value in q_constrained:
+                                        normalized_q_constrained.append(
+                                            wrap_to_interval(value))
+                                else:
+                                    continue
+                            else:
+                                for value in q_constrained:
+                                    normalized_q_constrained.append(
+                                        wrap_to_interval(value))
+                        else:
+                            continue
+                        if svc.validate(normalized_q_constrained):
+                            omega_pairs.append((sample, normalized_q_constrained))
+                            count+=1
+            planning_G.nodes[e1]["omega_pairs"] = omega_pairs
+
+        if planning_G.nodes[e2].get("omega_pairs", None) is None:
+            keyframe_space_e2 =  planning_G.nodes[e2]['keyframe_space']
+            tsr_config =  planning_G.nodes[e2].get("tsr", unconstrained_TSR)
+            T0_w2 = xyzrpy2trans(tsr_config['T0_w'], degrees=tsr_config['degrees'])
+            Tw_e2 = xyzrpy2trans(tsr_config['Tw_e'], degrees=tsr_config['degrees'])
+            Bw2 = bounds_matrix(tsr_config['Bw'][0], tsr_config['Bw'][1])
+            tsr = TSR(T0_w=T0_w2, Tw_e=Tw_e2, Bw=Bw2, bodyandlink=0, manipindex=16)
+            
+            print("Constraints {}: {}".format(e2, planning_G.nodes[e2].get("constraint_ids", [])))
+            foliation_model =  planning_G.nodes[e2].get("foliation_model", None)
+            foliation_value =  planning_G.nodes[e2].get("foliation_value", None)
+
+            keyframe_space_e1 = planning_G.nodes[e2]['keyframe_space']
+            omega_pairs = []
+            with DisabledCollisionsContext(sim, [], [], disable_visualization=True):
+                count = 0
+                while count < 10:
+                    raw_sample = keyframe_space_e2.sample()
+                    sample = []
+                    for value in raw_sample:
+                        sample.append(wrap_to_interval(value))
+                    # If the sample is already constraint compliant, no need to project. Thanks LfD!
+                    err, _ = distance_to_TSR_config(sawyer_robot, sample, tsr)
+                    if planning_G.nodes[e2].get("constraint_ids", []) == [2]:
+                        print("hello")
+                    if planning_G.nodes[e2].get("constraint_ids", []) == []:
+                        omega_pairs.append((sample, sample))
+                        count+=1
+                        continue
+                    elif err < epsilon and svc.validate(sample):
+                        omega_pairs.append((sample, sample))
+                        count+=1
+                        continue
+                    elif svc.validate(sample):
+                        q_constrained = project_config(sawyer_robot, planning_tsr, np.array(
+                        sample), np.array(sample), epsilon=epsilon, e_step=.35, q_step=100, iter_count=100)
+                        normalized_q_constrained = []
+                        # If there is a foliation model, then we must perform rejection sampling until the projected sample is classified 
+                        # to the node's foliation value
+                        if q_constrained is not None:
+                            if foliation_model is not None:
+                                # This is the rejection sampling step to enforce the foliation choice
+                                if foliation_model.predict(np.array([q_constrained])) == foliation_value:
+                                    for value in q_constrained:
+                                        normalized_q_constrained.append(
+                                            wrap_to_interval(value))
+                                else:
+                                    continue
+                            else:
+                                for value in q_constrained:
+                                    normalized_q_constrained.append(
+                                        wrap_to_interval(value))
+                        else:
+                            continue
+                        if svc.validate(normalized_q_constrained):
+                            omega_pairs.append((sample, normalized_q_constrained))
+                            count+=1
+                planning_G.nodes[e2]["omega_pairs"] = omega_pairs
+                print(omega_pairs)
+        sim_context.delete_context()
+
+                   
+               
+   
+    sim_context = SawyerBiasedSimContext(config, setup=False)
     sim_context.setup(sim_overrides={"use_gui": True, "run_parallel": False})
-    planning_state_space = sim_context.get_state_space() # The biased state space for sampling points according to intermediate trajectories.
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
     sawyer_robot = sim_context.get_robot()
-    svc = sim_context.get_state_validity() # the SVC is the same for all contexts so we will use this one in our planner.
-    interp_fn = partial(parametric_lerp, steps=20)
-    for node in planning_G.nodes():
-        
+    svc = sim_context.get_state_validity()
+    interp_fn = partial(parametric_lerp, steps=10)
+    sawyer_robot.set_joint_state(start_configuration)
+    key = input("Press any key to excute plan.")
 
-        # Create the TSR object
-        print(node)
-        keyframe_space_e1 = planning_G.nodes[node]['keyframe_space']
-        
-        for _ in range(0, 5):
-            sample = keyframe_space_e1.sample()
-            sawyer_robot.set_joint_state(sample)
-            time.sleep(2)
+    # splining uses numpy so needs to be converted
+    planning_path = [np.array(p) for p in final_path]
+    # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
+    jtc = JointTrajectoryCurve()
+    traj = jtc.generate_trajectory(planning_path, move_time=20)
+    try:
+        prior_time = 0
+        for i, point in enumerate(traj):
+            if not svc.validate(point[1]):
+                print("Invalid point: {}".format(point[1]))
+                continue
+            sawyer_robot.set_joint_state(point[1])
+            time.sleep(point[0] - prior_time)
+            prior_time = point[0]
+    except KeyboardInterrupt:
+        exit(1)
 
 

@@ -264,7 +264,7 @@ if __name__ == "__main__":
     
     # We will build a keyframe dsitribution using KDE from which to sample for steering points / viapoints. 
     end_data = [obsv['robot']['joint_angle'] for obsv in keyframes[end_keyframe_id]["observations"]]
-    keyframe_dist = KernelDensityDistribution(bandwidth=.05)
+    keyframe_dist = KernelDensityDistribution(bandwidth=.01)
     keyframe_dist.fit(end_data)
     keyframe_space = DistributionSpace(sampler=DistributionSampler(keyframe_dist, fraction_uniform=0), limits=limits)
     # we cast the keyframe ids to int for networkx node dereferencing as keyframe ids are output as strings from CAIRO LfD 
@@ -414,6 +414,8 @@ if __name__ == "__main__":
     # planning.                                       #
     ###################################################
     
+    testing_data = {}
+    
     # Here we use the keyframe planning order, creating a sequential pairing of keyframe ids.
     for edge in list(zip(keyframe_planning_order, keyframe_planning_order[1:])):
         e1 = edge[0]
@@ -452,6 +454,7 @@ if __name__ == "__main__":
                 found = False
                 while not found:
                     raw_sample = keyframe_space_e1.sample()
+                    # keyframe_space_e1.sampler.model.model.score(raw_sample)
                     sample = []
                     for value in raw_sample:
                         sample.append(wrap_to_interval(value))
@@ -460,11 +463,12 @@ if __name__ == "__main__":
                     if err < .1 and svc.validate(sample):
                         start = sample
                         planning_G.nodes[e1]['point'] = start
+                        planning_G.nodes[e1]['keyframe_point'] = raw_sample
                         found = True
                     elif svc.validate(sample):
                        
                         q_constrained = project_config(sawyer_robot, planning_tsr, np.array(
-                        sample), np.array(sample), epsilon=.025, e_step=.35, q_step=100)
+                        sample), np.array(sample), epsilon=.025, e_step=.1, q_step=100)
                         normalized_q_constrained = []
                         # If there is a foliation model, then we must perform rejection sampling until the projected sample is classified 
                         # to the node's foliation value
@@ -487,12 +491,12 @@ if __name__ == "__main__":
                             start = normalized_q_constrained
                             # We've generated a point so lets use it moving forward for all other planning segments. 
                             planning_G.nodes[e1]['point'] = start
+                            planning_G.nodes[e1]['keyframe_point'] = raw_sample
                             found = True
         # if the point steering/start point is available already, then we simply use it 
         else:
             start = planning_G.nodes[e1]['point']
-            print(start)
-
+        
         if e2 == 33 or e2 == '33':
             print("Made it")
 
@@ -522,11 +526,12 @@ if __name__ == "__main__":
                     if err < .1 and svc.validate(sample):
                         end = sample
                         planning_G.nodes[e2]['point'] = end
+                        planning_G.nodes[e1]['keyframe_point'] = raw_sample
                         found = True
                     elif svc.validate(sample):
                         # We use a large q_step since we're not using project_config for cbirrt2 but instead just trying to project as ingle point. We don't care about how far we're stepping w.r.t tree growth
                         q_constrained = project_config(sawyer_robot, tsr, np.array(
-                        sample), np.array(sample), epsilon=.025, e_step=.25, q_step=100)
+                        sample), np.array(sample), epsilon=.1, e_step=.25, q_step=100, iter_count=100)
                         normalized_q_constrained = []
                         if q_constrained is not None:
                             if foliation_model is not None:
@@ -549,41 +554,24 @@ if __name__ == "__main__":
                             end = normalized_q_constrained
                             # We've generated a point so lets use it moving forward for all other planning segments. 
                             planning_G.nodes[e2]['point'] = end
+                            planning_G.nodes[e1]['keyframe_point'] = raw_sample
                             found = True
         else:
             end = planning_G.nodes[e2]['point']
+        testing_data[(e1, e2)] = {
+            "start": start, 
+            "raw_start": planning_G.nodes[e1].get('keyframe_point', []),
+            "end:": end,
+            "raw_end": planning_G.nodes[e2].get('keyframe_point', [])
+        }
         print("\n\nSTART AND END\n")
         print(start, end)
+        print(planning_G.nodes[e1].get('keyframe_point', []), planning_G.nodes[e2].get('keyframe_point', []))
         print(np.linalg.norm(np.array(start) - np.array(end)))
-        print("\n\n")
-        if np.linalg.norm(np.array(start) - np.array(end)) > .1:
-            with DisabledCollisionsContext(sim, [], [], disable_visualization=True):
-                ###########
-                # CBiRRT2 #
-                ###########
-                # Use parametric linear interpolation with 10 steps between points.
-                interp = partial(parametric_lerp, steps=10)
-                # See params for CBiRRT2 specific parameters 
-                cbirrt = CBiRRT2(sawyer_robot, planning_state_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 5, 'epsilon': .08, 'q_step': .38, 'e_step': .25, 'iters': 20000})
-                logger.info("Planning....")
-                print("Start, end: ", start, end)
-                logger.info("Constraints: {}".format(planning_G.nodes[e1].get('constraint_ids', None)))
-                print(planning_tsr_config)
-                plan = cbirrt.plan(planning_tsr, np.array(start), np.array(end))
-                path = cbirrt.get_path(plan)
-            if len(path) == 0:
-                logger.info("Planning failed....")
-                sys.exit(1)
-            logger.info("Plan found....")
-        else:
-            # sometimes the start point is really, really close to the a keyframe so we just inerpolate, since really close points are challenging the CBiRRT2 given the growth parameters
-            path = [list(val) for val in interp_fn(np.array(start), np.array(end))]
-
-        # splining uses numpy so needs to be converted
-        logger.info("Length of path: {}".format(len(path)))
-        final_path = final_path + path
-        sim_context.delete_context()
+        print(e1, e2)
                
+        sim_context.delete_context()
+    
    
     sim_context = SawyerBiasedSimContext(config, setup=False)
     sim_context.setup(sim_overrides={"use_gui": True, "run_parallel": False})
@@ -595,21 +583,14 @@ if __name__ == "__main__":
     sawyer_robot.set_joint_state(start_configuration)
     key = input("Press any key to excute plan.")
 
-    # splining uses numpy so needs to be converted
-    planning_path = [np.array(p) for p in final_path]
-    # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
-    jtc = JointTrajectoryCurve()
-    traj = jtc.generate_trajectory(planning_path, move_time=20)
-    try:
-        prior_time = 0
-        for i, point in enumerate(traj):
-            if not svc.validate(point[1]):
-                print("Invalid point: {}".format(point[1]))
-                continue
-            sawyer_robot.set_joint_state(point[1])
-            time.sleep(point[0] - prior_time)
-            prior_time = point[0]
-    except KeyboardInterrupt:
-        exit(1)
+    for key,value in testing_data.items():
+        print(key)
+        print("Moving to start")
+        sawyer_robot.set_joint_state(value["start"])
+        time.sleep(5)
+        print("Moving raw start")
+        sawyer_robot.set_joint_state(value["raw_start"])
+        time.sleep(5)
 
+    
 
