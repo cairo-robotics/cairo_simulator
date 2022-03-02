@@ -172,7 +172,7 @@ class Manipulator(Robot):
         # return ((world_pos, world_ori), (local_pos, local_ori))
         curr_config = self.get_current_joint_states()
         self.set_joint_state(joint_configuration)
-        pyb_fk_results = p.getLinkState(self._simulator_id, self._end_effector_link_index, computeForwardKinematics=False)
+        pyb_fk_results = p.getLinkState(self._simulator_id, self._end_effector_link_index, computeForwardKinematics=True)
         pyb_world_pos, pyb_world_ori = list(pyb_fk_results[0]), list(pyb_fk_results[1]),
         pyb_local_pos, pyb_local_ori = list(pyb_fk_results[2]), list(pyb_fk_results[3])
         self.set_joint_state(curr_config)
