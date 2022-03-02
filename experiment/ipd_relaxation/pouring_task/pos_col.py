@@ -93,10 +93,10 @@ def main():
     Bw2 = bounds_matrix(tsr_config['Bw'][0], tsr_config['Bw'][1])
     tsr = TSR(T0_w=T0_w2, Tw_e=Tw_e2, Bw=Bw2)
     
+    start = [-0.8799135562638005, 0.15424067433906785, -1.3125523914606885, 0.4223353570071322, -0.14592991727768645, -1.3223722317647635, -0.046939063202142695]
+    end =  [-0.9137514174340717, 0.5698582591337029, -2.683346366831216, 0.9672316580147626, 1.0790643242973017, -1.320635357781881, -2.630111399767522]
 
-    start = [-1.0930450232101965, 0.442265466150249, -1.3717861567014207, -0.039296632642075835, -0.15583571437966048, -1.3894321974110178, -0.24840396138506593] 
-    end = [-1.3508387,   0.55236681, -1.179219,   -0.77012876, -0.41494029, -0.66105278, -3.42548387]
-
+    
     sim_context = SawyerBiasedSimContext(configuration=config)
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
@@ -105,7 +105,7 @@ def main():
     # _ = sawyer_robot.get_simulator_id()
     _ = sim_context.get_sim_objects(['Ground'])[0]
     svc = sim_context.get_state_validity()
-
+    time.sleep(5)
     print("Moving to start")
     sawyer_robot.set_joint_state(start)
     time.sleep(5)
