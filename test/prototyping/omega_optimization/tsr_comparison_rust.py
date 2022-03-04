@@ -40,14 +40,15 @@ def main():
     rusty_sawyer_robot = Agent(settings_path, False, False)
 
     p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, 1)
+    # [0.7511185307142259, -0.20750105802527086, 0.3492014692886301] [ 1.57079633 -1.39626233  1.57078898]
 
     # joint_config_relaxed_ik = rusty_sawyer_robot.omega_projection([.2,0,-.5], [0,0,0,1]).data
     # print(joint_config_relaxed_ik)
     TSR_123_config = {
         'degrees': False,
-        "T0_w":  [0, 0, 0, 0, 0, 0],
-        "Tw_e": [.7968, 0, .25, np.pi/2, -np.pi/2,  np.pi/2],
-        "Bw": [(-.05, .05), (-.05, .05), (0, 100),  
+        "T0_w":  [0.7511185307142259, 0, 0, np.pi/2, -1.39626233, np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0], # NOT WORKING IF VALUES PLACED HERE BECAUSE THIS IS THE OFFEST OF THE OBJECT TO THE ENDEFFECTR BUT OUR OBJECT IIISSS THE ENDEFFECTOR
+        "Bw": [(0, 0), (0, 0), (0, 0),  
                 (-.05, .05), (-.05, .05), (-.05, .05)]
     }
     # T0_w = [0, 0, 0, 0, 0, 0]
@@ -62,9 +63,9 @@ def main():
     # Bw = [list(bounds) for bounds in Bw_np]
     rusty_sawyer_robot.update_tsr(TSR_123_config["T0_w"], TSR_123_config["Tw_e"],TSR_123_config["Bw"])
     try:
-        joint_config_relaxed_ik = rusty_sawyer_robot.tsr_optimize().data
-        sawyer_robot.set_joint_state(joint_config_relaxed_ik)
-        time.sleep(10)
+        while True:
+            joint_config_relaxed_ik = rusty_sawyer_robot.tsr_optimize().data
+            sawyer_robot.set_joint_state(joint_config_relaxed_ik)
     except KeyboardInterrupt:
         p.disconnect()
         sys.exit(0)
