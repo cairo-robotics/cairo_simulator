@@ -405,7 +405,9 @@ class Sawyer(Manipulator):
         for joint_name in self._arm_dof_names:
             self._arm_ik_indices.append(actuated_joints.index(joint_name))
 
-        self._end_effector_link_index = self._arm_dof_indices[-1]
+        # self._end_effector_link_index = self._arm_dof_indices[-1]
+        self._end_effector_link_index = 26
+
 
     def _init_joint_limits(self):
         """
