@@ -7,6 +7,7 @@ from functools import partial
 import time
 import copy
 import logging
+from pathlib import Path
 
 if os.environ.get('ROS_DISTRO'):
     import rospy
@@ -172,7 +173,7 @@ if __name__ == "__main__":
     # Generic, unconstrained TSR:
     unconstrained_TSR = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, 0,  np.pi/2],
+        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, -1.40,  np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-100, 100), (-100, 100), (-100, 100)],  
                 [(-100, 100), (-100, 100), (-100, 100)]]
@@ -181,7 +182,7 @@ if __name__ == "__main__":
     # Orientation only (1)
     TSR_1_config = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, 0,  np.pi/2],
+        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, -1.40,  np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-100, 100), (-100, 100), (-100, 100)],  
                 [(-.05, .05), (-.05, .05), (-.05, .05)]]
@@ -189,7 +190,7 @@ if __name__ == "__main__":
     # centering only (2)
     TSR_2_config = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, 0,  np.pi/2],
+        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, -1.40,  np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-.05, .05), (-.05, .05), (-100, -0.2)],  
                 [(-100, 100), (-100, 100), (-100, 100)]]
@@ -197,7 +198,7 @@ if __name__ == "__main__":
     # height only (3)
     TSR_3_config = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, 0,  np.pi/2],
+        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, -1.40,  np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-100, 100), (-100, 100), (0, 100)],  
                  [(-100, 100), (-100, 100), (-100, 100)]]
@@ -205,7 +206,7 @@ if __name__ == "__main__":
     # Orientation AND centering constraint (1, 2)
     TSR_12_config = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, 0,  np.pi/2],
+        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, -1.40,  np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-.05, .05), (-.05, .05), (-100, 100)],  
                 [(-.05, .05), (-.05, .05), (-.05, .05)]]
@@ -213,7 +214,7 @@ if __name__ == "__main__":
     # orientation AND height constraint (1, 3)
     TSR_13_config = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, 0,  np.pi/2],
+        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, -1.40,  np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-100, 100), (-100, 100), (0, 100)],  
                 [(-.05, .05), (-.05, .05), (-.05, .05)]]
@@ -221,7 +222,7 @@ if __name__ == "__main__":
     # height AND centering constraint (2, 3)
     TSR_23_config = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, 0,  np.pi/2],
+        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, -1.40,  np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-.05, .05), (-.05, .05), (0, 100)],  
                 [(-100, 100), (-100, 100), (-100, 100)]]
@@ -229,7 +230,7 @@ if __name__ == "__main__":
     # orientation, centering, and height AND height constraint (1, 2, 3)
     TSR_123_config = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, 0,  np.pi/2],
+        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, -1.40,  np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-.05, .05), (-.05, .05), (0, 100)],  
                 [(-.05, .05), (-.05, .05), (-.05, .05)]]
@@ -427,6 +428,7 @@ if __name__ == "__main__":
     # problem. We perform IPD relaxation and actual   #
     # planning.                                       #
     ###################################################
+    rusty_agent_settings_path = str(Path(__file__).parent.absolute()) + "/settings.yaml"
     script_logger.info("STEERING POINT GENERATION")
     # Here we use the keyframe planning order, creating a sequential pairing of keyframe ids.
     for edge in list(zip(keyframe_planning_order, keyframe_planning_order[1:])):
@@ -479,15 +481,11 @@ if __name__ == "__main__":
                         script_logger.info("{}".format(start))
                         found = True
                     elif svc.validate(sample):
-                        rusty_sawyer_robot = Agent('/home/carl/cairo/cairo_simulator/test/prototyping/settings.yaml', False, False)
+                        rusty_sawyer_robot = Agent(rusty_agent_settings_path, False, False)
                         rusty_sawyer_robot.update_xopt(sample)
-                        tsr_euler_pose = list(tsr.trans_to_xyzrpy(tsr.T0_w))
-                        tsr_euler_pose[4] = tsr_euler_pose[4] + np.pi/2
-                        print(tsr_euler_pose)
-                        position = tsr_euler_pose[0:3]
-                        quat = rpy2quat(tsr_euler_pose[3:])
+                        rusty_sawyer_robot.update_tsr(planning_tsr_config['T0_w'], planning_tsr_config['Tw_e'], planning_tsr_config['Bw'][0] +  planning_tsr_config['Bw'][1])
                         for _ in range(0, 100):
-                            q_constrained = rusty_sawyer_robot.omega_optimize(position, quat, sample).data
+                            q_constrained = rusty_sawyer_robot.omega_optimize(sample).data
                         # q_constrained = project_config(sawyer_robot, planning_tsr, np.array(
                         # sample), np.array(sample), epsilon=.025, e_step=.35, q_step=100)
                         normalized_q_constrained = []
@@ -532,7 +530,6 @@ if __name__ == "__main__":
             Bw2 = bounds_matrix(tsr_config['Bw'][0], tsr_config['Bw'][1])
             tsr = TSR(T0_w=T0_w2, Tw_e=Tw_e2, Bw=Bw2, bodyandlink=0, manipindex=16)
             script_logger.info("Keyframe {}".format(e2))
-
             
             print("Constraints {}: {}".format(e2, planning_G.nodes[e2].get("constraint_ids", [])))
             foliation_model =  planning_G.nodes[e2].get("foliation_model", None)
@@ -556,15 +553,12 @@ if __name__ == "__main__":
                         script_logger.info("{}".format(end))
                         found = True
                     elif svc.validate(sample):
-                        # We use a large q_step since we're not using project_config for cbirrt2 but instead just trying to project as ingle point. We don't care about how far we're stepping w.r.t tree growth
-                        rusty_sawyer_robot = Agent('/home/carl/cairo/cairo_simulator/test/prototyping/settings.yaml', False, False)
+                        rusty_sawyer_robot = Agent(rusty_agent_settings_path, False, False)
                         rusty_sawyer_robot.update_xopt(sample)
-                        tsr_euler_pose = list(tsr.trans_to_xyzrpy(tsr.T0_w))
-                        tsr_euler_pose[4] = tsr_euler_pose[4] + np.pi/2
-                        position = tsr_euler_pose[0:3]
-                        quat = rpy2quat(tsr_euler_pose[3:])
+                        print(tsr_config['T0_w'], tsr_config['Tw_e'], tsr_config['Bw'])
+                        rusty_sawyer_robot.update_tsr(tsr_config['T0_w'], tsr_config['Tw_e'], tsr_config['Bw'][0] + tsr_config['Bw'][1])
                         for _ in range(0, 100):
-                            q_constrained = rusty_sawyer_robot.omega_optimize(position, quat, sample).data
+                            q_constrained = rusty_sawyer_robot.omega_optimize(sample).data
                         normalized_q_constrained = []
                         if q_constrained is not None:
                             if foliation_model is not None:

@@ -44,13 +44,15 @@ def main():
 
     # joint_config_relaxed_ik = rusty_sawyer_robot.omega_projection([.2,0,-.5], [0,0,0,1]).data
     # print(joint_config_relaxed_ik)
-    TSR_123_config = {
+    tsr_config = {
         'degrees': False,
-        "T0_w":  [0, 0, 0, 0, 0, 0],
-        "Tw_e": [0.6511185307142259, 0, -.3, np.pi/2, np.pi + -1.40, np.pi/2],
-        "Bw": [(0, 0), (0, 0), (0, 0),  
-                (-.1, .1), (-.1, .1), (-.1, .1)]
+        "T0_w":  [.7968, -.5772, .05, np.pi/2, np.pi + -1.39,  np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0],
+        "Bw": [[(-100, 100), (-100, 100), (-100, 100)],  
+                [(-.01, .01), (.01, .01), (.01, .01)]]
     }
+        
+
     # T0_w = [0, 0, 0, 0, 0, 0]
     # Tw_e = [.5, 0, 0, np.pi/2,  0,  np.pi/2]
     # Bw_np = np.zeros((6, 2))
@@ -61,10 +63,13 @@ def main():
     # Bw_np[4, :] = [-.03, .03]
     # Bw_np[5, :] = [-.03, .03]
     # Bw = [list(bounds) for bounds in Bw_np]
-    rusty_sawyer_robot.update_tsr(TSR_123_config["T0_w"], TSR_123_config["Tw_e"],TSR_123_config["Bw"])
+    sample = [-1.2935242817684087, 0.6871494889588692, -1.1435452680721492, -0.7077175889750391, -0.571226569472242, -0.6229696369014182, 2.8631755973215913]
+    sawyer_robot.set_joint_state(sample)
+    time.sleep(5)
+    rusty_sawyer_robot.update_tsr(tsr_config["T0_w"], tsr_config["Tw_e"], tsr_config["Bw"][0] + tsr_config["Bw"][1])
     try:
-        while True:
-            joint_config_relaxed_ik = rusty_sawyer_robot.tsr_optimize().data
+        while True:    
+            joint_config_relaxed_ik = rusty_sawyer_robot.omega_optimize(sample).data
             sawyer_robot.set_joint_state(joint_config_relaxed_ik)
     except KeyboardInterrupt:
         p.disconnect()
