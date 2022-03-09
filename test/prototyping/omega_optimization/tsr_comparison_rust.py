@@ -46,10 +46,9 @@ def main():
     # print(joint_config_relaxed_ik)
     TSR_123_config = {
         'degrees': False,
-        "T0_w":  [0, 0, 0, 0, 0, 0],
-        "Tw_e": [0.6511185307142259, 0, 0, np.pi/2, np.pi/2, np.pi/2],
-        "Bw": [(0, 0), (0, 0), (0, 0),  
-                (-.1, .1), (-.1, .1), (-.1, .1)]
+        "T0_w":  [.6968, 0, 0, np.pi/2, -1.39,  np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0],
+        "Bw": [(0, 0), (0, 0), (0, 0), (-.01, .01), (-.01, .01), (-.01, .01)]
     }
     # T0_w = [0, 0, 0, 0, 0, 0]
     # Tw_e = [.5, 0, 0, np.pi/2,  0,  np.pi/2]
@@ -61,6 +60,8 @@ def main():
     # Bw_np[4, :] = [-.03, .03]
     # Bw_np[5, :] = [-.03, .03]
     # Bw = [list(bounds) for bounds in Bw_np]
+    seed_start = sawyer_robot.solve_inverse_kinematics(TSR_123_config["T0_w"][0:3], TSR_123_config["T0_w"][3:])
+    rusty_sawyer_robot.update_xopt(seed_start)
     rusty_sawyer_robot.update_tsr(TSR_123_config["T0_w"], TSR_123_config["Tw_e"],TSR_123_config["Bw"])
     try:
         while True:

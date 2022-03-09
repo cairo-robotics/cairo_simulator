@@ -46,10 +46,10 @@ def main():
     # print(joint_config_relaxed_ik)
     tsr_config = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, .05, np.pi/2, np.pi + -1.39,  np.pi/2],
+        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, 0,  np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
-        "Bw": [[(-100, 100), (-100, 100), (-100, 100)],  
-                [(-.01, .01), (.01, .01), (.01, .01)]]
+        "Bw": [[(-.05, .05), (-.05, .05), (-100, 100)],  
+                [(-.05, .05), (-.05, .05), (-.05, .05)]]
     }
         
 
@@ -63,9 +63,12 @@ def main():
     # Bw_np[4, :] = [-.03, .03]
     # Bw_np[5, :] = [-.03, .03]
     # Bw = [list(bounds) for bounds in Bw_np]
-    sample = [-1.2935242817684087, 0.6871494889588692, -1.1435452680721492, -0.7077175889750391, -0.571226569472242, -0.6229696369014182, 2.8631755973215913]
+    sample = [-1.0541111350003591, 0.47938957018657513, -1.2804332159469978, 0.1631097390425542, -0.0701496186869246, -1.2661493531546648, -0.3275759417945361]
+    # sample = [0, 0, 0, 0, 0, 0, 0]
     sawyer_robot.set_joint_state(sample)
     time.sleep(5)
+    seed_start = sawyer_robot.solve_inverse_kinematics(tsr_config["T0_w"][0:3], tsr_config["T0_w"][3:])
+    rusty_sawyer_robot.update_xopt(seed_start)
     rusty_sawyer_robot.update_tsr(tsr_config["T0_w"], tsr_config["Tw_e"], tsr_config["Bw"][0] + tsr_config["Bw"][1])
     try:
         while True:    

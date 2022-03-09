@@ -474,7 +474,7 @@ if __name__ == "__main__":
                         sample.append(wrap_to_interval(value))
                     # If the sample is already constraint compliant, no need to project. Thanks LfD!
                     err, _ = distance_to_TSR_config(sawyer_robot, sample, planning_tsr)
-                    if err < .025 and svc.validate(sample):
+                    if err < .15 and svc.validate(sample):
                         start = sample
                         planning_G.nodes[e1]['point'] = start
                         script_logger.info("Sampled point TSR compliant!")
@@ -482,16 +482,18 @@ if __name__ == "__main__":
                         found = True
                     elif svc.validate(sample):
                         rusty_sawyer_robot = Agent(rusty_agent_settings_path, False, False)
-                        rusty_sawyer_robot.update_xopt(sample)
+                        seed_start = sawyer_robot.solve_inverse_kinematics(planning_tsr_config["T0_w"][0:3], planning_tsr_config["T0_w"][3:])
+                        rusty_sawyer_robot.update_xopt(seed_start)
                         rusty_sawyer_robot.update_tsr(planning_tsr_config['T0_w'], planning_tsr_config['Tw_e'], planning_tsr_config['Bw'][0] +  planning_tsr_config['Bw'][1])
-                        for _ in range(0, 100):
+                        for _ in range(0, 500):
                             q_constrained = rusty_sawyer_robot.omega_optimize(sample).data
                         # q_constrained = project_config(sawyer_robot, planning_tsr, np.array(
                         # sample), np.array(sample), epsilon=.025, e_step=.35, q_step=100)
                         normalized_q_constrained = []
                         # If there is a foliation model, then we must perform rejection sampling until the projected sample is classified 
                         # to the node's foliation value
-                        if q_constrained is not None:
+                        err, _ = distance_to_TSR_config(sawyer_robot, q_constrained, tsr)
+                        if err < .15 and q_constrained is not None:
                             if foliation_model is not None:
                                 # This is the rejection sampling step to enforce the foliation choice
                                 if foliation_model.predict(np.array([q_constrained])) == foliation_value:
@@ -546,7 +548,7 @@ if __name__ == "__main__":
                     # print(sawyer_robot.solve_forward_kinematics(sample)[0][0], quat2rpy(sawyer_robot.solve_forward_kinematics(sample)[0][1]))
                     err, _ = distance_to_TSR_config(sawyer_robot, sample, tsr)
                     # print(err)
-                    if err < .025 and svc.validate(sample):
+                    if err < .15 and svc.validate(sample):
                         end = sample
                         planning_G.nodes[e2]['point'] = end
                         script_logger.info("Sampled point TSR compliant!")
@@ -554,13 +556,16 @@ if __name__ == "__main__":
                         found = True
                     elif svc.validate(sample):
                         rusty_sawyer_robot = Agent(rusty_agent_settings_path, False, False)
-                        rusty_sawyer_robot.update_xopt(sample)
                         print(tsr_config['T0_w'], tsr_config['Tw_e'], tsr_config['Bw'])
+                        seed_start = sawyer_robot.solve_inverse_kinematics(tsr_config["T0_w"][0:3], tsr_config["T0_w"][3:])
+                        rusty_sawyer_robot.update_xopt(seed_start)
                         rusty_sawyer_robot.update_tsr(tsr_config['T0_w'], tsr_config['Tw_e'], tsr_config['Bw'][0] + tsr_config['Bw'][1])
-                        for _ in range(0, 100):
+                        for _ in range(0, 500):
                             q_constrained = rusty_sawyer_robot.omega_optimize(sample).data
                         normalized_q_constrained = []
-                        if q_constrained is not None:
+                        print(q_constrained)
+                        err, _ = distance_to_TSR_config(sawyer_robot, q_constrained, tsr)
+                        if err < .15 and q_constrained is not None:
                             if foliation_model is not None:
                                 # This is the rejection sampling step to enforce the foliation choice
                                 if foliation_model.predict(np.array([q_constrained])) == foliation_value:
@@ -581,6 +586,7 @@ if __name__ == "__main__":
                             end = normalized_q_constrained
                             # We've generated a point so lets use it moving forward for all other planning segments. 
                             planning_G.nodes[e2]['point'] = end
+                            script_logger.info("Original point {}".format(sample))
                             script_logger.info("Omega Optimized Point.")
                             script_logger.info("{}".format(end))
                             found = True
