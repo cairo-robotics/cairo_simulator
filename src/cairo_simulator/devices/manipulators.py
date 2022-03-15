@@ -382,11 +382,6 @@ class Sawyer(Manipulator):
         """
         _link_name_to_index = {p.getBodyInfo(self._simulator_id)[0].decode('UTF-8'):-1,}
         
-        for _id in range(p.getNumJoints(self._simulator_id)):
-            _name = p.getJointInfo(self._simulator_id, _id)[12].decode('UTF-8')
-            print(_id, _name)
-            _link_name_to_index[_name] = _id
-        
         self._arm_dof_names = ['right_j0', 'right_j1', 'right_j2',
                                'right_j3', 'right_j4', 'right_j5', 'right_j6']
         self._gripper_dof_names = [

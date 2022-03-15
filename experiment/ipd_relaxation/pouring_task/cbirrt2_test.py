@@ -76,10 +76,10 @@ def main():
     }
     config['tsr'] = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, .15, np.pi/2, -1.3,  np.pi/2],
-        "Tw_e":[0, 0, 0, 0, 0, 0],
-        "Bw": [[(-.1, .1), (-100, 100), (-100, 100)],  
-                [(-100, 100), (-100, 100), (-100, 100)]]
+        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, -1.40,  np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0],
+        "Bw": [[(-.05, .05), (-.05, .05), (-100, 100)],  
+                [(-.05, .05), (-.05, .05), (-.05, .05)]]
     }
     
     # # Collect all joint configurations from all demonstration .json files.
@@ -105,8 +105,8 @@ def main():
     # sampler = DistributionSampler(distribution_model=model, fraction_uniform=config['sampling_bias']['fraction_uniform'])
     # state_space = DistributionSpace(sampler=sampler)
 
-    start = [-0.7048218339245818, 0.45685347725535186, -1.4017091517942437, -0.08979731088870624, -0.06855931921025427, -1.0721452733057917, -0.18843590867040572] 
-    goal = [-1.2430838722942696, 0.6191928880135347, -1.2300758302306845, -0.7560430599768746, -0.5663726314028903, -0.6795320204199666, 2.866698285512072]
+    start = [-1.025350608791035, 0.4358941424477414, -1.356561504301865, 0.04633933877962759, -0.08633939815376168, -1.3322145378578556, -0.3571230040385909]
+    goal = [-0.8039957707122825, 0.4543881884638612, -1.4018428733626933, 0.25525729538943853, -0.2980737981142765, -1.0072700425521073, 1.6992664178510886]
 
     sim_context = SawyerBiasedTSRSimContext(configuration=config)
     sim = sim_context.get_sim_instance()
@@ -135,7 +135,7 @@ def main():
             # Use parametric linear interpolation with 10 steps between points.
             interp = partial(parametric_lerp, steps=10)
             # See params for PRM specific parameters
-            cbirrt = CBiRRT2(sawyer_robot, state_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 5, 'q_step': .35, 'e_step': .25, 'iters': 100000, 'epsilon': .06})
+            cbirrt = CBiRRT2(sawyer_robot, state_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 5, 'q_step': .15, 'e_step': .1, 'iters': 100000, 'epsilon': .08})
             logger.info("Planning....")
             plan = cbirrt.plan(tsr, np.array(start), np.array(goal))
             path = cbirrt.get_path(plan)
