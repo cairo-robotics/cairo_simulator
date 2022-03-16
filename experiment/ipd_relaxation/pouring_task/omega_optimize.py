@@ -54,7 +54,7 @@ fh.setFormatter(formatter)
 # add the handlers to logger
 script_logger.addHandler(fh)
 
-TSR_EPSILON = .08
+TSR_EPSILON = .05
 
 if __name__ == "__main__":
     ###########################################
@@ -101,18 +101,18 @@ if __name__ == "__main__":
             "sim_object_configs": 
                 {
                     "object_name": "cylinder",
-                    "position": [.85, -.57, -.3],
+                    "position": [.75, -.57, -.3],
                     "orientation":  [0, 0, 0],
                     "fixed_base": 1    
                 }
         },
         {
             "type": "box",
-            "primitive_configs": {"w": .25, "l": .25, "h": .25},
+            "primitive_configs": {"w": .25, "l": .25, "h": .35},
             "sim_object_configs": 
                 {
                     "object_name": "box",
-                    "position": [.8, -.34, -.2],
+                    "position": [.75, -.34, -.2],
                     "orientation":  [0, 0, 0],
                     "fixed_base": 1    
                 }
@@ -323,7 +323,7 @@ if __name__ == "__main__":
     script_logger.info("Building planning graph")
 
     reversed_keyframes = list(reversed(keyframes.items()))[1:]
-    
+
     # used to keep track of sequence of constraint transition, start, and end keyframe ids as
     # not all keyframes in the lfd model will be used
     keyframe_planning_order = []
@@ -359,6 +359,7 @@ if __name__ == "__main__":
             # ensure the start point and ending steering point are in the same foliation, so we utilize the constraints from both keyframes.
             foliation_constraint_ids = list(set(keyframe_data["applied_constraints"] + keyframes[str(upcoming_id)]["applied_constraints"]))
 
+            # we use the current upcoming TSR as the planning TSR...
             planning_G.nodes[keyframe_id]["constraint_ids"] = constraint_ids
             
             # Get the TSR configurations so they can be appended to both the keyframe and the edge between associated with constraint ID combo.
@@ -434,11 +435,11 @@ if __name__ == "__main__":
     # planning.                                       #
     ###################################################
     rusty_agent_settings_path = str(Path(__file__).parent.absolute()) + "/settings.yaml"
-    script_logger.info("Generating steering points")
     # Here we use the keyframe planning order, creating a sequential pairing of keyframe ids.
     for edge in list(zip(keyframe_planning_order, keyframe_planning_order[1:])):
         e1 = edge[0]
         e2 = edge[1]
+        script_logger.info("Planning for {} to {}".format(e1, e2))
         edge_data = planning_G.edges[e1, e2]
         # lets ge the planning config from the edge or use the generic base config defined above
         config = edge_data.get('config', base_config)
@@ -657,9 +658,8 @@ if __name__ == "__main__":
 
         print("\n\nSTART AND END\n")
         print(start, end)
-        script_logger.info("PLANNING FOR {} to {}".format(e1, e2))
-        script_logger.info("start: {}".format(start))
-        script_logger.info("end: {}".format(end))
+        script_logger.info("Planning start: {}".format(start))
+        script_logger.info("Planning end: {}".format(end))
         print(np.linalg.norm(np.array(start) - np.array(end)))
         print("\n\n")
         if np.linalg.norm(np.array(start) - np.array(end)) > .1:
