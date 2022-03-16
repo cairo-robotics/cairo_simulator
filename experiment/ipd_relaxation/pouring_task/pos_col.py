@@ -92,8 +92,8 @@ def main():
     Bw2 = bounds_matrix(tsr_config['Bw'][0], tsr_config['Bw'][1])
     tsr = TSR(T0_w=T0_w2, Tw_e=Tw_e2, Bw=Bw2)
     
-    start = [-0.5635793207513968, 0.0714930758578749, -1.4742213380210702, 0.9532397902842007, -0.03896865897708812, -1.5488155999964595, -0.1326624635860929] 
-    end = [-1.1409341979553327, 0.431843043239978, -1.37183670307782, 0.03933627307272447, -0.1254912329819029, -1.4058454655571604, -0.15147944134165625]
+    start = [-0.9342423041407049, 0.12630225324986633, -1.4069735594719583, 0.459736692723383, -0.13995701844821884, -1.4406988661857207, -0.191269432200059] 
+    end = [-1.0649414094055443, 0.40473572903735766, -1.3338006745116746, 0.030818747098442234, -0.03156851647329617, -1.3305308309382213, -0.181641913528503]
 
     sim_context = SawyerBiasedSimContext(configuration=config)
     sim = sim_context.get_sim_instance()
@@ -103,12 +103,18 @@ def main():
     # _ = sawyer_robot.get_simulator_id()
     _ = sim_context.get_sim_objects(['Ground'])[0]
     svc = sim_context.get_state_validity()
-    time.sleep(5)
-    print("Moving to start")
-    sawyer_robot.set_joint_state(start)
-    time.sleep(5)
-    print("Moving to end")
-    sawyer_robot.set_joint_state(end)
+    time.sleep(2)
+    while True:
+        print("Moving to start")
+        sawyer_robot.set_joint_state(start)
+        key = input("Press any key to switch to end position, or c to continue")
+        if key == 'c':
+            break
+        print("Moving to end")
+        sawyer_robot.set_joint_state(end)
+        key = input("Press any key to switch to start position, or c to continue")
+        if key == 'c':
+            break
     # time.sleep(5)
     # sawyer_robot.set_joint_state([-1.53672197,  0.58640682, -1.39922472, -0.84949547, -0.52335235,
     #    -0.71242567, -3.25788548])
