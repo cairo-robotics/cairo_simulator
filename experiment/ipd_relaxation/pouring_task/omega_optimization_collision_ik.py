@@ -54,7 +54,7 @@ fh.setFormatter(formatter)
 # add the handlers to logger
 script_logger.addHandler(fh)
 
-TSR_EPSILON = .1
+TSR_EPSILON = .05
 
 if __name__ == "__main__":
     ###########################################
@@ -414,12 +414,12 @@ if __name__ == "__main__":
     # We populat ethe "point" attribute of the planning graph node which will indicate that we do not need to sample from this node
     # We also use a basic keyframe space -> TODO: is this necessary?
     planning_G.add_nodes_from([(0, {"point": start_configuration, "keyframe_space": SawyerConfigurationSpace(limits=limits)})])
-    planning_G.nodes[0]['tsr'] = unconstrained_TSR
+    planning_G.nodes[0]['tsr'] = TSR_1_config
     # let's connect the starting point to the node associated with the starting keyframe
     planning_G.add_edge(0, int(start_keyframe_id))
     keyframe_planning_order.insert(0, 0)
     planning_config['tsr'] = TSR_1_config
-    # planning_G.nodes[int(start_keyframe_id)]['tsr'] = TSR_1_config
+    planning_G.nodes[int(start_keyframe_id)]['tsr'] = TSR_1_config
     # Add the lanning config to the planning graph edge. 
     planning_G.edges[0, int(start_keyframe_id)]['config'] = planning_config
     # A list to append path segments in order to create one continuous path
@@ -451,7 +451,7 @@ if __name__ == "__main__":
         logger = sim_context.get_logger()
         sawyer_robot = sim_context.get_robot()
         svc = sim_context.get_state_validity() # the SVC is the same for all contexts so we will use this one in our planner.
-        interp_fn = partial(parametric_lerp, steps=100)
+        interp_fn = partial(parametric_lerp, steps=10)
 
         # Create the TSR object
         planning_tsr_config =  planning_G.nodes[e1].get("tsr", unconstrained_TSR)
@@ -486,7 +486,7 @@ if __name__ == "__main__":
                         sample = []
                         for value in raw_sample:
                             sample.append(wrap_to_interval(value))
-                    err, deltas = distance_to_TSR_config(sawyer_robot, sample, planning_tsr)
+                    err, _ = distance_to_TSR_config(sawyer_robot, sample, planning_tsr)
                     constraint_list = planning_G.nodes[e1].get("constraint_ids", None)
                     # If there are not constraints, we directly use the sampeld point. Thanks LfD!
                     if constraint_list is None or constraint_list == []:
@@ -507,7 +507,7 @@ if __name__ == "__main__":
                                         wrap_to_interval(value))
                         start = normalized_sampled
                         planning_G.nodes[e2]['point'] = start
-                        script_logger.info("Sampled point TSR compliant! {} {}".format(err, deltas))
+                        script_logger.info("Sampled point TSR compliant!")
                         script_logger.info("{}".format(start))
                         found = True
                     # If the sampled point is valid according to our state validity, we then perform omega optimization.
@@ -592,7 +592,7 @@ if __name__ == "__main__":
                         sample = []
                         for value in raw_sample:
                             sample.append(wrap_to_interval(value))
-                    err, deltas = distance_to_TSR_config(sawyer_robot, sample, tsr)
+                    err, _ = distance_to_TSR_config(sawyer_robot, sample, tsr)
                     constraint_list = planning_G.nodes[e2].get("constraint_ids", None)
                     if constraint_list is None or constraint_list == []:
                         normalized_sampled = []
@@ -611,7 +611,7 @@ if __name__ == "__main__":
                                         wrap_to_interval(value))
                         end = normalized_sampled
                         planning_G.nodes[e2]['point'] = end
-                        script_logger.info("Sampled point TSR compliant! {} {}".format(err, deltas))
+                        script_logger.info("Sampled point TSR compliant!")
                         script_logger.info("{}".format(end))
                         found = True
                     elif svc.validate(sample):

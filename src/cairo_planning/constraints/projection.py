@@ -88,8 +88,9 @@ def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25,
         J_rpy = analytic_xyz_jacobian(J[3:6, :], quat2rpy(quat))
         Ja = np.vstack([np.array(J_t), np.array(J_rpy)])
         try:
-            delta=.1
-            J_cross = np.dot(Ja.T, np.linalg.inv(np.dot(Ja, Ja.T)))
+            delta=.01
+            # J_cross = np.dot(Ja.T, np.linalg.inv(np.dot(Ja, Ja.T)))
+            J_cross = np.dot(Ja.T, np.linalg.inv(np.dot(Ja, Ja.T) + delta**2*np.ones(6)))
         except np.linalg.linalg.LinAlgError:
             # likely a singular matrix error...
             return None
@@ -102,7 +103,7 @@ def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25,
         #     for val in q_s:
         #         q_s_new.append(w2i(val))
         #     q_s = np.array(q_s_new)
-        if np.linalg.norm(q_s - np.array(q_old)) > 2 * q_step or not within_joint_limits(manipulator, q_s):
+        if np.linalg.norm(q_s - np.array(q_old)) > 4 * q_step or not within_joint_limits(manipulator, q_s):
                 return None
 
         # if not within_joint_limits(manipulator, q_s):
@@ -147,11 +148,14 @@ def distance_from_TSR(T0_s, tsr):
     """
     # pose of the grasp location or the pose of the object held by the hand in world coordinates
     #T0_sp = np.dot(transform_inv(tsr.Tw_e), T0_s)
-    T0_sp = np.dot(T0_s, transform_inv(tsr.Tw_e))
+    T0_sp = np.dot(T0_s, np.linalg.inv(tsr.Tw_e))
     # T0_sp in terms of the coordinates of the target frame w given by the Task Space Region tsr.
-    Tw_sp = np.dot(transform_inv(tsr.T0_w), T0_sp)
+    Tw_sp = np.dot(np.linalg.inv(tsr.T0_w), T0_sp)
     # Generate the displacement vector of Tw_sp. Displacement represents the error given T0_s relative to Tw_e transform.
     disp = displacement(Tw_sp)
+    disp[0] = T0_sp[0:3, 3][0] - tsr.T0_w[0:3, 3][0]
+    disp[1] = T0_sp[0:3, 3][1] - tsr.T0_w[0:3, 3][1]
+    disp[2] = T0_sp[0:3, 3][2] - tsr.T0_w[0:3, 3][2]
     # Since there are equivalent angle displacements for rpy, generate those equivalents by added +/- PI.
     # Use the smallest delta_x_dist of the equivalency set.
     rpys = generate_equivalent_euler_angles([disp[3], disp[4], disp[5]])

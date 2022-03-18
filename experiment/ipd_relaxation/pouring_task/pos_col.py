@@ -10,9 +10,20 @@ import numpy as np
 from cairo_simulator.core.sim_context import SawyerBiasedSimContext
 from cairo_simulator.core.utils import ASSETS_PATH
 from cairo_planning.collisions import DisabledCollisionsContext
-from cairo_planning.geometric.transformation import quat2rpy
+from cairo_planning.geometric.transformation import pose2trans, quat2rpy
 from cairo_planning.geometric.transformation import xyzrpy2trans, bounds_matrix
 from cairo_planning.geometric.tsr import TSR
+from cairo_planning.local.interpolation import parametric_lerp
+from cairo_planning.constraints.projection import distance_from_TSR
+
+def distance_to_TSR_config(manipulator, q_s, tsr):
+    world_pose, _ = manipulator.solve_forward_kinematics(q_s)
+    trans, quat = world_pose[0], world_pose[1]
+    T0_s = pose2trans(np.hstack([trans + quat]))
+    # generates the task space distance and error/displacement vector
+    min_distance_new, x_err = distance_from_TSR(T0_s, tsr)
+    return min_distance_new, x_err
+
 
 global dist, inc
 inc = 3
@@ -76,15 +87,16 @@ def main():
     ]
     config["tsr"] = {
         'degrees': False,
-        'T0_w': [0.7968, -0.5772, 0.15, 1.5707963267948966, -1.4, 1.5707963267948966], 
-        'Tw_e': [0, 0, 0, 0, 0, 0], 
-        'Bw': [[(-0.05, 0.05), (-0.05, 0.05), (-100, -0.2)], [(-100, 100), (-100, 100), (-100, 100)]]
+        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, -1.40,  np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0],
+        "Bw": [[(-.05, .05), (-.05, .05), (-100, 100)],  
+                [(-.05, .05), (-.05, .05), (-.05, .05)]]
     }
     # For the mug-based URDF of sawyer, we need to exclude links that are in constant self collision for the SVC
     config["state_validity"] = {
         "self_collision_exclusions": [("mug", "right_gripper_l_finger"), ("mug", "right_gripper_r_finger")]
     }
-
+    
     
     tsr_config = config["tsr"]
     T0_w2 = xyzrpy2trans(tsr_config['T0_w'], degrees=tsr_config['degrees'])
@@ -92,8 +104,8 @@ def main():
     Bw2 = bounds_matrix(tsr_config['Bw'][0], tsr_config['Bw'][1])
     tsr = TSR(T0_w=T0_w2, Tw_e=Tw_e2, Bw=Bw2)
     
-    start = [-0.9342423041407049, 0.12630225324986633, -1.4069735594719583, 0.459736692723383, -0.13995701844821884, -1.4406988661857207, -0.191269432200059] 
-    end = [-1.0649414094055443, 0.40473572903735766, -1.3338006745116746, 0.030818747098442234, -0.03156851647329617, -1.3305308309382213, -0.181641913528503]
+    start =[-0.6903113088786279, 0.11843669877594332, -1.408512476628253, 0.6775104686721223, -0.05125287379652166, -1.4950756013765276, -0.17595167604036366] 
+    end = [-1.032609391616461, 0.5313591420459192, -1.3281487609271172, -0.011683198576487808, -0.12442496415311588, -1.3248458859456587, -0.40053533928682317]
 
     sim_context = SawyerBiasedSimContext(configuration=config)
     sim = sim_context.get_sim_instance()
@@ -127,7 +139,23 @@ def main():
     # time.sleep(5)
     # sawyer_robot.set_joint_state([-1.29645937,  0.58280675, -1.33026263, -0.39615308, -0.71812744,
     #    -0.56107295, -3.60860816])
-
+    while True:
+        sawyer_robot.set_joint_state(start)
+        key = input("Press i for an interpolated movement or c to continue")
+        if key == 'c':
+            break
+        if key == 'i':
+            steps = parametric_lerp(np.array(start), np.array(end), 100)
+            print(steps)
+            for i, point in enumerate(steps):
+                if not svc.validate(point):
+                    print("Invalid point: {}".format(point))
+                    continue
+                sawyer_robot.set_joint_state(point)
+                print(sawyer_robot.solve_forward_kinematics(point)[0])
+                print(distance_to_TSR_config(sawyer_robot, point, tsr))
+                time.sleep(.1)
+               
     key_u = ord('u') #y up
     key_h = ord('h') #x down
     key_j = ord('j') #y down

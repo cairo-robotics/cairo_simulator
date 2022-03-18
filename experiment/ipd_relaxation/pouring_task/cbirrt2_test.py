@@ -5,6 +5,8 @@ import time
 import json
 
 import pybullet as p
+
+from cairo_planning.constraints.projection import distance_from_TSR
 if os.environ.get('ROS_DISTRO'):
     import rospy
 import numpy as np
@@ -22,7 +24,15 @@ from cairo_planning.geometric.state_space import SawyerConfigurationSpace
 from cairo_planning.geometric.state_space import DistributionSpace
 from cairo_planning.sampling.samplers import DistributionSampler
 from cairo_planning.geometric.distribution import KernelDensityDistribution
+from cairo_planning.geometric.transformation import pose2trans
 
+def distance_to_TSR_config(manipulator, q_s, tsr):
+    world_pose, _ = manipulator.solve_forward_kinematics(q_s)
+    trans, quat = world_pose[0], world_pose[1]
+    T0_s = pose2trans(np.hstack([trans + quat]))
+    # generates the task space distance and error/displacement vector
+    min_distance_new, x_err = distance_from_TSR(T0_s, tsr)
+    return min_distance_new, x_err
 
 def main():
 
@@ -105,8 +115,8 @@ def main():
     # sampler = DistributionSampler(distribution_model=model, fraction_uniform=config['sampling_bias']['fraction_uniform'])
     # state_space = DistributionSpace(sampler=sampler)
 
-    start = [-0.5672457864902514, 0.13030413930079643, -1.3447493480999815, 0.9620646712740841, -0.017087189059864727, -1.547830777165786, -0.16799273803110504] 
-    goal = [-1.1156304714477105, 0.4406782731358101, -1.3856390979632762, 0.11548086477211061, -0.09245362204511753, -1.4013317933088492, -0.2708809848511917]
+    start = [-0.6723126947029323, 0.12131272038587326, -1.4146298457599766, 0.7339426100818214, -0.02952737636740732, -1.4878850848565042, -0.17262923792696805] 
+    goal = [-1.077815788919854, 0.44725360192014385, -1.3775875785061915, -0.008566533931395615, -0.1862506024728079, -1.322243218875883, -0.242331024915624]
 
     sim_context = SawyerBiasedTSRSimContext(configuration=config)
     sim = sim_context.get_sim_instance()
@@ -117,6 +127,10 @@ def main():
     tsr = sim_context.get_tsr()
     _ = sim_context.get_sim_objects(['Ground'])[0]
     svc = sim_context.get_state_validity()
+    
+    print(distance_to_TSR_config(sawyer_robot, start, tsr))
+    print(distance_to_TSR_config(sawyer_robot, goal, tsr))
+
 
     state_space = SawyerConfigurationSpace()
     
