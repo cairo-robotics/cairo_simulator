@@ -34,7 +34,8 @@ def main():
     # table = SimObject("Table", ASSETS_PATH + 'table.sdf', (0.9, 0, 0),
     #                   (0, 0, 1.5708))  # Table rotated 90deg along z-axis
     # print(p.getNumJoints(table.get_simulator_id()))
-    sawyer_robot = Sawyer("sawyer0", [0, 0, 0.0], fixed_base=1)
+
+    sawyer_robot = Sawyer("sawyer0", [0, 0, 0.0], fixed_base=1, urdf_file=ASSETS_PATH + 'sawyer_description/urdf/sawyer_static_mug_combined.urdf')
     settings_path = str(Path(__file__).parent.absolute()) + "/settings.yaml"
     print(settings_path)
     rusty_sawyer_robot = Agent(settings_path, False, False)
@@ -46,7 +47,7 @@ def main():
     # print(joint_config_relaxed_ik)
     tsr_config = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0.15, np.pi, 0,  np.pi],
+        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, -np.pi/2, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-.05, .05), (-.05, .05), (-100, 100)],  
                 [(-.05, .05), (-.05, .05), (-.05, .05)]]
@@ -65,14 +66,15 @@ def main():
     # Bw = [list(bounds) for bounds in Bw_np]
     sample = [-1.0541111350003591, 0.47938957018657513, -1.2804332159469978, 0.1631097390425542, -0.0701496186869246, -1.2661493531546648, -0.3275759417945361]
     # sample = [0, 0, 0, 0, 0, 0, 0]
-    sawyer_robot.set_joint_state(sample)
     time.sleep(5)
     seed_start = sawyer_robot.solve_inverse_kinematics(tsr_config["T0_w"][0:3], tsr_config["T0_w"][3:])
-    rusty_sawyer_robot.update_xopt(seed_start)
+    target = sawyer_robot.solve_inverse_kinematics(tsr_config["T0_w"][0:2] + [-.2], tsr_config["T0_w"][3:])
+    sawyer_robot.set_joint_state(seed_start)
+    # rusty_sawyer_robot.update_xopt(seed_start)
     rusty_sawyer_robot.update_tsr(tsr_config["T0_w"], tsr_config["Tw_e"], tsr_config["Bw"][0] + tsr_config["Bw"][1])
     try:
         while True:    
-            joint_config_relaxed_ik = rusty_sawyer_robot.omega_optimize(sample).data
+            joint_config_relaxed_ik = rusty_sawyer_robot.omega_optimize(seed_start).data
             sawyer_robot.set_joint_state(joint_config_relaxed_ik)
     except KeyboardInterrupt:
         p.disconnect()

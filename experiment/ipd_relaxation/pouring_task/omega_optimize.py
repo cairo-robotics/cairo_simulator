@@ -54,7 +54,10 @@ fh.setFormatter(formatter)
 # add the handlers to logger
 script_logger.addHandler(fh)
 
-TSR_EPSILON = .1
+OMEGA_TSR_EPSILON = .025
+PLANNING_TSR_EPSILON = .1
+Q_STEP = .05
+E_STEP = .1
 
 if __name__ == "__main__":
     ###########################################
@@ -97,18 +100,18 @@ if __name__ == "__main__":
     base_config["primitives"] = [
         {
             "type": "cylinder",
-            "primitive_configs": {"radius": .1, "height": .05},
+            "primitive_configs": {"radius": .12, "height": .05},
             "sim_object_configs": 
                 {
                     "object_name": "cylinder",
-                    "position": [.75, -.57, -.3],
+                    "position": [.75, -.6, -.3],
                     "orientation":  [0, 0, 0],
                     "fixed_base": 1    
                 }
         },
         {
             "type": "box",
-            "primitive_configs": {"w": .25, "l": .25, "h": .35},
+            "primitive_configs": {"w": .25, "l": .25, "h": .45},
             "sim_object_configs": 
                 {
                     "object_name": "box",
@@ -175,7 +178,7 @@ if __name__ == "__main__":
     # Generic, unconstrained TSR:
     unconstrained_TSR = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0, np.pi/2, -1.40,  np.pi/2],
+        "T0_w":  [0.62, -0.6324, 0., np.pi/2, -np.pi/2, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-100, 100), (-100, 100), (-100, 100)],  
                 [(-100, 100), (-100, 100), (-100, 100)]]
@@ -184,23 +187,23 @@ if __name__ == "__main__":
     # Orientation only (1)
     TSR_1_config = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0, np.pi/2, -1.40,  np.pi/2],
+        "T0_w":  [0.62, -0.6324, 0., np.pi/2, -np.pi/2, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-100, 100), (-100, 100), (-100, 100)],  
-                [(-.05, .05), (-.05, .05), (-.05, .05)]]
+                [(-.1, .1), (-.1, .11), (-.1, .1)]]
     }
     # centering only (2)
     TSR_2_config = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0, np.pi/2, -1.40,  np.pi/2],
+        "T0_w":  [0.62, -0.6324, 0., np.pi/2, -np.pi/2, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
-        "Bw": [[(-.05, .05), (-.05, .05), (-100, 100)],  
+        "Bw": [[(-.01, .01), (-.01, .01), (-100, 100)],  
                 [(-100, 100), (-100, 100), (-100, 100)]]
     }
     # height only (3)
     TSR_3_config = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, -1.40,  np.pi/2],
+        "T0_w":  [0.6668, -0.6324, 0., np.pi/2, -np.pi/2, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-100, 100), (-100, 100), (0, 100)],  
                  [(-100, 100), (-100, 100), (-100, 100)]]
@@ -208,34 +211,34 @@ if __name__ == "__main__":
     # Orientation AND centering constraint (1, 2)
     TSR_12_config = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, -1.40,  np.pi/2],
+        "T0_w":  [0.62, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
-        "Bw": [[(-.05, .05), (-.05, .05), (-100, 100)],  
-                [(-.05, .05), (-.05, .05), (-.05, .05)]]
+        "Bw": [[(-.01, .01), (-.01, .01), (-100, 100)],  
+                [(-.1, .1), (-.1, .11), (-.1, .1)]]
     }
     # orientation AND height constraint (1, 3)
     TSR_13_config = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, -1.40,  np.pi/2],
+        "T0_w":  [0.62, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-100, 100), (-100, 100), (0, 100)],  
-                [(-.05, .05), (-.05, .05), (-.05, .05)]]
+                [(-.1, .1), (-.1, .11), (-.1, .1)]]
     }
     # height AND centering constraint (2, 3)
     TSR_23_config = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, -1.40,  np.pi/2],
+        "T0_w":  [0.62, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
-        "Bw": [[(-.05, .05), (-.05, .05), (0, 100)],  
+        "Bw": [[(-.01, .01), (-.01, .01), (0, 100)],  
                 [(-100, 100), (-100, 100), (-100, 100)]]
     }
     # orientation, centering, and height AND height constraint (1, 2, 3)
     TSR_123_config = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, -1.40,  np.pi/2],
+        "T0_w":  [0.62, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
-        "Bw": [[(-.05, .05), (-.05, .05), (0, 100)],  
-                [(-.05, .05), (-.05, .05), (-.05, .05)]]
+        "Bw": [[(-.01, .01), (-.01, .01), (0, 100)],  
+                [(-.1, .1), (-.1, .11), (-.1, .1)]]
     }
 
     c2tsr_map = {}
@@ -394,7 +397,7 @@ if __name__ == "__main__":
                 
                 # this information will be used to create a biasing distribution for sampling during planning between steering points.
                 sampling_bias = {
-                    'bandwidth': .25,
+                    'bandwidth': .15,
                     'fraction_uniform': .1,
                     'data': inter_trajs_data
                 }
@@ -490,26 +493,19 @@ if __name__ == "__main__":
                     constraint_list = planning_G.nodes[e1].get("constraint_ids", None)
                     # If there are not constraints, we directly use the sampeld point. Thanks LfD!
                     if constraint_list is None or constraint_list == []:
-                        normalized_sampled = []
-                        for value in sample:
-                                    normalized_sampled.append(
-                                        wrap_to_interval(value))
-                        start = normalized_sampled
-                        planning_G.nodes[e2]['point'] = start
-                        script_logger.info("No constraints, using LfD model sampled point!")
-                        script_logger.info("{}".format(start))
-                        found = True
+                        if svc.validate(sample):
+                            start = sample
+                            planning_G.nodes[e2]['point'] = start
+                            script_logger.info("No constraints, using LfD model sampled point!")
+                            script_logger.info("{}".format(start))
+                            found = True
                     # If the sample is already constraint compliant, no need to perform omega optimization. Thanks LfD!
-                    elif err < TSR_EPSILON and svc.validate(sample):
-                        normalized_sampled = []
-                        for value in sample:
-                                    normalized_sampled.append(
-                                        wrap_to_interval(value))
-                        start = normalized_sampled
-                        planning_G.nodes[e2]['point'] = start
-                        script_logger.info("Sampled point TSR compliant! {} {}".format(err, deltas))
-                        script_logger.info("{}".format(start))
-                        found = True
+                    elif err < OMEGA_TSR_EPSILON and svc.validate(sample):
+                            start = sample
+                            planning_G.nodes[e2]['point'] = start
+                            script_logger.info("Sampled point TSR compliant! {} {}".format(err, deltas))
+                            script_logger.info("{}".format(start))
+                            found = True
                     # If the sampled point is valid according to our state validity, we then perform omega optimization.
                     elif svc.validate(sample):
                         # We create an Agent used for OmegaOptimization from planning_core_rust.
@@ -528,25 +524,19 @@ if __name__ == "__main__":
                         # q_constrained = project_config(sawyer_robot, planning_tsr, np.array(
                         # sample), np.array(sample), epsilon=.025, e_step=.35, q_step=100)
                         normalized_q_constrained = []
+                        for value in q_constrained:
+                            normalized_q_constrained.append(
+                                wrap_to_interval(value))
                         # If there is a foliation model, then we must perform rejection sampling until the projected sample is classified 
                         # to the node's foliation value
                         err, _ = distance_to_TSR_config(sawyer_robot, q_constrained, tsr)
                         # We do one last check to ensure the optimized sample is TSR compliant.
-                        if err < TSR_EPSILON and q_constrained is not None:
+                        if err < OMEGA_TSR_EPSILON:
                             # If it is, we then check to see if the sample classifies into the learned foliation/disjoint set choice/ID of the model which was learned from human demonstration data.
                             if foliation_model is not None:
                                 # This is the rejection sampling step to enforce the foliation choice
-                                if foliation_model.predict(np.array([q_constrained])) == foliation_value:
-                                    for value in q_constrained:
-                                        normalized_q_constrained.append(
-                                            wrap_to_interval(value))
-                                else:
+                                if foliation_model.predict(np.array([normalized_q_constrained])) != foliation_value:
                                     continue
-                            else:
-                                # Once we have a TSR compliant sample from the right foliation, we normalize the values.
-                                for value in q_constrained:
-                                    normalized_q_constrained.append(
-                                        wrap_to_interval(value))
                             if svc.validate(normalized_q_constrained):
                                 start = normalized_q_constrained
                                 # We've generated a point so lets use it moving forward for all other planning segments. 
@@ -595,25 +585,18 @@ if __name__ == "__main__":
                     err, deltas = distance_to_TSR_config(sawyer_robot, sample, tsr)
                     constraint_list = planning_G.nodes[e2].get("constraint_ids", None)
                     if constraint_list is None or constraint_list == []:
-                        normalized_sampled = []
-                        for value in sample:
-                                    normalized_sampled.append(
-                                        wrap_to_interval(value))
-                        end = normalized_sampled
-                        planning_G.nodes[e2]['point'] = end
-                        script_logger.info("No constraints so using LfD model sampled point!")
-                        script_logger.info("{}".format(end))
-                        found = True
-                    elif err < TSR_EPSILON and svc.validate(sample):
-                        normalized_sampled = []
-                        for value in sample:
-                                    normalized_sampled.append(
-                                        wrap_to_interval(value))
-                        end = normalized_sampled
-                        planning_G.nodes[e2]['point'] = end
-                        script_logger.info("Sampled point TSR compliant! {} {}".format(err, deltas))
-                        script_logger.info("{}".format(end))
-                        found = True
+                        if svc.validate(sample):
+                            end = sample
+                            planning_G.nodes[e2]['point'] = end
+                            script_logger.info("No constraints so using LfD model sampled point!")
+                            script_logger.info("{}".format(end))
+                            found = True
+                    elif err < OMEGA_TSR_EPSILON and svc.validate(sample):
+                            end = sample
+                            planning_G.nodes[e2]['point'] = end
+                            script_logger.info("Sampled point TSR compliant! {} {}".format(err, deltas))
+                            script_logger.info("{}".format(end))
+                            found = True
                     elif svc.validate(sample):
                         rusty_sawyer_robot = Agent(rusty_agent_settings_path, False, False)
                         seed_start = sawyer_robot.solve_inverse_kinematics(tsr_config["T0_w"][0:3], tsr_config["T0_w"][3:])
@@ -624,22 +607,16 @@ if __name__ == "__main__":
                         normalized_q_constrained = []
                         if any([np.isnan(val) for val in q_constrained]):
                             continue
-                        err, _ = distance_to_TSR_config(sawyer_robot, q_constrained, tsr)
-                        if err < TSR_EPSILON and q_constrained is not None:
+                        for value in q_constrained:
+                            normalized_q_constrained.append(
+                                wrap_to_interval(value))
+                        err, _ = distance_to_TSR_config(sawyer_robot, normalized_q_constrained, tsr)
+                        if err < OMEGA_TSR_EPSILON and q_constrained is not None:
                             if foliation_model is not None:
                                 # This is the rejection sampling step to enforce the foliation choice
-                                if foliation_model.predict(np.array([q_constrained])) == foliation_value:
-                                    for value in q_constrained:
-                                        normalized_q_constrained.append(
-                                            wrap_to_interval(value))
-                                else:
+                                if foliation_model.predict(np.array([normalized_q_constrained])) != foliation_value:
                                     continue
-                            else:
-                                for value in q_constrained:
-                                    normalized_q_constrained.append(
-                                        wrap_to_interval(value))
                             if svc.validate(normalized_q_constrained):
-                                err, _ = distance_to_TSR_config(sawyer_robot, normalized_q_constrained, tsr)
                                 end = normalized_q_constrained
                                 # We've generated a point so lets use it moving forward for all other planning segments. 
                                 planning_G.nodes[e2]['point'] = end
@@ -669,7 +646,7 @@ if __name__ == "__main__":
                 # Use parametric linear interpolation with 10 steps between points.
                 interp = partial(parametric_lerp, steps=10)
                 # See params for CBiRRT2 specific parameters 
-                cbirrt = CBiRRT2(sawyer_robot, planning_state_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 10, 'epsilon': TSR_EPSILON, 'q_step': .15, 'e_step': .1, 'iters': 20000})
+                cbirrt = CBiRRT2(sawyer_robot, planning_state_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 10, 'epsilon': PLANNING_TSR_EPSILON, 'q_step': Q_STEP, 'e_step': E_STEP, 'iters': 5000})
                 logger.info("Planning....")
                 print("Start, end: ", start, end)
                 logger.info("Constraints: {}".format(planning_G.nodes[e1].get('constraint_ids', None)))

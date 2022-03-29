@@ -55,45 +55,6 @@ def main():
     rust_euler = quat2rpy(rusty_fk[1])
     # rust_euler[-1] = rust_euler[-1] + np.pi/2
     print(rusty_fk[0], rust_euler)
-    sawyer_robot.set_joint_state(test_fk_config)
-    time.sleep(10)
-    exit()
-    # Loop until someone shuts us down
-    test_keyframe_mean_config = [
-        -1.3020732421875,
-        -0.44705859375,
-        0.6508818359375,
-        1.5064189453125,
-        -0.889978515625,
-        0.8245869140625,
-        -1.6826474609375]
-    sawyer_robot.set_joint_state(test_keyframe_mean_config)
-    time.sleep(2)
-    # joint_config_relaxed_ik = rusty_sawyer_robot.omega_projection([.2,0,-.5], [0,0,0,1]).data
-    # print(joint_config_relaxed_ik)
-    position = [.7968, -.5772, 0.15]
-    orientation = rpy2quat([np.pi/2, 0,  np.pi/2])
-    # rusty_orientation = rpy2quat([np.pi/2, 0,  np.pi/2])
-    rusty_orientation = rpy2quat([np.pi/2, np.pi/2,  np.pi/2])
-    print(position)
-    print(orientation)
-    print(rusty_orientation)
-    _ = input("Press any key")
-    try:
-        while True:
-            print("Reg IK")
-            for _ in range(0, 1):
-                joint_config = sawyer_robot.solve_inverse_kinematics(position, orientation)
-                sawyer_robot.set_joint_state(joint_config)
-            time.sleep(2)
-            print("relaxed ik")
-            for _ in range(0, 1000):
-                joint_config_relaxed_ik = rusty_sawyer_robot.relaxed_inverse_kinematics(position, rusty_orientation).data
-                sawyer_robot.set_joint_state(joint_config_relaxed_ik)
-            time.sleep(5)
-    except KeyboardInterrupt:
-        p.disconnect()
-        sys.exit(0)
 
 
 if __name__ == "__main__":

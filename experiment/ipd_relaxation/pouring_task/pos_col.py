@@ -44,7 +44,7 @@ def main():
     config["sawyer"] = {
             "robot_name": "sawyer0",
             'urdf_file': ASSETS_PATH + 'sawyer_description/urdf/sawyer_static_mug_combined.urdf',
-            "position": [0, 0, 0.9],
+            "position": [0, 0, 0],
             "fixed_base": True
         }
 
@@ -52,34 +52,35 @@ def main():
         {
             "object_name": "Ground",
             "model_file_or_sim_id": "plane.urdf",
-            "position": [0, 0, 0]
+            "position": [0, 0, -.9]
         },
         {
             "object_name": "Table",
             "model_file_or_sim_id": ASSETS_PATH + 'table.sdf',
-            "position": [0.75, 0, .1],
-            "orientation":  [0, 0, 1.5708]
+            "position": [0.75, 0, -.8],
+            "orientation":  [0, 0, 1.5708],
+            "fixed_base": 1
         },
     ]
     config["primitives"] = [
         {
             "type": "cylinder",
-            "primitive_configs": {"radius": .1, "height": .05},
+            "primitive_configs": {"radius": .12, "height": .05},
             "sim_object_configs": 
                 {
                     "object_name": "cylinder",
-                    "position": [.85, -.57, .6],
+                    "position": [.75, -.6, -.3],
                     "orientation":  [0, 0, 0],
                     "fixed_base": 1    
                 }
         },
         {
             "type": "box",
-            "primitive_configs": {"w": .25, "l": .25, "h": .25},
+            "primitive_configs": {"w": .25, "l": .25, "h": .45},
             "sim_object_configs": 
                 {
                     "object_name": "box",
-                    "position": [.84, -.34, .7],
+                    "position": [.75, -.34, -.2],
                     "orientation":  [0, 0, 0],
                     "fixed_base": 1    
                 }
@@ -87,10 +88,10 @@ def main():
     ]
     config["tsr"] = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, -1.40,  np.pi/2],
+        "T0_w":  [0.62, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-.05, .05), (-.05, .05), (-100, 100)],  
-                [(-.05, .05), (-.05, .05), (-.05, .05)]]
+                [(-.15, .15), (-.15, .15), (-.15, .15)]]
     }
     # For the mug-based URDF of sawyer, we need to exclude links that are in constant self collision for the SVC
     config["state_validity"] = {
@@ -104,9 +105,8 @@ def main():
     Bw2 = bounds_matrix(tsr_config['Bw'][0], tsr_config['Bw'][1])
     tsr = TSR(T0_w=T0_w2, Tw_e=Tw_e2, Bw=Bw2)
     
-    start =[-0.6903113088786279, 0.11843669877594332, -1.408512476628253, 0.6775104686721223, -0.05125287379652166, -1.4950756013765276, -0.17595167604036366] 
-    end = [-1.032609391616461, 0.5313591420459192, -1.3281487609271172, -0.011683198576487808, -0.12442496415311588, -1.3248458859456587, -0.40053533928682317]
-
+    start = [-0.8687910860942303, 0.20877581326011807, -1.4177586171219212, 0.4239344580886595, -0.14228102690792088, -1.4016687834485404, -0.13484553083117268] 
+    end = [-1.0978450534034292, 0.5149905806842856, -1.3520642577116146, 0.032558709577309664, -0.06778488872041422, -1.3910532440503818, -0.4155474884059731]
     sim_context = SawyerBiasedSimContext(configuration=config)
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
@@ -119,11 +119,13 @@ def main():
     while True:
         print("Moving to start")
         sawyer_robot.set_joint_state(start)
+        print(svc.validate(start))
         key = input("Press any key to switch to end position, or c to continue")
         if key == 'c':
             break
         print("Moving to end")
         sawyer_robot.set_joint_state(end)
+        print(svc.validate(end))
         key = input("Press any key to switch to start position, or c to continue")
         if key == 'c':
             break
@@ -152,7 +154,7 @@ def main():
                     print("Invalid point: {}".format(point))
                     continue
                 sawyer_robot.set_joint_state(point)
-                print(sawyer_robot.solve_forward_kinematics(point)[0])
+                print(sawyer_robot.solve_forward_kinematics(point)[0][0],  quat2rpy(sawyer_robot.solve_forward_kinematics(point)[0][1]))
                 print(distance_to_TSR_config(sawyer_robot, point, tsr))
                 time.sleep(.1)
                
