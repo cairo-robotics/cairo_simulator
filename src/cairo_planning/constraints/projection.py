@@ -153,9 +153,9 @@ def distance_from_TSR(T0_s, tsr):
     Tw_sp = np.dot(np.linalg.inv(tsr.T0_w), T0_sp)
     # Generate the displacement vector of Tw_sp. Displacement represents the error given T0_s relative to Tw_e transform.
     disp = displacement(Tw_sp)
-    disp[0] = T0_sp[0:3, 3][0] - tsr.T0_w[0:3, 3][0]
-    disp[1] = T0_sp[0:3, 3][1] - tsr.T0_w[0:3, 3][1]
-    disp[2] = T0_sp[0:3, 3][2] - tsr.T0_w[0:3, 3][2]
+    # disp[0] = T0_sp[0:3, 3][0] - tsr.T0_w[0:3, 3][0]
+    # disp[1] = T0_sp[0:3, 3][1] - tsr.T0_w[0:3, 3][1]
+    # disp[2] = T0_sp[0:3, 3][2] - tsr.T0_w[0:3, 3][2]
     # Since there are equivalent angle displacements for rpy, generate those equivalents by added +/- PI.
     # Use the smallest delta_x_dist of the equivalency set.
     rpys = generate_equivalent_euler_angles([disp[3], disp[4], disp[5]])
