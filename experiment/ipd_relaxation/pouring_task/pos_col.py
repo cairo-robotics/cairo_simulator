@@ -88,10 +88,10 @@ def main():
     ]
     config["tsr"] = {
         'degrees': False,
-        "T0_w":  [0.62, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
+        "T0_w":  [0.62, -0.6324, 0., np.pi/2, -np.pi/2, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
-        "Bw": [[(-.05, .05), (-.05, .05), (-100, 100)],  
-                [(-.15, .15), (-.15, .15), (-.15, .15)]]
+        "Bw": [[(-.01, .01), (-.01, .01), (-100, 100)],  
+                [(-100, 100), (-100, 100), (-100, 100)]]
     }
     # For the mug-based URDF of sawyer, we need to exclude links that are in constant self collision for the SVC
     config["state_validity"] = {
@@ -105,8 +105,8 @@ def main():
     Bw2 = bounds_matrix(tsr_config['Bw'][0], tsr_config['Bw'][1])
     tsr = TSR(T0_w=T0_w2, Tw_e=Tw_e2, Bw=Bw2)
     
-    start = [-0.8687910860942303, 0.20877581326011807, -1.4177586171219212, 0.4239344580886595, -0.14228102690792088, -1.4016687834485404, -0.13484553083117268] 
-    end = [-1.0978450534034292, 0.5149905806842856, -1.3520642577116146, 0.032558709577309664, -0.06778488872041422, -1.3910532440503818, -0.4155474884059731]
+    start = [-0.9068902174310702, 0.24170020065351006, -1.424444888226277, 0.4625597337076468, 0.004462281336602203, -1.4439890507784587, -0.22574803516662412] 
+    end = [-1.0562578693980615, 0.4425656502088584, -1.340903806282369, -0.10538647286195246, -0.35988860566031144, -0.8794354483887821, 2.104055796302678]
     sim_context = SawyerBiasedSimContext(configuration=config)
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
@@ -120,12 +120,14 @@ def main():
         print("Moving to start")
         sawyer_robot.set_joint_state(start)
         print(svc.validate(start))
+        print(distance_to_TSR_config(sawyer_robot, start, tsr))
         key = input("Press any key to switch to end position, or c to continue")
         if key == 'c':
             break
         print("Moving to end")
         sawyer_robot.set_joint_state(end)
         print(svc.validate(end))
+        print(distance_to_TSR_config(sawyer_robot, end, tsr))
         key = input("Press any key to switch to start position, or c to continue")
         if key == 'c':
             break

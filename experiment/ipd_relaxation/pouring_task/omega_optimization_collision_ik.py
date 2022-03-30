@@ -54,7 +54,10 @@ fh.setFormatter(formatter)
 # add the handlers to logger
 script_logger.addHandler(fh)
 
-TSR_EPSILON = .05
+OMEGA_TSR_EPSILON = .025
+PLANNING_TSR_EPSILON = .1
+Q_STEP = .05
+E_STEP = .1
 
 if __name__ == "__main__":
     ###########################################
@@ -175,7 +178,7 @@ if __name__ == "__main__":
     # Generic, unconstrained TSR:
     unconstrained_TSR = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0., np.pi/2, np.pi/2, np.pi/2],
+        "T0_w":  [0.62, -0.6324, 0., np.pi/2, -1.4, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-100, 100), (-100, 100), (-100, 100)],  
                 [(-100, 100), (-100, 100), (-100, 100)]]
@@ -184,15 +187,15 @@ if __name__ == "__main__":
     # Orientation only (1)
     TSR_1_config = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0., np.pi/2, np.pi/2, np.pi/2],
+        "T0_w":  [0.62, -0.6324, 0., np.pi/2,-1.4, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-100, 100), (-100, 100), (-100, 100)],  
-                [(-.05, .05), (-.05, .05), (-.05, .05)]]
+                [(-.1, .1), (-.1, .1), (-.1, .1)]]
     }
     # centering only (2)
     TSR_2_config = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0., np.pi/2, np.pi/2, np.pi/2],
+        "T0_w":  [0.62, -0.6324, 0., np.pi/2, -1.4, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-.01, .01), (-.01, .01), (-100, 100)],  
                 [(-100, 100), (-100, 100), (-100, 100)]]
@@ -200,7 +203,7 @@ if __name__ == "__main__":
     # height only (3)
     TSR_3_config = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0., np.pi/2, np.pi/2, np.pi/2],
+        "T0_w":  [0.6668, -0.6324, 0., np.pi/2, -1.4, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-100, 100), (-100, 100), (0, 100)],  
                  [(-100, 100), (-100, 100), (-100, 100)]]
@@ -208,23 +211,23 @@ if __name__ == "__main__":
     # Orientation AND centering constraint (1, 2)
     TSR_12_config = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, np.pi/2, np.pi/2],
+        "T0_w":  [0.62, -0.6324, 0.15, np.pi/2, -1.4, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-.01, .01), (-.01, .01), (-100, 100)],  
-                [(-.05, .05), (-.05, .05), (-.05, .05)]]
+                [(-.1, .1), (-.1, .1), (-.1, .1)]]    
     }
     # orientation AND height constraint (1, 3)
     TSR_13_config = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, np.pi/2, np.pi/2],
+        "T0_w":  [0.62, -0.6324, 0.15, np.pi/2, -1.4, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-100, 100), (-100, 100), (0, 100)],  
-                [(-.05, .05), (-.05, .05), (-.05, .05)]]
+                [(-.1, .1), (-.1, .1), (-.1, .1)]]    
     }
     # height AND centering constraint (2, 3)
     TSR_23_config = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, np.pi/2, np.pi/2],
+        "T0_w":  [0.62, -0.6324, 0.15, np.pi/2, -1.4, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-.01, .01), (-.01, .01), (0, 100)],  
                 [(-100, 100), (-100, 100), (-100, 100)]]
@@ -232,10 +235,10 @@ if __name__ == "__main__":
     # orientation, centering, and height AND height constraint (1, 2, 3)
     TSR_123_config = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, np.pi/2, np.pi/2],
+        "T0_w":  [0.62, -0.6324, 0.15, np.pi/2, -1.4, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-.01, .01), (-.01, .01), (0, 100)],  
-                [(-.05, .05), (-.05, .05), (-.05, .05)]]
+                [(-.1, .1), (-.1, .1), (-.1, .1)]]
     }
 
     c2tsr_map = {}
@@ -361,10 +364,14 @@ if __name__ == "__main__":
             # we use the current upcoming TSR as the planning TSR...
             planning_G.nodes[keyframe_id]["constraint_ids"] = constraint_ids
             
+            #
+            planning_G.nodes[upcoming_id]["unioned_constraint_ids"] = foliation_constraint_ids
+            
+            
             # Get the TSR configurations so they can be appended to both the keyframe and the edge between associated with constraint ID combo.
             planning_G.nodes[keyframe_id]['tsr'] = c2tsr_map.get(tuple(sorted(constraint_ids)), unconstrained_TSR)
             planning_config['tsr'] = c2tsr_map.get(tuple(sorted(constraint_ids)), unconstrained_TSR)
-            
+            planning_G.nodes[upcoming_id]['union_tsr'] = c2tsr_map.get(tuple(sorted(foliation_constraint_ids)), unconstrained_TSR)
             # get the foliation model
             foliation_model = c2f_map.get(tuple(sorted(foliation_constraint_ids)), None)
             if foliation_model is not None:
@@ -403,18 +410,23 @@ if __name__ == "__main__":
             planning_G.add_edge(keyframe_id, upcoming_id)
             # Finally add the planning config to the planning graph edge. 
             planning_G.edges[keyframe_id, upcoming_id]['config'] = planning_config
-
+            script_logger.info("Segment: {} -> {}".format(keyframe_id, upcoming_id))
+            script_logger.info("Start point and planning constraints: {}".format(constraint_ids))
+            script_logger.info("Start point / planning TSR config: {}".format(planning_config['tsr']))
+            script_logger.info("End point constraints: {}".format(foliation_constraint_ids))
+            script_logger.info("End point TSR config: {}".format(planning_G.nodes[keyframe_id]['union_tsr']))
+            script_logger.info("")
             # update the upcoming keyframe id with the current id
             upcoming_id = keyframe_id
- 
-    script_logger.info("Inserting the starting point")
-    # Let's insert the starting point:
+
+    script_logger.info("Inserting the starting point into the planning graph: {}".format(start_configuration))
+    # Let's insert the starting point to the Planning graph:
     # Copy the base planning config. This will be updated with specfic configurations for this planning segment (tsrs, biasing etc,.)
     planning_config = copy.deepcopy(base_config)
     # We populat ethe "point" attribute of the planning graph node which will indicate that we do not need to sample from this node
     # We also use a basic keyframe space -> TODO: is this necessary?
     planning_G.add_nodes_from([(0, {"point": start_configuration, "keyframe_space": SawyerConfigurationSpace(limits=limits)})])
-    planning_G.nodes[0]['tsr'] = unconstrained_TSR
+    planning_G.nodes[0]['tsr'] = TSR_1_config
     # let's connect the starting point to the node associated with the starting keyframe
     planning_G.add_edge(0, int(start_keyframe_id))
     keyframe_planning_order.insert(0, 0)
@@ -497,10 +509,10 @@ if __name__ == "__main__":
                             script_logger.info("{}".format(start))
                             found = True
                     # If the sample is already constraint compliant, no need to perform omega optimization. Thanks LfD!
-                    elif err < TSR_EPSILON and svc.validate(sample):
+                    elif err < OMEGA_TSR_EPSILON and svc.validate(sample):
                             start = sample
                             planning_G.nodes[e2]['point'] = start
-                            script_logger.info("Sampled point TSR compliant! {} {}".format(err, deltas))
+                            script_logger.info("Sampled start point TSR compliant for constraints: {}! {} {}".format(constraint_list, err, deltas))
                             script_logger.info("{}".format(start))
                             found = True
                     # If the sampled point is valid according to our state validity, we then perform omega optimization.
@@ -511,7 +523,7 @@ if __name__ == "__main__":
                         seed_start = sawyer_robot.solve_inverse_kinematics(planning_tsr_config["T0_w"][0:3], planning_tsr_config["T0_w"][3:])
                         # We update the optimization variables with the seed start and the current TSR used for optimization.
                         rusty_sawyer_robot.update_xopt(seed_start)
-                        rusty_sawyer_robot.update_tsr(planning_tsr_config['T0_w'], planning_tsr_config['Tw_e'], planning_tsr_config['Bw'][0] +  planning_tsr_config['Bw'][1])
+                        rusty_sawyer_robot.update_planning_tsr(planning_tsr_config['T0_w'], planning_tsr_config['Tw_e'], planning_tsr_config['Bw'][0] +  planning_tsr_config['Bw'][1])
                         # The optimization is based on CollisionIK which maintains feasibility with the starting seed start. This feasibility might aid in the optimization staying reasonably close to the ideal TSR sample.
                         for _ in range(0, 500):
                             # The sample we are optimizing is passed as an argument to omega_optimize. This feeds the optimization call to bias staying close to this sample. 
@@ -528,7 +540,7 @@ if __name__ == "__main__":
                         # to the node's foliation value
                         err, _ = distance_to_TSR_config(sawyer_robot, q_constrained, tsr)
                         # We do one last check to ensure the optimized sample is TSR compliant.
-                        if err < TSR_EPSILON:
+                        if err < OMEGA_TSR_EPSILON:
                             # If it is, we then check to see if the sample classifies into the learned foliation/disjoint set choice/ID of the model which was learned from human demonstration data.
                             if foliation_model is not None:
                                 # This is the rejection sampling step to enforce the foliation choice
@@ -539,7 +551,7 @@ if __name__ == "__main__":
                                 # We've generated a point so lets use it moving forward for all other planning segments. 
                                 planning_G.nodes[e1]['point'] = start
                                 script_logger.info("Original point that was optimized: {}".format(sample))
-                                script_logger.info("Omega Optimized Point for constraints: {}.".format(constraint_list))
+                                script_logger.info("Omega Optimized Start Point for constraints: {}.".format(constraint_list))
                                 script_logger.info("{}", start)
                                 found = True
                         else:
@@ -547,18 +559,17 @@ if __name__ == "__main__":
         # If the ending/steering point has been generated from the prior iteration, we use it as our starting point. 
         else:
             start = planning_G.nodes[e1]['point']
-            script_logger.info("Reusing previously acquired point")
-            script_logger.info("{}".format(start))
+            script_logger.info("Reusing previously acquired point: {}".format(start))
 
         if  planning_G.nodes[e2].get('point', None) is None:
             keyframe_space_e2 =  planning_G.nodes[e2]['keyframe_space']
-            tsr_config =  planning_G.nodes[e2].get("tsr", unconstrained_TSR)
+            tsr_config =  planning_G.nodes[e2].get("union_tsr", unconstrained_TSR)
             T0_w2 = xyzrpy2trans(tsr_config['T0_w'], degrees=tsr_config['degrees'])
             Tw_e2 = xyzrpy2trans(tsr_config['Tw_e'], degrees=tsr_config['degrees'])
             Bw2 = bounds_matrix(tsr_config['Bw'][0], tsr_config['Bw'][1])
             tsr = TSR(T0_w=T0_w2, Tw_e=Tw_e2, Bw=Bw2, bodyandlink=0, manipindex=16)
             
-            print("Constraints {}: {}".format(e2, planning_G.nodes[e2].get("constraint_ids", [])))
+            print("Constraints for keyframe {} as an endpoint: {}".format(e2, planning_G.nodes[e2].get("unioned_constraint_ids", [])))
             foliation_model =  planning_G.nodes[e2].get("foliation_model", None)
             foliation_value =  planning_G.nodes[e2].get("foliation_value", None)
 
@@ -580,7 +591,7 @@ if __name__ == "__main__":
                         for value in raw_sample:
                             sample.append(wrap_to_interval(value))
                     err, deltas = distance_to_TSR_config(sawyer_robot, sample, tsr)
-                    constraint_list = planning_G.nodes[e2].get("constraint_ids", None)
+                    constraint_list = planning_G.nodes[e2].get("unioned_constraint_ids", None)
                     if constraint_list is None or constraint_list == []:
                         if svc.validate(sample):
                             end = sample
@@ -588,17 +599,18 @@ if __name__ == "__main__":
                             script_logger.info("No constraints so using LfD model sampled point!")
                             script_logger.info("{}".format(end))
                             found = True
-                    elif err < TSR_EPSILON and svc.validate(sample):
+                    elif err < OMEGA_TSR_EPSILON and svc.validate(sample):
                             end = sample
                             planning_G.nodes[e2]['point'] = end
-                            script_logger.info("Sampled point TSR compliant! {} {}".format(err, deltas))
+                            script_logger.info("Sampled end point TSR compliant for constraints: {}! {} {}".format(constraint_list, err, deltas))
                             script_logger.info("{}".format(end))
                             found = True
                     elif svc.validate(sample):
                         rusty_sawyer_robot = Agent(rusty_agent_settings_path, False, False)
                         seed_start = sawyer_robot.solve_inverse_kinematics(tsr_config["T0_w"][0:3], tsr_config["T0_w"][3:])
                         rusty_sawyer_robot.update_xopt(seed_start)
-                        rusty_sawyer_robot.update_tsr(tsr_config['T0_w'], tsr_config['Tw_e'], tsr_config['Bw'][0] + tsr_config['Bw'][1])
+                        rusty_sawyer_robot.update_planning_tsr(tsr_config['T0_w'], tsr_config['Tw_e'], tsr_config['Bw'][0] + tsr_config['Bw'][1])
+                        # we use the planning TSR used for the constrained planner as a secondary target.
                         for _ in range(0, 500):
                             q_constrained = rusty_sawyer_robot.omega_optimize(sample).data
                         normalized_q_constrained = []
@@ -608,7 +620,7 @@ if __name__ == "__main__":
                             normalized_q_constrained.append(
                                 wrap_to_interval(value))
                         err, _ = distance_to_TSR_config(sawyer_robot, normalized_q_constrained, tsr)
-                        if err < TSR_EPSILON and q_constrained is not None:
+                        if err < OMEGA_TSR_EPSILON and q_constrained is not None:
                             if foliation_model is not None:
                                 # This is the rejection sampling step to enforce the foliation choice
                                 if foliation_model.predict(np.array([normalized_q_constrained])) != foliation_value:
@@ -618,7 +630,7 @@ if __name__ == "__main__":
                                 # We've generated a point so lets use it moving forward for all other planning segments. 
                                 planning_G.nodes[e2]['point'] = end
                                 script_logger.info("Original point that was optimized: {}".format(sample))
-                                script_logger.info("Omega Optimized Point for constraints: {}.".format(constraint_list))
+                                script_logger.info("Omega Optimized End Point for constraints: {}.".format(constraint_list))
                                 script_logger.info("{}".format(end))
                                 found = True
                         else:
@@ -644,8 +656,9 @@ if __name__ == "__main__":
     while True:
         key = input("Press s key to excute plan, p to preview waypoints, or q to quit.")
         if key == 'p':
+            sawyer_robot.set_joint_state(start_configuration)
             for index in keyframe_planning_order:
-                sawyer_robot.set_joint_state(start_configuration)
+                print(index)
                 p1 = planning_G.nodes[index]['point']
                 sawyer_robot.set_joint_state(p1)
                 time.sleep(2)

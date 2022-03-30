@@ -53,6 +53,7 @@ class CBiRRT2():
         if self.tree is not None:
             self.log.debug("Extracting path through graph...")
             graph_path = self._extract_graph_path()
+            self.log.debug("Graph path length prior to smoothing: {}".format(len(graph_path)))
             if len(graph_path) == 1:
                 return None
             else:
@@ -60,7 +61,9 @@ class CBiRRT2():
                     self.log.debug("Smoothing for {} seconds".format(self.smoothing_time))
                     self._smooth_path(graph_path, tsr, self.smoothing_time)
                 #print("Graph path found: {}".format(graph_path))
-                return self._extract_graph_path()
+                graph_path = self._extract_graph_path()
+                self.log.debug("Graph path length after smoothing: {}".format(len(graph_path)))
+                return graph_path
         # plan = self.get_plan(graph_path)
         # #self._smooth(path)
         # return plan
@@ -131,7 +134,7 @@ class CBiRRT2():
                 prior_distance = self._distance(q_s, q_target)
                 # if q_s is valid AND all of the interpolated points between qs_old and q_s are valid, we add the edge.
                 interp = self.interp_fn(qs_old, q_s)
-                if self._validate(q_s) and all([self._validate(p) for p in interp]):
+                if all([self._validate(p) for p in interp]):
                     self._add_vertex(tree, q_s)
                     generated_values.append(q_s)
                     if tree['name'] == 'forwards' or tree['name'] == 'smoothing':
