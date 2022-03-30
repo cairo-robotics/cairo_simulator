@@ -134,7 +134,7 @@ class CBiRRT2():
                 prior_distance = self._distance(q_s, q_target)
                 # if q_s is valid AND all of the interpolated points between qs_old and q_s are valid, we add the edge.
                 interp = self.interp_fn(qs_old, q_s)
-                if all([self._validate(p) for p in interp]):
+                if self._validate(q_s) and all([self._validate(p) for p in interp]):
                     self._add_vertex(tree, q_s)
                     generated_values.append(q_s)
                     if tree['name'] == 'forwards' or tree['name'] == 'smoothing':
@@ -189,23 +189,24 @@ class CBiRRT2():
             q_s_idx = utils.name2idx(smoothing_tree, q_s_name)
             # constrained extend to the potential shortcut point.
             q_reached, added_q_values = self._constrained_extend(smoothing_tree, tsr, q_old, q_s)
-            if self._distance(q_reached, q_s) < .01 and len(added_q_values) > 0:
-                # since constrain extend does not connect the last point to the target q_s we need to do so.
+            if  self._distance(q_reached, q_s) < .01 and len(added_q_values) > 0 and all([self._validate(p) for p in added_q_values]):
+               # since constrain extend does not connect the last point to the target q_s we need to do so.
                 self._add_edge(smoothing_tree, added_q_values[-1], q_s, self._distance(added_q_values[-1], q_s))
                 smoothed_path_values = [smoothing_tree.vs[idx]['value'] for idx in self._extract_graph_path(smoothing_tree, q_old_idx, q_s_idx)]
-                curr_path_values = [self.tree.vs[idx]['value'] for idx in self._extract_graph_path(self.tree, rand_idx1, rand_idx2)]
-                smoothed_path_value_pairs = [(smoothed_path_values[i], smoothed_path_values[(i + 1) % len(smoothed_path_values)]) for i in range(len(smoothed_path_values))][:-1]
-                curr_path_values_pairs = [(curr_path_values[i], curr_path_values[(i + 1) % len(curr_path_values)]) for i in range(len(curr_path_values))][:-1]
-                smooth_path_distance = sum([self._distance(pair[0], pair[1]) for pair in smoothed_path_value_pairs])
-                curr_path_distance = sum([self._distance(pair[0], pair[1]) for pair in curr_path_values_pairs])
+                if all([self._validate(p) for p in smoothed_path_values]):
+                    curr_path_values = [self.tree.vs[idx]['value'] for idx in self._extract_graph_path(self.tree, rand_idx1, rand_idx2)]
+                    smoothed_path_value_pairs = [(smoothed_path_values[i], smoothed_path_values[(i + 1) % len(smoothed_path_values)]) for i in range(len(smoothed_path_values))][:-1]
+                    curr_path_values_pairs = [(curr_path_values[i], curr_path_values[(i + 1) % len(curr_path_values)]) for i in range(len(curr_path_values))][:-1]
+                    smooth_path_distance = sum([self._distance(pair[0], pair[1]) for pair in smoothed_path_value_pairs])
+                    curr_path_distance = sum([self._distance(pair[0], pair[1]) for pair in curr_path_values_pairs])
 
-                # if the newly found path between indices is shorter, lets use it and add it do the graph
-                if smooth_path_distance < curr_path_distance:
-                    # crop off start and end since they already exist and add inbetween vertices of smoothing tree to main
-                    for q in smoothed_path_values[1:-1]:
-                        self._add_vertex(self.tree, q)
-                    for pair in smoothed_path_value_pairs:
-                        self._add_edge(self.tree, pair[0], pair[1], self._distance(pair[0], pair[1]))
+                    # if the newly found path between indices is shorter, lets use it and add it do the graph
+                    if smooth_path_distance < curr_path_distance:
+                        # crop off start and end since they already exist and add inbetween vertices of smoothing tree to main
+                        for q in smoothed_path_values[1:-1]:
+                            self._add_vertex(self.tree, q)
+                        for pair in smoothed_path_value_pairs:
+                            self._add_edge(self.tree, pair[0], pair[1], self._distance(pair[0], pair[1]))
 
         return self._extract_graph_path()
 

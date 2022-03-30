@@ -54,9 +54,9 @@ fh.setFormatter(formatter)
 # add the handlers to logger
 script_logger.addHandler(fh)
 
-OMEGA_TSR_EPSILON = .1
-PLANNING_TSR_EPSILON = .1
-Q_STEP = .05
+OMEGA_TSR_EPSILON = .08
+PLANNING_TSR_EPSILON = .08
+Q_STEP = .15
 E_STEP = .1
 
 if __name__ == "__main__":
@@ -666,7 +666,7 @@ if __name__ == "__main__":
                 # Use parametric linear interpolation with 10 steps between points.
                 interp = partial(parametric_lerp, steps=10)
                 # See params for CBiRRT2 specific parameters 
-                cbirrt = CBiRRT2(sawyer_robot, planning_state_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 10, 'epsilon': PLANNING_TSR_EPSILON, 'q_step': Q_STEP, 'e_step': E_STEP, 'iters': 5000})
+                cbirrt = CBiRRT2(sawyer_robot, planning_state_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 4, 'epsilon': PLANNING_TSR_EPSILON, 'q_step': Q_STEP, 'e_step': E_STEP, 'iters': 5000})
                 logger.info("Planning....")
                 print("Start, end: ", start, end)
                 logger.info("Constraints: {}".format(planning_G.nodes[e1].get('constraint_ids', None)))
