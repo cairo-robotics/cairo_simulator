@@ -7,19 +7,22 @@ import json
 import pybullet as p
 
 from cairo_planning.constraints.projection import distance_from_TSR
+from cairo_planning.sampling import state_validity
 if os.environ.get('ROS_DISTRO'):
     import rospy
 import numpy as np
 
-from cairo_simulator.core.sim_context import SawyerBiasedTSRSimContext
+from cairo_simulator.core.sim_context import SawyerBiasedSimContext
 from cairo_simulator.core.utils import ASSETS_PATH
 from cairo_planning.geometric.transformation import quat2rpy
+from cairo_planning.geometric.tsr import TSR
 
 from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.local.interpolation import parametric_lerp
 from cairo_planning.local.curve import JointTrajectoryCurve
 from cairo_planning.planners import CBiRRT2
 from cairo_planning.geometric.state_space import SawyerConfigurationSpace
+from cairo_planning.geometric.transformation import xyzrpy2trans, bounds_matrix, pose2trans
 
 from cairo_planning.geometric.state_space import DistributionSpace
 from cairo_planning.sampling.samplers import DistributionSampler
@@ -37,60 +40,75 @@ def distance_to_TSR_config(manipulator, q_s, tsr):
 def main():
 
 
-    config = {}
-    config["sim"] = {
+    base_config = {}
+    base_config["sim"] = {
             "use_real_time": False
         }
 
-    config["logging"] = {
+    base_config["logging"] = {
             "handlers": ['logging'],
             "level": "debug"
         }
 
-    config["sawyer"] = {
+    base_config["sawyer"] = {
             "robot_name": "sawyer0",
             'urdf_file': ASSETS_PATH + 'sawyer_description/urdf/sawyer_static_mug_combined.urdf',
-            "position": [0, 0, 0.9],
+            "position": [0, 0, 0],
             "fixed_base": True
         }
 
-    config["sim_objects"] = [
+    base_config["sim_objects"] = [
         {
             "object_name": "Ground",
             "model_file_or_sim_id": "plane.urdf",
-            "position": [0, 0, 0]
+            "position": [0, 0, -.9]
         },
         {
             "object_name": "Table",
             "model_file_or_sim_id": ASSETS_PATH + 'table.sdf',
-            "position": [0.6, 0, .1],
+            "position": [0.75, 0, -.8],
             "orientation":  [0, 0, 1.5708],
             "fixed_base": 1
         },
     ]
-    config["primitives"] = [
+    base_config["primitives"] = [
         {
             "type": "cylinder",
-            "primitive_configs": {"radius": .1, "height": .05},
+            "primitive_configs": {"radius": .12, "height": .05},
             "sim_object_configs": 
                 {
                     "object_name": "cylinder",
-                    "position": [.8, -.5726, .6],
+                    "position": [.75, -.6, -.3],
+                    "orientation":  [0, 0, 0],
+                    "fixed_base": 1    
+                }
+        },
+        {
+            "type": "box",
+            "primitive_configs": {"w": .25, "l": .25, "h": .45},
+            "sim_object_configs": 
+                {
+                    "object_name": "box",
+                    "position": [.75, -.34, -.2],
                     "orientation":  [0, 0, 0],
                     "fixed_base": 1    
                 }
         }
     ]
-    config["state_validity"] = {
+    
+    # For the mug-based URDF of sawyer, we need to exclude links that are in constant self collision for the SVC
+    base_config["state_validity"] = {
         "self_collision_exclusions": [("mug", "right_gripper_l_finger"), ("mug", "right_gripper_r_finger")]
     }
-    config['tsr'] = {
+    
+    base_config["tsr"] = {
         'degrees': False,
-        "T0_w":  [.7968, -.5772, 0.15, np.pi/2, -np.pi/2, np.pi/2],
+        "T0_w":  [0.62, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-100, 100), (-100, 100), (0, 100)],  
-                [(-.05, .05), (-.05, .05), (-.05, .05)]]
+                [(-.1, .1), (-.1, .1), (-.1, .1)]]
     }
+
     
     # # Collect all joint configurations from all demonstration .json files.
     # configurations = []
@@ -115,24 +133,24 @@ def main():
     # sampler = DistributionSampler(distribution_model=model, fraction_uniform=config['sampling_bias']['fraction_uniform'])
     # state_space = DistributionSpace(sampler=sampler)
 
-    start = [0.5591763048205407, 0.3898184880936588, -1.3416641382336156, 0.5466304681223622, 1.6764514311641987, -0.4691990073698622, -1.456568214752588] 
-    goal = [-0.8502236527382898, 0.24661512357391446, -1.3428681539919958, 0.5071611623606875, -0.09413497818953154, -1.4105617145474465, -0.07399113486410291]
+    start =  [0.560495990739899, 0.420308558448768, -1.2783427522860364, 0.5076192791954268, 1.7018968770060532, -0.5722165943723141, -1.5264520422711643]
+    end = [-0.7564221181204824, 0.09167911976956278, -1.4039700616604895, 0.6753979776749839, -0.0610461738495327, -1.528190623124451, -0.07081692818155894]
     
-    sim_context = SawyerBiasedTSRSimContext(configuration=config)
+    sim_context = SawyerBiasedSimContext(configuration=base_config)
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
-    _ = sim_context.get_state_space()
+    state_space = sim_context.get_state_space()
     sawyer_robot = sim_context.get_robot()
     # _ = sawyer_robot.get_simulator_id()
-    tsr = sim_context.get_tsr()
     _ = sim_context.get_sim_objects(['Ground'])[0]
     svc = sim_context.get_state_validity()
-    
+    T0_w = xyzrpy2trans(base_config["tsr"]['T0_w'], degrees=base_config["tsr"]['degrees'])
+    Tw_e = xyzrpy2trans(base_config["tsr"]['Tw_e'], degrees=base_config["tsr"]['degrees'])
+    Bw = bounds_matrix(base_config["tsr"]['Bw'][0], base_config["tsr"]['Bw'][1])
+    tsr = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw)
+
     print(distance_to_TSR_config(sawyer_robot, start, tsr))
-    print(distance_to_TSR_config(sawyer_robot, goal, tsr))
-
-
-    state_space = SawyerConfigurationSpace()
+    print(distance_to_TSR_config(sawyer_robot, end, tsr))
     
     sawyer_robot.set_joint_state(start)
     print(quat2rpy(sawyer_robot.solve_forward_kinematics(start)[0][1]))
@@ -147,11 +165,11 @@ def main():
             # LazyPRM #
             #######
             # Use parametric linear interpolation with 10 steps between points.
-            interp = partial(parametric_lerp, steps=10)
+            interp = partial(parametric_lerp, steps=100)
             # See params for PRM specific parameters
             cbirrt = CBiRRT2(sawyer_robot, state_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 5, 'q_step': .15, 'e_step': .1, 'iters': 100000, 'epsilon': .08})
             logger.info("Planning....")
-            plan = cbirrt.plan(tsr, np.array(start), np.array(goal))
+            plan = cbirrt.plan(tsr, np.array(start), np.array(end))
             path = cbirrt.get_path(plan)
             print(plan)
 

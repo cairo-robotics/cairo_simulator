@@ -583,7 +583,7 @@ if __name__ == "__main__":
         logger.info("Length of path: {}".format(len(path)))
         final_path = final_path + path
         sim_context.delete_context()
-               
+        sim_context = None
    
     sim_context = SawyerBiasedSimContext(config, setup=False)
     sim_context.setup(sim_overrides={"use_gui": True, "run_parallel": False})

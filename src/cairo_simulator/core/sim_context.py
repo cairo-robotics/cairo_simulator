@@ -372,8 +372,10 @@ class SawyerBiasedSimContext(AbstractSimContext):
     def get_collision_exclusions(self):
         return self.collision_exclusions
 
-    def delete_context(self):
-        self.sim.__del__()
+    def disconnect(self):
+        self.sim.disconnect()
+        del self.sim
+        self.sim = None
 
 
 

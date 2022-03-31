@@ -124,9 +124,16 @@ class Simulator:
             self.logger = logger if logger is not None else Logger(handlers=[
                                                                    'ros'])
 
-    def __del__(self):
+    def disconnect(self):
+        Simulator.__instance = None
         if p.isConnected():
             p.disconnect()
+    
+    def __del__(self):
+        Simulator.__instance = None
+        if p.isConnected():
+            p.disconnect()
+            
 
 
     def __init_vars(self, use_real_time):
