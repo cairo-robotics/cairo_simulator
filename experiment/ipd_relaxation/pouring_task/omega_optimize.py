@@ -52,10 +52,10 @@ fh.setFormatter(formatter)
 # add the handlers to logger
 script_logger.addHandler(fh)
 
-OMEGA_TSR_EPSILON = .08
-PLANNING_TSR_EPSILON = .08
-Q_STEP = .15
-E_STEP = .1
+OMEGA_TSR_EPSILON = .05
+PLANNING_TSR_EPSILON = .05
+Q_STEP = .05
+E_STEP = .025
 
 if __name__ == "__main__":
     ###########################################
@@ -356,6 +356,8 @@ if __name__ == "__main__":
 
             # get the constraint IDs
             constraint_ids = keyframe_data["applied_constraints"]
+            if keyframe_id == 1:
+                constraint_ids = [1]
             # The foliation constraint ids combines both start and end keyframes of the planning segment. In other words, we need to 
             # ensure the start point and ending steering point are in the same foliation, so we utilize the constraints from both keyframes.
             foliation_constraint_ids = list(set(keyframe_data["applied_constraints"] + keyframes[str(upcoming_id)]["applied_constraints"]))
@@ -462,12 +464,10 @@ if __name__ == "__main__":
         sim_context.setup(sim_overrides={"use_gui": False, "run_parallel": False})
         planning_state_space = sim_context.get_state_space() # The biased state space for sampling points according to intermediate trajectories.
         sim = sim_context.get_sim_instance()
-        print(sim)
-        time.sleep(5)
+        script_logger.info(sim)
         logger = sim_context.get_logger()
         sawyer_robot = sim_context.get_robot()
         svc = sim_context.get_state_validity() # the SVC is the same for all contexts so we will use this one in our planner.
-        print(svc.col_func)
         with DisabledCollisionsContext(sim, [], [], disable_visualization=True):
             # Create the TSR object
             e1_tsr_config =  planning_G.nodes[e1].get("tsr", unconstrained_TSR)
@@ -657,6 +657,8 @@ if __name__ == "__main__":
                 ###########
                 edge_tsr_config = edge_config.get('tsr', unconstrained_TSR)
                 print(edge_tsr_config)
+                if e1 == 0:
+                    time.sleep(10)
                 T0_w = xyzrpy2trans(edge_tsr_config['T0_w'], degrees=edge_tsr_config['degrees'])
                 Tw_e = xyzrpy2trans(edge_tsr_config['Tw_e'], degrees=edge_tsr_config['degrees'])
                 Bw = bounds_matrix(edge_tsr_config['Bw'][0], edge_tsr_config['Bw'][1])
@@ -664,7 +666,7 @@ if __name__ == "__main__":
                 # Use parametric linear interpolation with 10 steps between points.
                 interp = partial(parametric_lerp, steps=20)
                 # See params for CBiRRT2 specific parameters 
-                cbirrt = CBiRRT2(sawyer_robot, planning_state_space, svc, interp, params={'smooth_path': False, 'smoothing_time': 4, 'epsilon': PLANNING_TSR_EPSILON, 'q_step': Q_STEP, 'e_step': E_STEP, 'iters': 10000})
+                cbirrt = CBiRRT2(sawyer_robot, planning_state_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 10, 'epsilon': PLANNING_TSR_EPSILON, 'q_step': Q_STEP, 'e_step': E_STEP, 'iters': 10000})
                 logger.info("Planning....")
                 print("Start, end: ", start, end)
                 logger.info("Constraints: {}".format(planning_G.nodes[e1].get('constraint_ids', None)))
