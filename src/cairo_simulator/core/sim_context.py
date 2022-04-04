@@ -374,8 +374,6 @@ class SawyerBiasedSimContext(AbstractSimContext):
 
     def disconnect(self):
         self.sim.disconnect()
-        del self.sim
-        self.sim = None
 
 
 

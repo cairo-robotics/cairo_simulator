@@ -129,10 +129,10 @@ class Simulator:
         if p.isConnected():
             p.disconnect()
     
-    def __del__(self):
-        Simulator.__instance = None
-        if p.isConnected():
-            p.disconnect()
+    # def __del__(self):
+    #     Simulator.__instance = None
+    #     if p.isConnected():
+    #         p.disconnect()
             
 
 
