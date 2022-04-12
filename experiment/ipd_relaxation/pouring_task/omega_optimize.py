@@ -449,6 +449,7 @@ if __name__ == "__main__":
     # planning.                                       #
     ###################################################
     rusty_agent_settings_path = str(Path(__file__).parent.absolute()) + "/settings.yaml"
+
     # Here we use the keyframe planning order, creating a sequential pairing of keyframe ids.
     for edge in list(zip(keyframe_planning_order, keyframe_planning_order[1:])):
         e1 = edge[0]

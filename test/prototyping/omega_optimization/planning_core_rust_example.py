@@ -7,6 +7,7 @@ from cairo_planning_core import Agent
 def main():
 
     settings_path = str(Path(__file__).parent.absolute()) + "/settings.yaml"
+    print(settings_path)
     rusty_sawyer_robot = Agent(settings_path, False, False)
  
    
@@ -18,7 +19,7 @@ def main():
    
     collision_ik_results = []
     for _ in range(0, 10000):
-        collision_ik_results = rusty_sawyer_robot.relaxed_inverse_kinematics(rusty_fk[0], rusty_fk[1]).data
+        collision_ik_results = rusty_sawyer_robot.collision_ik(rusty_fk[0], rusty_fk[1]).data
         
     print(collision_ik_results)
     summation = 0
