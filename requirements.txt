@@ -4,7 +4,7 @@ isort==4.3.21
 joblib==0.16.0
 lazy-object-proxy==1.4.3
 mccabe==0.6.1
-numpy==1.19.0
+numpy==1.22.0
 pybullet==2.8.1
 pylint==2.5.3
 pyquaternion==0.9.5
