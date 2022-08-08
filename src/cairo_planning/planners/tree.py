@@ -8,6 +8,7 @@ import numpy as np
 import igraph as ig
 
 from cairo_planning.constraints.projection import project_config
+from cairo_planning.geometric.transformation import quat2rpy
 
 from cairo_planning.planners import utils
 from cairo_simulator.core.log import Logger
@@ -48,9 +49,11 @@ class CBiRRT2():
         self._initialize_trees(start_q, goal_q)
         self.log.debug("Running Constrained Bidirectional RRT...")
         self.tree = self.cbirrt(tsr)
+        print("Size of tree: {}".format(len(self.tree.vs)))
         if self.tree is not None:
             self.log.debug("Extracting path through graph...")
             graph_path = self._extract_graph_path()
+            self.log.debug("Graph path length prior to smoothing: {}".format(len(graph_path)))
             if len(graph_path) == 1:
                 return None
             else:
@@ -58,7 +61,9 @@ class CBiRRT2():
                     self.log.debug("Smoothing for {} seconds".format(self.smoothing_time))
                     self._smooth_path(graph_path, tsr, self.smoothing_time)
                 #print("Graph path found: {}".format(graph_path))
-                return self._extract_graph_path()
+                graph_path = self._extract_graph_path()
+                self.log.debug("Graph path length after smoothing: {}".format(len(graph_path)))
+                return graph_path
         # plan = self.get_plan(graph_path)
         # #self._smooth(path)
         # return plan
@@ -76,11 +81,15 @@ class CBiRRT2():
             q_rand = self._random_config()
             qa_near = self._neighbors(a_tree, q_rand)  # closest leaf value to q_rand
             # extend tree at as far as possible to generate qa_reach
-            qa_reach, _ = self._constrained_extend(a_tree, tsr, qa_near, q_rand)
+            qa_reach, _, valid = self._constrained_extend(a_tree, tsr, qa_near, q_rand)
+            if not valid:
+                continue
             # closest leaf value of B to qa_reach
             qb_near = self._neighbors(b_tree, qa_reach)  
             # now tree B is extended as far as possible to qa_reach
-            qb_reach, _ = self._constrained_extend(b_tree, tsr, qb_near, qa_reach)
+            qb_reach, _, valid = self._constrained_extend(b_tree, tsr, qb_near, qa_reach)
+            if not valid:
+                continue
             # if the qa_reach and qb_reach are equivalent, the trees are connectable. 
             if self._equal(qa_reach, qb_reach):
                 self.connected_tree = self._join_trees(a_tree, qa_reach, b_tree, qb_reach)
@@ -103,30 +112,33 @@ class CBiRRT2():
         while True:
             iters += 1
             if iters >= 1000:
-                return q_s, generated_values
+                return q_s, generated_values, True
             if self._equal(q_target, q_s):
-                return q_s, generated_values
+                return q_s, generated_values, True
             # we dont bother to keep a new qs that has traversed further away from the target.
             elif self._distance(q_target, q_s) > self._distance(q_target, qs_old):
-                return qs_old, generated_values
+                return qs_old, generated_values, True
             # set the qs_old to the current value then update
             qs_old = q_s
             # What this update step does is it moves qs off the manifold towards q_target. And then this is projected back down onto the manifold.
             q_s = q_s + min([self.q_step, self._distance(q_target, q_s)]) * (q_target - q_s) / self._distance(q_target, q_s)
             # More problem sepcific versions of constrained_extend use constraint value information 
-            # constraints = self._get_constraint_values(tree, qs_old) 
+            # constraints = self._get_constraint_values(tree, qs_old)
+            
+       
             q_s = self._constrain_config(qs_old=qs_old, q_s=q_s, tsr=tsr)
             if q_s is not None:
                 # this function will occasionally osscilate between to projection values.
                 if utils.val2str(q_s) in tree.vs['name']:
                     # If they've already been added, return the current projection value.
-                    return q_s, generated_values
+                    return q_s, generated_values, True
                 elif abs(self._distance(q_s, q_target) - prior_distance) < .005:
                     # or if the projection can no longer move closer along manifold
-                    return qs_old, generated_values
+                    return qs_old, generated_values, True
                 prior_distance = self._distance(q_s, q_target)
                 # if q_s is valid AND all of the interpolated points between qs_old and q_s are valid, we add the edge.
-                if self._validate(q_s) and all([self._validate(p) for p in self.interp_fn(qs_old, q_s)]):
+                interp = self.interp_fn(qs_old, q_s)
+                if self._validate(q_s) and all([self._validate(p) for p in interp]):
                     self._add_vertex(tree, q_s)
                     generated_values.append(q_s)
                     if tree['name'] == 'forwards' or tree['name'] == 'smoothing':
@@ -134,15 +146,15 @@ class CBiRRT2():
                     else:
                         self._add_edge(tree, q_s, qs_old, self._distance(q_s, qs_old))
                 else:
-                    return qs_old, generated_values
+                    return qs_old, generated_values, False
             else:
                 # the current q_s is not valid or couldn't be projected so we return the last best value qs_old
-                return qs_old, generated_values
+                return qs_old, generated_values, False
 
     def _constrain_config(self, qs_old, q_s, tsr):
         # these functions can be very problem specific. For now we'll just assume the most very basic form.
         # futre implementations might favor injecting the constrain_config function 
-        q_constrained = project_config(self.robot, tsr, q_s=q_s, q_old=qs_old, epsilon=self.epsilon, q_step=self.q_step, e_step=self.e_step, iter_count=10000)
+        q_constrained = project_config(self.robot, tsr, q_s=q_s, q_old=qs_old, epsilon=self.epsilon, q_step=self.q_step, e_step=self.e_step, iter_count=10000, wrap_to_interval=True)
         if q_constrained is None:
             return None
         if self.svc.validate(q_constrained):
@@ -156,7 +168,9 @@ class CBiRRT2():
         smoothing_tree['name'] = 'smoothing'
         start_time = time.time()
 
-
+        if len(graph_path) <= 2:
+            return self._extract_graph_path()
+ 
         while True:
             current_time = time.time()
             elapsed_time = current_time - start_time
@@ -178,24 +192,25 @@ class CBiRRT2():
             q_s_name = utils.val2str(q_s)
             q_s_idx = utils.name2idx(smoothing_tree, q_s_name)
             # constrained extend to the potential shortcut point.
-            q_reached, added_q_values = self._constrained_extend(smoothing_tree, tsr, q_old, q_s)
-            if self._distance(q_reached, q_s) < .01 and len(added_q_values) > 0:
-                # since constrain extend does not connect the last point to the target q_s we need to do so.
+            q_reached, added_q_values, valid = self._constrained_extend(smoothing_tree, tsr, q_old, q_s)
+            if valid and self._distance(q_reached, q_s) < .01 and len(added_q_values) > 0:
+               # since constrain extend does not connect the last point to the target q_s we need to do so.
                 self._add_edge(smoothing_tree, added_q_values[-1], q_s, self._distance(added_q_values[-1], q_s))
                 smoothed_path_values = [smoothing_tree.vs[idx]['value'] for idx in self._extract_graph_path(smoothing_tree, q_old_idx, q_s_idx)]
-                curr_path_values = [self.tree.vs[idx]['value'] for idx in self._extract_graph_path(self.tree, rand_idx1, rand_idx2)]
-                smoothed_path_value_pairs = [(smoothed_path_values[i], smoothed_path_values[(i + 1) % len(smoothed_path_values)]) for i in range(len(smoothed_path_values))][:-1]
-                curr_path_values_pairs = [(curr_path_values[i], curr_path_values[(i + 1) % len(curr_path_values)]) for i in range(len(curr_path_values))][:-1]
-                smooth_path_distance = sum([self._distance(pair[0], pair[1]) for pair in smoothed_path_value_pairs])
-                curr_path_distance = sum([self._distance(pair[0], pair[1]) for pair in curr_path_values_pairs])
+                if all([self._validate(p) for p in smoothed_path_values]):
+                    curr_path_values = [self.tree.vs[idx]['value'] for idx in self._extract_graph_path(self.tree, rand_idx1, rand_idx2)]
+                    smoothed_path_value_pairs = [(smoothed_path_values[i], smoothed_path_values[(i + 1) % len(smoothed_path_values)]) for i in range(len(smoothed_path_values))][:-1]
+                    curr_path_values_pairs = [(curr_path_values[i], curr_path_values[(i + 1) % len(curr_path_values)]) for i in range(len(curr_path_values))][:-1]
+                    smooth_path_distance = sum([self._distance(pair[0], pair[1]) for pair in smoothed_path_value_pairs])
+                    curr_path_distance = sum([self._distance(pair[0], pair[1]) for pair in curr_path_values_pairs])
 
-                # if the newly found path between indices is shorter, lets use it and add it do the graph
-                if smooth_path_distance < curr_path_distance:
-                    # crop off start and end since they already exist and add inbetween vertices of smoothing tree to main
-                    for q in smoothed_path_values[1:-1]:
-                        self._add_vertex(self.tree, q)
-                    for pair in smoothed_path_value_pairs:
-                        self._add_edge(self.tree, pair[0], pair[1], self._distance(pair[0], pair[1]))
+                    # if the newly found path between indices is shorter, lets use it and add it do the graph
+                    if smooth_path_distance < curr_path_distance:
+                        # crop off start and end since they already exist and add inbetween vertices of smoothing tree to main
+                        for q in smoothed_path_values[1:-1]:
+                            self._add_vertex(self.tree, q)
+                        for pair in smoothed_path_value_pairs:
+                            self._add_edge(self.tree, pair[0], pair[1], self._distance(pair[0], pair[1]))
 
         return self._extract_graph_path()
 
@@ -254,6 +269,7 @@ class CBiRRT2():
             qb_idx = utils.name2idx(B, qb_name)
             B.vs[qb_idx]['name'] = qf_name
             B.vs[qb_idx]['value'] = qf_value
+            return B
         
         if len(F.vs) > 1 and len(B.vs) == 1:
             qb_name = utils.val2str(qb)
@@ -264,6 +280,7 @@ class CBiRRT2():
             qf_idx = utils.name2idx(F, qf_name)
             F.vs[qf_idx]['name'] = qb_name
             F.vs[qf_idx]['value'] = qb_value
+            return F
             
 
 
@@ -332,9 +349,11 @@ class CBiRRT2():
         # ig.plot(tree, **visual_style)
         return tree
 
-    def _neighbors(self, tree, q_s):
+    def _neighbors(self, tree, q_s, fraction_random=.1):
         if len(tree.vs) == 1:
             return [v for v in tree.vs][0]['value']
+        if random.random() <= fraction_random:
+            return random.choice([v for v in tree.vs])['value']
         return sorted([v for v in tree.vs], key= lambda vertex: self._distance(vertex['value'], q_s))[0]['value']
 
     def _random_config(self):
@@ -358,6 +377,11 @@ class CBiRRT2():
             return True
         return False
 
+    def _within_manifold(self, q_s, tsr):
+        xyz, quat = self.robot.solve_forward_kinematics(q_s)[0]
+        pose = list(xyz) + list(quat2rpy(quat))
+        return all(tsr.is_valid(q_s))
+
     def _validate(self, sample):
         return self.svc.validate(sample)
     
@@ -376,10 +400,6 @@ class CBiRRT2():
     def _add_edge(self, tree, q_from, q_to, weight):
         q_from_idx = utils.name2idx(tree, utils.val2str(q_from))
         q_to_idx = utils.name2idx(tree, utils.val2str(q_to))
-        if q_from_idx is None:
-            print("GRR")
-        if q_to_idx is None:
-            print("GRR")
         if utils.val2str(q_from) == self.start_name and utils.val2str(q_to) == self.goal_name:
             tree.add_edge(q_from_idx, q_to_idx, **{'weight': weight})
         elif tuple(sorted([q_from_idx, q_to_idx])) not in set([tuple(sorted(edge.tuple)) for edge in tree.es]):

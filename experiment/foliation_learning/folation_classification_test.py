@@ -6,7 +6,7 @@ import time
 import json
 
 import networkx as nx
-from sklearn.mixture import GaussianMixture
+from cairo_planning.geometric.distribution import KernelDensityDistribution
 import pybullet as p
 if os.environ.get('ROS_DISTRO'):
     import rospy
@@ -21,8 +21,16 @@ from cairo_planning.local.curve import JointTrajectoryCurve
 from cairo_planning.planners import CBiRRT2
 from cairo_planning.geometric.state_space import DistributionSpace
 from cairo_planning.sampling.samplers import DistributionSampler
-from cairo_planning.geometric.distribution import KernelDensityDistribution
+from cairo_planning.constraints.foliation import VGMMFoliationClustering
 
+
+from cairo_planning.geometric.transformation import quat2rpy
+from cairo_planning.constraints.projection import project_config
+from cairo_planning.geometric.utils import wrap_to_interval
+
+import umap
+from sklearn.preprocessing import StandardScaler
+import matplotlib.pyplot as plt
 
 
 def main():
@@ -79,11 +87,20 @@ def main():
     config['tsr'] = {
             'degrees': False,
             "T0_w": [.7, 0, 0, 0, 0, 0],
-            "Tw_e": [-.2, 0, .739, -3.1261701132911655, 0.023551837572146628, 0.060331404738664496],
-            "Bw": [[(0, 100), (-100, 100), (-.1, 0)],  
+            "Tw_e": [-.2, 0, .739, 3.09499115, 0.01804426, 1.59540829],
+            "Bw": [[(-100, 100), (-100, 100), (-100, 100)],  
                     [(-.07, .07), (-.07, .07), (-.07, .07)]]
         }
-        
+    
+    sim_context = SawyerBiasedTSRSimContext(configuration=config)
+    sim = sim_context.get_sim_instance()
+    logger = sim_context.get_logger()
+    state_space = sim_context.get_state_space()
+    sawyer_robot = sim_context.get_robot()
+    # _ = sawyer_robot.get_simulator_id()
+    tsr = sim_context.get_tsr()
+    _ = sim_context.get_sim_objects(['Ground'])[0]
+    svc = sim_context.get_state_validity()
 
     # Collect all joint configurations from all demonstration .json files.
     test_configurations = []
@@ -92,7 +109,7 @@ def main():
     with open(samples_file, "r") as f:
         data = json.load(f)
         samples = data['samples']
-
+    print(len(samples))
     test_points = []
     test_points_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_points.json")
   
@@ -101,15 +118,56 @@ def main():
         for entry in data:
             test_points.append(entry['robot']['joint_angle'])
 
-    model = GaussianMixture(n_components=2, covariance_type='full')
+    model = VGMMFoliationClustering(estimated_foliations=3)
     model.fit(np.array(samples))
 
-    for point in test_points:
-        print(model.predict(np.array([point])))
-    
-    print(model.weights_)
-    print(model.means_)
+    # for point in test_points:
+    #     sawyer_robot.set_joint_state(point)
+    #     pos, ori_q = sawyer_robot.solve_forward_kinematics(point)[0]
+    #     ori_ts = quat2rpy(ori_q) 
+    #     print(print(pos, ori_ts))
+    #     print(model.predict(np.array([point])))
+    #     time.sleep(1)
 
+    # n_samples = 5
+    # valid_samples = []
+    # with DisabledCollisionsContext(sim, [], []):
+    #     while len(valid_samples) < n_samples:
+    #         sample = state_space.sample()
+    #         if sample is not None and svc.validate(sample):
+    #             q_constrained = project_config(sawyer_robot, tsr, np.array(
+    #             sample), np.array(sample), epsilon=.1, e_step=.25)
+    #             normalized_q_constrained = []
+    #             print(model.predict(np.array([q_constrained]))[0])
+    #             print(model.predict(np.array([q_constrained]))[0] == 1)
+    #             if q_constrained is not None and model.predict(np.array([q_constrained]))[0] == 1:
+    #                 for value in q_constrained:
+    #                     normalized_q_constrained.append(
+    #                         wrap_to_interval(value))
+    #             else:
+    #                 continue
+    #             if svc.validate(normalized_q_constrained):
+    #                 valid_samples.append(normalized_q_constrained)
+
+
+    # for point in valid_samples:
+    #     sawyer_robot.set_joint_state(point)
+    #     pos, ori_q = sawyer_robot.solve_forward_kinematics(point)[0]
+    #     ori_ts = quat2rpy(ori_q) 
+    #     print(print(pos, ori_ts))
+    #     print(model.predict(np.array([point])))
+        # time.sleep(1)
+
+    reducer = umap.UMAP(n_components=3)
+    embedding = reducer.fit_transform(np.array(samples[0:10000]))
+    print(embedding.shape)
+    plt.scatter(
+    embedding[:, 0],
+    embedding[:, 1],
+    embedding[:, 2])
+    plt.gca().set_aspect('equal', 'datalim')
+    plt.title('UMAP projection of the Penguin dataset', fontsize=24)
+    plt.show()
     ##########################################################################
     # Let's use the above cluster to guide the choice of steering point.
     # 
@@ -122,11 +180,7 @@ def main():
         # We then create a planning graph structure with these steering points and biasing distributions between steering point (if we want)
     # 
     # We will only use a transition point that        #
-    #############################################
-
-    for _ in range(0, 10):
-        print(model.sample())
-
+    #############################################                        
 
      #############################################
     #         Import Serialized LfD Graph       #

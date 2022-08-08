@@ -380,6 +380,8 @@ class Sawyer(Manipulator):
         """
         Initialize joint names i.e.  Sawyer's"right_j0"
         """
+        _link_name_to_index = {p.getBodyInfo(self._simulator_id)[0].decode('UTF-8'):-1,}
+        
         self._arm_dof_names = ['right_j0', 'right_j1', 'right_j2',
                                'right_j3', 'right_j4', 'right_j5', 'right_j6']
         self._gripper_dof_names = [
@@ -404,8 +406,14 @@ class Sawyer(Manipulator):
 
         for joint_name in self._arm_dof_names:
             self._arm_ik_indices.append(actuated_joints.index(joint_name))
+        
+        for _id in range(p.getNumJoints(self._simulator_id)):
+	        print(_id, p.getJointInfo(self._simulator_id, _id)[12].decode('UTF-8'))
+        
+        # self._end_effector_link_index = self._arm_dof_indices[-1]
+        # CollisionIK and Moveit uses right hand, which is link 17.
+        self._end_effector_link_index = 17
 
-        self._end_effector_link_index = self._arm_dof_indices[-1]
 
     def _init_joint_limits(self):
         """

@@ -40,11 +40,14 @@ POSSIBILITY OF SUCH DAMAGE.
 from itertools import product
 
 import numpy as np
+from numpy import linalg
 
-from cairo_planning.geometric.transformation import pose2trans, pseudoinverse, analytic_xyz_jacobian, quat2rpy, rot2rpy
+from cairo_planning.geometric.transformation import pose2trans, pseudoinverse, analytic_xyz_jacobian, quat2rpy, rot2rpy, transform_inv
+from cairo_planning.geometric.utils import wrap_to_interval as w2i
+from numpy.core.numeric import identity
 
 
-def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25, iter_count=10000):
+def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25, iter_count=10000, wrap_to_interval=False):
     """
     This function projects a sampled configuration point down to a constraint manifold defined implicitly by a 
     Task Space Region representation. http://cs.brown.edu/courses/csci2951-k/papers/berenson12.pdf
@@ -73,8 +76,7 @@ def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25,
         T0_s = pose2trans(np.hstack([trans + quat]))
         # generates the task space distance and error/displacement vector
         min_distance_new, x_err = distance_from_TSR(T0_s, tsr)
-        # print(min_distance_new)
-        # print(x_err)
+        # print(min_distance_new, x_err)
         if min_distance_new < epsilon:
             return q_s  # we've reached the manifold within epsilon error
         elif count > iter_count:
@@ -85,13 +87,25 @@ def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25,
         # obtain the analytic jacobian
         J_rpy = analytic_xyz_jacobian(J[3:6, :], quat2rpy(quat))
         Ja = np.vstack([np.array(J_t), np.array(J_rpy)])
-        J_cross = pseudoinverse(Ja)
+        try:
+            delta=.01
+            # J_cross = np.dot(Ja.T, np.linalg.inv(np.dot(Ja, Ja.T)))
+            J_cross = np.dot(Ja.T, np.linalg.inv(np.dot(Ja, Ja.T) + delta**2*np.ones(6)))
+        except np.linalg.linalg.LinAlgError:
+            # likely a singular matrix error...
+            return None
         q_error = np.dot(J_cross, x_err)
         q_s = q_s - e_step * q_error
         # if the displacement of the current projected configuration relative to q_old (could be q_near etc)
         # is any larger than twice the step size q_step, we discard the projection. 
-        if np.linalg.norm(q_s - q_old) > 2 * q_step or not within_joint_limits(manipulator, q_s):
-            return None
+        # if wrap_to_interval:
+        #     q_s_new = []
+        #     for val in q_s:
+        #         q_s_new.append(w2i(val))
+        #     q_s = np.array(q_s_new)
+        if np.linalg.norm(q_s - np.array(q_old)) > 4 * q_step or not within_joint_limits(manipulator, q_s):
+                return None
+
         # if not within_joint_limits(manipulator, q_s):
         #     return None
 
@@ -133,11 +147,15 @@ def distance_from_TSR(T0_s, tsr):
         float, ndarray: The min distance from a TSR and the corresponding task space error vector.
     """
     # pose of the grasp location or the pose of the object held by the hand in world coordinates
+    #T0_sp = np.dot(transform_inv(tsr.Tw_e), T0_s)
     T0_sp = np.dot(T0_s, np.linalg.inv(tsr.Tw_e))
     # T0_sp in terms of the coordinates of the target frame w given by the Task Space Region tsr.
     Tw_sp = np.dot(np.linalg.inv(tsr.T0_w), T0_sp)
     # Generate the displacement vector of Tw_sp. Displacement represents the error given T0_s relative to Tw_e transform.
     disp = displacement(Tw_sp)
+    # disp[0] = T0_sp[0:3, 3][0] - tsr.T0_w[0:3, 3][0]
+    # disp[1] = T0_sp[0:3, 3][1] - tsr.T0_w[0:3, 3][1]
+    # disp[2] = T0_sp[0:3, 3][2] - tsr.T0_w[0:3, 3][2]
     # Since there are equivalent angle displacements for rpy, generate those equivalents by added +/- PI.
     # Use the smallest delta_x_dist of the equivalency set.
     rpys = generate_equivalent_euler_angles([disp[3], disp[4], disp[5]])
@@ -161,6 +179,7 @@ def displacement(Tm):
     Returns:
         ndarray: The displacement vector.
     """
+    # Tv = [-Tm[0:3, 3][2], -Tm[0:3, 3][0], -Tm[0:3, 3][1]]
     Tv = Tm[0:3, 3]
     Rt = Tm[0:3, 0:3]
     rpy = rot2rpy(Rt)

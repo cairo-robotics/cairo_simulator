@@ -9,7 +9,7 @@ def name2idx(igraph, name):
         pass
 
 def val2str(value, decimal_places=8):
-    def trunc(number, places=8):
+    def trunc(number, places=decimal_places):
         if not isinstance(places, int):
             raise ValueError("Decimal places must be an integer.")
         if places < 1:

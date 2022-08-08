@@ -107,7 +107,8 @@ class Simulator:
         if run_parallel:
             Simulator.__instance = None
         if Simulator.__instance is not None:
-            raise Exception(
+            if p.isConnected():
+                raise Exception(
                 "You may only initialize -one- simulator per program! Use get_instance instead.")
         else:
             Simulator.__instance = self
@@ -123,8 +124,17 @@ class Simulator:
             self.logger = logger if logger is not None else Logger(handlers=[
                                                                    'ros'])
 
-    def __del__(self):
-        p.disconnect()
+    def disconnect(self):
+        Simulator.__instance = None
+        if p.isConnected():
+            p.disconnect()
+    
+    # def __del__(self):
+    #     Simulator.__instance = None
+    #     if p.isConnected():
+    #         p.disconnect()
+            
+
 
     def __init_vars(self, use_real_time):
         """
@@ -566,7 +576,6 @@ class Robot(ABC):
         self._state = None
         if Simulator.is_instantiated():
             self.logger = Simulator.get_logger()
-            print(urdf_file)
             self._simulator_id = p.loadURDF(urdf_file, basePosition=position,
                                             baseOrientation=orientation, useFixedBase=fixed_base, flags=urdf_flags)
             # Register with Simulator manager
