@@ -52,8 +52,8 @@ fh.setFormatter(formatter)
 # add the handlers to logger
 script_logger.addHandler(fh)
 
-OMEGA_TSR_EPSILON = .05
-PLANNING_TSR_EPSILON = .05
+OMEGA_TSR_EPSILON = .075
+PLANNING_TSR_EPSILON = .1
 Q_STEP = .05
 E_STEP = .025
 
@@ -617,6 +617,8 @@ if __name__ == "__main__":
                         # we use the planning TSR used for the constrained planner as a secondary target.
                         for _ in range(0, 1000):
                             q_constrained = rusty_sawyer_robot.omega_optimize(sample).data
+                        if e2 == '33':
+                            print("Here")
                         normalized_q_constrained = []
                         if any([np.isnan(val) for val in q_constrained]):
                             continue
@@ -667,7 +669,7 @@ if __name__ == "__main__":
                 # Use parametric linear interpolation with 10 steps between points.
                 interp = partial(parametric_lerp, steps=20)
                 # See params for CBiRRT2 specific parameters 
-                cbirrt = CBiRRT2(sawyer_robot, planning_state_space, svc, interp, params={'smooth_path': True, 'smoothing_time': 10, 'epsilon': PLANNING_TSR_EPSILON, 'q_step': Q_STEP, 'e_step': E_STEP, 'iters': 10000})
+                cbirrt = CBiRRT2(sawyer_robot, planning_state_space, svc, interp, params={'smooth_path': False, 'smoothing_time': 10, 'epsilon': PLANNING_TSR_EPSILON, 'q_step': Q_STEP, 'e_step': E_STEP, 'iters': 10000})
                 logger.info("Planning....")
                 print("Start, end: ", start, end)
                 logger.info("Constraints: {}".format(planning_G.nodes[e1].get('constraint_ids', None)))
