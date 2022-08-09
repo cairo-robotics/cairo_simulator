@@ -11,6 +11,7 @@ from cairo_planning.constraints.projection import project_config
 from cairo_planning.geometric.transformation import quat2rpy
 
 from cairo_planning.planners import utils
+from cairo_planning.planners.exceptions import MaxItersException, PlanningTimeoutException
 from cairo_simulator.core.log import Logger
 
 __all__ = ['CBiRRT2']
@@ -32,6 +33,7 @@ class CBiRRT2():
         self.epsilon = params.get('epsilon', .1)
         self.e_step = params.get('e_step', .25)
         self.iters = params.get('iters', 20000)
+        self.max_planning_time = params.get('max_time', 60)
         self.smoothing_time = params.get('smoothing_time', 10)
         self.log =  logger if logger is not None else Logger(name="CBiRRT2", handlers=['logging'], level=params.get('log_level', 'debug'))
         self.log.info("q_step: {}, epsilon: {}, e_step: {}, BiRRT Iters {}".format(self.q_step, self.epsilon, self.e_step, self.iters))
@@ -73,11 +75,12 @@ class CBiRRT2():
         continue_to_plan = True
         tree_swp = self._tree_swap_gen()
         a_tree, b_tree = next(tree_swp)
+        tick = time.perf_counter()
         while continue_to_plan:
             iters += 1
             if iters > self.iters:
                 self.log.debug("Max iters reach...no feasbile plan.")
-                return None
+                raise MaxItersException()
             q_rand = self._random_config()
             qa_near = self._neighbors(a_tree, q_rand)  # closest leaf value to q_rand
             # extend tree at as far as possible to generate qa_reach
@@ -97,6 +100,9 @@ class CBiRRT2():
             # otherwise we swap trees and repeat.
             else:
                  a_tree, b_tree = next(tree_swp)
+            tock = time.perf_counter()
+            if tock - tick > self.timeout_in_seconds:
+                raise PlanningTimeoutException()
     
     def reset_planner(self):
         self.tree = ig.Graph(directed=True)
