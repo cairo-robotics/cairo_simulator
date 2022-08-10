@@ -80,7 +80,7 @@ class CBiRRT2():
             iters += 1
             if iters > self.iters:
                 self.log.debug("Max iters reach...no feasbile plan.")
-                raise MaxItersException()
+                raise MaxItersException("Max CBiRRT2 iterations reached...planning failure.")
             q_rand = self._random_config()
             qa_near = self._neighbors(a_tree, q_rand)  # closest leaf value to q_rand
             # extend tree at as far as possible to generate qa_reach

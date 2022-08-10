@@ -101,14 +101,15 @@ if __name__ == "__main__":
     EVAL_OUTPUT_DIRECTORY = os.path.join(FILE_DIR, "participant_{}/output".format(participant))
 
     # IPD RELAX PARAMS
-    KEYFRAME_KDE_BANDWIDTH = .35
-    SAMPLING_BIAS_KDE_BANDWIDTH = .05
+    KEYFRAME_KDE_BANDWIDTH = .15
+    SAMPLING_BIAS_KDE_BANDWIDTH = .15
     OPTIMIZATION_ITERS = 1000
     OMEGA_TSR_EPSILON = .075
-    
+    MAX_STEERING_POINT_ITERS = 500
+
     # PLANNING PARAMS
-    SMOOTH = False
-    SMOOTHING_TIME = 10
+    SMOOTH = True
+    SMOOTHING_TIME = 5
     MAX_SEGMENT_PLANNING_TIME = 60
     MAX_ITERS = 5000
     PLANNING_TSR_EPSILON = .1
@@ -118,7 +119,7 @@ if __name__ == "__main__":
     
     # EXPERIMENT PARAMS
     TRIALS = 10
-    VISUALIZE_EXECUTION = False
+    VISUALIZE_EXECUTION = True
        
     ##############
     # EVALUATION #
@@ -129,7 +130,7 @@ if __name__ == "__main__":
         
     # Create the gold demonstration trajectory
     gold_demo_data = load_json_files(GOLD_DEMO_INPUT_DIRECTORY)["data"][0]
-    gold_demo_traj = [[entry["robot"]["joint_angle"] for entry in gold_demo_data]]
+    gold_demo_traj = [entry["robot"]["joint_angle"] for entry in gold_demo_data]
     
     ###########################################
     #       BASE PLANNING CONFIGURATION       #
@@ -374,7 +375,11 @@ if __name__ == "__main__":
         
         # The start configuration. For this pouring task, we let the keyframe model / sampling dicate the ending point (but this is not strictly required)
         start_configuration = [0.4523310546875, 0.8259462890625, -1.3458369140625, 0.3512138671875, 1.7002646484375, -0.7999306640625, -1.324783203125]
-        planning_G = nx.Graph()
+        
+        # TODO: Goal configuration
+        # goal_configuration = []
+                
+        planning_G = nx.Graph() 
 
         # Starting and ending keyframe ids
         start_keyframe_id = list(keyframes.keys())[0]
@@ -387,7 +392,7 @@ if __name__ == "__main__":
         # We will build a keyframe dsitribution using KDE from which to sample for steering points / viapoints. 
         end_data = [obsv['robot']['joint_angle'] for obsv in keyframes[end_keyframe_id]["observations"]]
         #Keyframe bandwidth dictates how heavily biased / overfit out sampling is from our keyframe distribution. In this case we want heavy bias. 
-        keyframe_dist = KernelDensityDistribution(bandwidth=.05)
+        keyframe_dist = KernelDensityDistribution(bandwidth=KEYFRAME_KDE_BANDWIDTH)
         keyframe_dist.fit(end_data)
         keyframe_space = DistributionSpace(sampler=DistributionSampler(keyframe_dist, fraction_uniform=0, high_confidence_sampling=False), limits=limits)
         # we cast the keyframe ids to int for networkx node dereferencing as keyframe ids are output as strings from CAIRO LfD 
@@ -505,7 +510,7 @@ if __name__ == "__main__":
                     
                     # this information will be used to create a biasing distribution for sampling during planning between steering points.
                     sampling_bias = {
-                        'bandwidth': .15,
+                        'bandwidth': SAMPLING_BIAS_KDE_BANDWIDTH,
                         'fraction_uniform': .1,
                         'data': inter_trajs_data
                     }
@@ -604,7 +609,11 @@ if __name__ == "__main__":
 
                         found = False
                         eval_trial.start_timer("steering_point_generation_1")
+                        ip_iters = 0
                         while not found:
+                            ip_iters += 1                            
+                            if ip_iters > MAX_STEERING_POINT_ITERS:
+                                raise MaxItersException("Cannot generate an intersection point. Max iters reached")
                             # we want the candidate sample to be from the foliation of the model
                             if foliation_model is not None:
                                 sample_from_foliation = False
@@ -718,7 +727,11 @@ if __name__ == "__main__":
                         
                         found = False
                         eval_trial.start_timer("steering_point_generation_2")
+                        ip_iters = 0
                         while not found:
+                            ip_iters += 1                            
+                            if ip_iters > MAX_STEERING_POINT_ITERS:
+                                raise MaxItersException("Cannot generate an intersection point. Max iters reached")
                             if foliation_model is not None:
                                 sample_from_foliation = False
                                 while not sample_from_foliation:
@@ -858,10 +871,10 @@ if __name__ == "__main__":
             print("PLANNING TIMEOUT! PLANNING FAILURE!")
             PLANNING_FAILURE = True
             eval_trial.notes = "Planning timeout failure."
-        except MaxItersException:
+        except MaxItersException as e:
             print("MAX ITERS REACHED. PLANNING FAILURE!")
             PLANNING_FAILURE = True
-            eval_trial.notes = "Planning max iters failure."                    
+            eval_trial.notes = str(e)                  
         
         
         if not PLANNING_FAILURE:
@@ -870,7 +883,8 @@ if __name__ == "__main__":
             planning_path = [np.array(p) for p in final_path]
             # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
             jtc = JointTrajectoryCurve()
-            traj = jtc.generate_trajectory(planning_path, move_time=10)
+            timed_spline_trajectory = jtc.generate_trajectory(planning_path, move_time=10)
+            spline_trajectory = [p[1] for p in timed_spline_trajectory]
             
             # Build map of actual TSR objects for evaluation
             cs2tsr_object_map = {}
@@ -881,14 +895,15 @@ if __name__ == "__main__":
                 cs2tsr_object_map[key] = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw)
             
             # Update trial evaluation data.
-            eval_trial.path_length = eval_trial.eval_path_length(trajectory)
-            eval_trial.success = eval_trial.eval_success(trajectory, goal, EPSILON)
-            eval_trial.a2s_distance = eval_trial.eval_a2s([p[:2] for p in trajectory], [p[:2] for p in gold_demo_traj])
+            eval_trial.path_length = eval_trial.eval_path_length(spline_trajectory)
+            # TODO: Get goal points for planning
+            #eval_trial.success = eval_trial.eval_success(spline_trajectory, goal, EPSILON)
+            eval_trial.a2s_distance = eval_trial.eval_a2s(spline_trajectory, gold_demo_traj)
             eval_trial.a2f_percentage = eval_trial.eval_a2f(TRAJECTORY_SEGMENTS, cs2tsr_object_map, EVAL_CONSTRAINT_ORDER)
             eval_trial.ip_gen_times = IP_GEN_TIMES
             eval_trial.ip_gen_types = IP_GEN_TYPES
             eval_trial.ip_tsr_distances = IP_TSR_DISTANCES
-            eval_trial.trajectory = traj
+            eval_trial.trajectory = spline_trajectory
             evaluation.add_trial(eval_trial)
                                         
             if VISUALIZE_EXECUTION:
@@ -905,7 +920,7 @@ if __name__ == "__main__":
             
                 try:
                     prior_time = 0
-                    for i, point in enumerate(traj):
+                    for i, point in enumerate(timed_spline_trajectory):
                         if not svc.validate(point[1]):
                             print("Invalid point: {}".format(point[1]))
                             continue
@@ -914,6 +929,7 @@ if __name__ == "__main__":
                         prior_time = point[0]
                 except KeyboardInterrupt:
                     sim_context.disconnect()
+                sim_context.disconnect()
         else:
             # Update trial evaluation data with failure-style data. Many defaults are already set.
             eval_trial.success = "X"

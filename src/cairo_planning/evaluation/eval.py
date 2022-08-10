@@ -69,21 +69,15 @@ class IPDRelaxEvaluationTrial():
             total_path_length += euclidean(trajectory[i], trajectory[i + 1])
         return total_path_length
 
-    def eval_a2s(self, trajectory, gold_trajectory, ignore_theta=True):
-        if ignore_theta:
-            t1 = [p[0:2] for p in trajectory]
-            t2 = [p[0:2] for p in gold_trajectory]
-        else:
-            t1 = trajectory
-            t2 = gold_trajectory
+    def eval_a2s(self, trajectory, gold_trajectory):
+        t1 = trajectory
+        t2 = gold_trajectory
         dist, _ = fastdtw(t1, t2)
         return dist
 
-    def eval_success(self, trajectory, goal_point, epsilon=25):
-        dist_xy = euclidean(trajectory[-1][:2], goal_point[:2])
-        delta_theta = abs(trajectory[-1][2] - goal_point[2])
-        diff_theta = abs((delta_theta + 180) % 360 - 180)
-        if dist_xy < epsilon and diff_theta < 10:
+    def eval_success(self, trajectory, goal_point, epsilon=5):
+        dist = euclidean(trajectory[-1], goal_point)
+        if dist < epsilon:
             return True
         else:
             return False
@@ -93,10 +87,10 @@ class IPDRelaxEvaluationTrial():
         for idx, segment in enumerate(trajectory_segments):
             if constraint_ordering[idx] is not None:
                 evaluator = constraint_eval_map.get(
-                    constraint_ordering[idx], None)
+                    tuple(constraint_ordering[idx]), None)
                 if evaluator is not None:
                     for point in segment:
-                        results.append(evaluator.validate(point))
+                        results.append(evaluator.is_valid(point))
             else:
                 for point in segment:
                     results.append(True)
