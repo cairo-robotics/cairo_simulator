@@ -97,7 +97,7 @@ def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25,
         q_error = np.dot(J_cross, x_err)
         q_s = q_s - e_step * q_error
         # if the displacement of the current projected configuration relative to q_old (could be q_near etc)
-        # is any larger than twice the step size q_step, we discard the projection. 
+        # is any larger than four times the step size q_step, we discard the projection. 
         # if wrap_to_interval:
         #     q_s_new = []
         #     for val in q_s:
