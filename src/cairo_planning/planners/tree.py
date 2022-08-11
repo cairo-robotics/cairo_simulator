@@ -7,8 +7,8 @@ import time
 import numpy as np
 import igraph as ig
 
-from cairo_planning.constraints.projection import project_config
-from cairo_planning.geometric.transformation import quat2rpy
+from cairo_planning.constraints.projection import project_config, distance_from_TSR
+from cairo_planning.geometric.transformation import quat2rpy, pose2trans
 
 from cairo_planning.planners import utils
 from cairo_planning.planners.exceptions import MaxItersException, PlanningTimeoutException
@@ -35,6 +35,7 @@ class CBiRRT2():
         self.iters = params.get('iters', 20000)
         self.max_planning_time = params.get('max_time', 60)
         self.smoothing_time = params.get('smoothing_time', 10)
+        self.allow_off_manifold_endpoints = params.get('off_manifold_endpoints', False)
         self.log =  logger if logger is not None else Logger(name="CBiRRT2", handlers=['logging'], level=params.get('log_level', 'debug'))
         self.log.info("q_step: {}, epsilon: {}, e_step: {}, BiRRT Iters {}".format(self.q_step, self.epsilon, self.e_step, self.iters))
     
@@ -76,6 +77,13 @@ class CBiRRT2():
         tree_swp = self._tree_swap_gen()
         a_tree, b_tree = next(tree_swp)
         tick = time.perf_counter()
+        
+        if self.allow_off_manifold_endpoints:
+            if not self._within_manifold(self.forwards_tree.vs.find(name=self.start_name)['value'], tsr):
+                self._insert_off_manifold_point(self.forwards_tree, self.forwards_tree.vs.find(name=self.start_name)['value'], tsr)
+            if not self._within_manifold(self.backwards_tree.vs.find(name=self.goal_name)['value'], tsr):
+                self._insert_off_manifold_point(self.backwards_tree, self.backwards_tree.vs.find(name=self.goal_name)['value'], tsr)
+            
         while continue_to_plan:
             iters += 1
             if iters > self.iters:
@@ -83,16 +91,28 @@ class CBiRRT2():
                 raise MaxItersException("Max CBiRRT2 iterations reached...planning failure.")
             q_rand = self._random_config()
             qa_near = self._neighbors(a_tree, q_rand)  # closest leaf value to q_rand
-            # extend tree at as far as possible to generate qa_reach
-            qa_reach, _, valid = self._constrained_extend(a_tree, tsr, qa_near, q_rand)
-            if not valid:
-                continue
+            
+            # Try interpolation first:
+            qa_int, path, interpolation_valid = self._interpolated_extend(a_tree, tsr, qa_near, q_rand)
+            if interpolation_valid:
+                qa_reach = q_int
+            else:
+                # extend tree at as far as possible to generate qa_reach
+                qa_reach, _, valid = self._constrained_extend(a_tree, tsr, qa_near, q_rand)
+                if not valid:
+                    continue
             # closest leaf value of B to qa_reach
-            qb_near = self._neighbors(b_tree, qa_reach)  
-            # now tree B is extended as far as possible to qa_reach
-            qb_reach, _, valid = self._constrained_extend(b_tree, tsr, qb_near, qa_reach)
-            if not valid:
-                continue
+            qb_near = self._neighbors(b_tree, qa_reach) 
+             
+            # Try interpolation first:
+            qb_int, path, interpolation_valid = self._interpolated_extend(a_tree, tsr, qb_near, q_rand)
+            if interpolation_valid:
+                qb_reach = qb_int
+            else: 
+            # otherwise tree B is extended as far as possible to qa_reach
+                qb_reach, _, valid = self._constrained_extend(b_tree, tsr, qb_near, qa_reach)
+                if not valid:
+                    continue
             # if the qa_reach and qb_reach are equivalent, the trees are connectable. 
             if self._equal(qa_reach, qb_reach):
                 self.connected_tree = self._join_trees(a_tree, qa_reach, b_tree, qb_reach)
@@ -109,6 +129,20 @@ class CBiRRT2():
         self.forwards_tree = ig.Graph(directed=True)
         self.backwards_tree = ig.Graph(directed=True)
     
+    def _interpolated_extend(self, tree, tsr, q_near, q_target):
+        interpolated_path = self.interp_fn(q_near, q_target)
+        path_tsr_valid = all([self._within_manifold(q, tsr) for q in interpolated_path])
+        path_svc_valid =  all([self._validate(q) for q in interpolated_path])
+        if path_tsr_valid and path_svc_valid:
+            self._add_vertex(tree, q_target)
+            if tree['name'] == 'forwards' or tree['name'] == 'smoothing':
+                self._add_edge(tree, q_near, q_target, self._distance(q_near, q_target))
+            else:
+                self._add_edge(tree, q_target, q_near, self._distance(q_target, q_near))
+            return q_target, interpolated_path, True
+        else:
+            return None, [], False
+                  
     def _constrained_extend(self, tree, tsr, q_near, q_target):
         generated_values = []
         q_s = np.array(q_near)
@@ -131,7 +165,6 @@ class CBiRRT2():
             # More problem sepcific versions of constrained_extend use constraint value information 
             # constraints = self._get_constraint_values(tree, qs_old)
             
-       
             q_s = self._constrain_config(qs_old=qs_old, q_s=q_s, tsr=tsr)
             if q_s is not None:
                 # this function will occasionally osscilate between to projection values.
@@ -156,6 +189,16 @@ class CBiRRT2():
             else:
                 # the current q_s is not valid or couldn't be projected so we return the last best value qs_old
                 return qs_old, generated_values, False
+
+    def _insert_off_manifold_point(self, tree, point, tsr, n=10):
+        projected_points = []
+        for _ in range(0, n):
+            q_constrained = project_config(self.robot, tsr, q_s=point, q_old=point, epsilon=self.epsilon, q_step=.5, e_step=self.e_step, iter_count=10000, wrap_to_interval=True)
+            if q_constrained is not None:
+                projected_points.append(q_constrained)
+        for proj_point in projected_points:
+            self._add_vertex(tree, proj_point)
+            self._add_edge(tree, point, proj_point, self._distance(point, proj_point))
 
     def _constrain_config(self, qs_old, q_s, tsr):
         # these functions can be very problem specific. For now we'll just assume the most very basic form.
@@ -371,7 +414,6 @@ class CBiRRT2():
         self.forwards_tree.add_vertex(self.start_name)
         self.forwards_tree.vs.find(name=self.start_name)['value'] = start_q
         self.forwards_tree['name'] = 'forwards'
-       
 
         self.goal_name = utils.val2str(goal_q)
         self.backwards_tree.add_vertex(self.goal_name)
@@ -384,9 +426,13 @@ class CBiRRT2():
         return False
 
     def _within_manifold(self, q_s, tsr):
-        xyz, quat = self.robot.solve_forward_kinematics(q_s)[0]
-        pose = list(xyz) + list(quat2rpy(quat))
-        return all(tsr.is_valid(q_s))
+        trans, quat = self.robot.solve_forward_kinematics(q_s)[0]
+        T0_s = pose2trans(np.hstack([trans + quat]))
+        min_distance_new, x_err = distance_from_TSR(T0_s, tsr)
+        if min_distance_new < self.epsilon:
+            return True
+        else:
+            return False
 
     def _validate(self, sample):
         return self.svc.validate(sample)
