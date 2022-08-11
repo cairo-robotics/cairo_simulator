@@ -52,7 +52,7 @@ fh.setFormatter(formatter)
 # add the handlers to logger
 script_logger.addHandler(fh)
 
-OMEGA_TSR_EPSILON = .075
+OMEGA_TSR_EPSILON = .1
 PLANNING_TSR_EPSILON = .1
 Q_STEP = .05
 E_STEP = .025
