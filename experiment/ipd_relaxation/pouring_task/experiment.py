@@ -893,12 +893,18 @@ if __name__ == "__main__":
                 Tw_e = xyzrpy2trans(config['Tw_e'], degrees=config['degrees'])
                 Bw = bounds_matrix(config['Bw'][0], config['Bw'][1])
                 cs2tsr_object_map[key] = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw)
+                
+            # get taskspace trajectory of gold and planned path:
+            rusty_sawyer_robot = Agent(rusty_agent_settings_path, False, False)
+            taskspace_gold_demo_traj =  [rusty_sawyer_robot.forward_kinematics(point) for point in gold_demo_traj]                                   
+            taskspace_trajectory = [rusty_sawyer_robot.forward_kinematics(point) for point in spline_trajectory]      
             
             # Update trial evaluation data.
             eval_trial.path_length = eval_trial.eval_path_length(spline_trajectory)
             # TODO: Get goal points for planning
             #eval_trial.success = eval_trial.eval_success(spline_trajectory, goal, EPSILON)
-            eval_trial.a2s_distance = eval_trial.eval_a2s(spline_trajectory, gold_demo_traj)
+            eval_trial.a2s_cspace_distance = eval_trial.eval_a2s(spline_trajectory, gold_demo_traj)
+            eval_trial.a2s_taskspace_distance = eval_trial.eval_a2s(taskspace_trajectory, taskspace_gold_demo_traj)
             eval_trial.a2f_percentage = eval_trial.eval_a2f(TRAJECTORY_SEGMENTS, cs2tsr_object_map, EVAL_CONSTRAINT_ORDER)
             eval_trial.ip_gen_times = IP_GEN_TIMES
             eval_trial.ip_gen_types = IP_GEN_TYPES

@@ -30,7 +30,8 @@ class IPDRelaxEvaluation():
         for trial in self.trials:
             trial_data = {}
             trial_data["path_length"] = trial.path_length
-            trial_data["a2s_distance"] = trial.a2s_distance
+            trial_data["a2s_cspace_distance"] = trial.a2s_cspace_distance
+            trial_data["a2s_taskspace_distance"] = trial.a2s_taskspace_distance
             trial_data["success"] = trial.success
             trial_data["a2f_percentage"] = trial.a2f_percentage
             trial_data["planning_time"] = trial.planning_time
@@ -52,7 +53,8 @@ class IPDRelaxEvaluationTrial():
 
     def __init__(self):
         self.path_length = -1
-        self.a2s_distance = -1
+        self.a2s_cspace_distance = -1
+        self.a2s_taskspace_distance = -1
         self.success = False
         self.a2f_percentage = -1
         self.planning_time = -1
