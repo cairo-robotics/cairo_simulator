@@ -95,7 +95,7 @@ class CBiRRT2():
             # Try interpolation first:
             qa_int, path, interpolation_valid = self._interpolated_extend(a_tree, tsr, qa_near, q_rand)
             if interpolation_valid:
-                qa_reach = q_int
+                qa_reach = qa_int
             else:
                 # extend tree at as far as possible to generate qa_reach
                 qa_reach, _, valid = self._constrained_extend(a_tree, tsr, qa_near, q_rand)
@@ -105,7 +105,7 @@ class CBiRRT2():
             qb_near = self._neighbors(b_tree, qa_reach) 
              
             # Try interpolation first:
-            qb_int, path, interpolation_valid = self._interpolated_extend(a_tree, tsr, qb_near, q_rand)
+            qb_int, path, interpolation_valid = self._interpolated_extend(b_tree, tsr, qb_near, qa_reach)
             if interpolation_valid:
                 qb_reach = qb_int
             else: 

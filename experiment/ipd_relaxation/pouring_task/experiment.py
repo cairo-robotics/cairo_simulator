@@ -115,17 +115,17 @@ if __name__ == "__main__":
 
     # PLANNING PARAMS
     SMOOTH = True
-    SMOOTHING_TIME = 5
+    SMOOTHING_TIME = 10
     MAX_SEGMENT_PLANNING_TIME = 30
     MAX_ITERS = 5000
-    PLANNING_TSR_EPSILON = .1
+    PLANNING_TSR_EPSILON = .15
     Q_STEP = .1
     # Controls the error signal effect size when mapped back into configuration space.
-    E_STEP = .025
-    MOVE_TIME = 10
+    E_STEP = .05
+    MOVE_TIME = 15
 
     # EXPERIMENT PARAMS
-    TRIALS = 10
+    TRIALS = 1
     VISUALIZE_EXECUTION = True
 
     ##############
@@ -573,7 +573,7 @@ if __name__ == "__main__":
         # We also use a basic keyframe space -> TODO: is this necessary?
         planning_G.add_nodes_from(
             [(0, {"point": start_configuration, "keyframe_space": SawyerConfigurationSpace(limits=limits)})])
-        # Since this specific task starts off in an orientation constraint, lets use it to plan.
+
         planning_G.nodes[0]['tsr'] = TSR_1_config
         planning_G.nodes[0]['constraint_ids'] = [1]
         # let's connect the starting point to the node associated with the starting keyframe
@@ -953,7 +953,7 @@ if __name__ == "__main__":
                             edge_tsr_config['Bw'][0], edge_tsr_config['Bw'][1])
                         planning_tsr = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw)
                         # Use parametric linear interpolation with 10 steps between points.
-                        interp = partial(parametric_lerp, steps=20)
+                        interp = partial(parametric_lerp, steps=50)
                         # See params for CBiRRT2 specific parameters
                         cbirrt = CBiRRT2(sawyer_robot, planning_state_space, svc, interp, params={
                                          'off_manifold_endpoints': True, 'smooth_path': SMOOTH, 'smoothing_time': SMOOTHING_TIME, 'epsilon': PLANNING_TSR_EPSILON, 'q_step': Q_STEP, 'e_step': E_STEP, 'iters': MAX_ITERS})

@@ -92,7 +92,7 @@ class IPDRelaxEvaluationTrial():
                     tuple(constraint_ordering[idx]), None)
                 if evaluator is not None:
                     for point in segment:
-                        results.append(evaluator.is_valid(point))
+                        results.append(all(evaluator.is_valid(point)))
             else:
                 for point in segment:
                     results.append(True)
