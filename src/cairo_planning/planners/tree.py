@@ -121,7 +121,7 @@ class CBiRRT2():
             else:
                  a_tree, b_tree = next(tree_swp)
             tock = time.perf_counter()
-            if tock - tick > self.timeout_in_seconds:
+            if tock - tick > self.max_planning_time:
                 raise PlanningTimeoutException()
     
     def reset_planner(self):
