@@ -6,6 +6,7 @@ import time
 from fastdtw import fastdtw
 from scipy.spatial.distance import euclidean
 
+from cairo_planning.constraints.projection import distance_from_TSR
 
 class IPDRelaxEvaluation():
 
@@ -84,17 +85,18 @@ class IPDRelaxEvaluationTrial():
         else:
             return False
 
-    def eval_a2f(self, trajectory_segments, constraint_eval_map, constraint_ordering):
+    def eval_a2f(self, trajectory_segments, constraint_eval_map, constraint_ordering, epsilon):
         results = []
         for idx, segment in enumerate(trajectory_segments):
             if constraint_ordering[idx] is not None:
-                evaluator = constraint_eval_map.get(
+                tsr = constraint_eval_map.get(
                     tuple(constraint_ordering[idx]), None)
-                if evaluator is not None:
-                    for point in segment:
-                        results.append(all(evaluator.is_valid(point)))
+                if tsr is not None:
+                    for transform in segment:
+                        dist, _ = distance_from_TSR(transform, tsr)
+                        results.append(dist < epsilon)
             else:
-                for point in segment:
+                for transform in segment:
                     results.append(True)
         return sum(results) / len(results)
 

@@ -110,18 +110,18 @@ if __name__ == "__main__":
     KEYFRAME_KDE_BANDWIDTH = .15
     SAMPLING_BIAS_KDE_BANDWIDTH = .15
     OPTIMIZATION_ITERS = 1000
-    OMEGA_TSR_EPSILON = .075
+    OMEGA_TSR_EPSILON = .1
     MAX_STEERING_POINT_ITERS = 500
 
     # PLANNING PARAMS
     SMOOTH = True
     SMOOTHING_TIME = 10
-    MAX_SEGMENT_PLANNING_TIME = 30
+    MAX_SEGMENT_PLANNING_TIME = 60
     MAX_ITERS = 5000
     PLANNING_TSR_EPSILON = .15
-    Q_STEP = .1
+    Q_STEP = .05
     # Controls the error signal effect size when mapped back into configuration space.
-    E_STEP = .05
+    E_STEP = .25
     MOVE_TIME = 15
 
     # EXPERIMENT PARAMS
@@ -956,7 +956,7 @@ if __name__ == "__main__":
                         interp = partial(parametric_lerp, steps=50)
                         # See params for CBiRRT2 specific parameters
                         cbirrt = CBiRRT2(sawyer_robot, planning_state_space, svc, interp, params={
-                                         'off_manifold_endpoints': True, 'smooth_path': SMOOTH, 'smoothing_time': SMOOTHING_TIME, 'epsilon': PLANNING_TSR_EPSILON, 'q_step': Q_STEP, 'e_step': E_STEP, 'iters': MAX_ITERS})
+                                         'off_manifold_endpoints': True, 'smooth_path': SMOOTH, 'smoothing_time': SMOOTHING_TIME, 'epsilon': PLANNING_TSR_EPSILON, 'q_step': Q_STEP, 'e_step': E_STEP, 'iters': MAX_ITERS, 'max_time': MAX_SEGMENT_PLANNING_TIME})
                         logger.info("Planning....")
                         print("Start, end: ", start, end)
                         logger.info("Constraints: {}".format(
@@ -1015,10 +1015,18 @@ if __name__ == "__main__":
 
             # get taskspace trajectory of gold and planned path:
             rusty_sawyer_robot = Agent(rusty_agent_settings_path, False, False)
-            taskspace_gold_demo_traj = [rusty_sawyer_robot.forward_kinematics(
-                point)[0] for point in gold_demo_traj]
-            taskspace_trajectory = [rusty_sawyer_robot.forward_kinematics(
-                point)[0] for point in spline_trajectory]
+            rust_results_of_gdt = [rusty_sawyer_robot.forward_kinematics(
+                point) for point in gold_demo_traj]
+            taskspace_gold_demo_traj = [p[0] + p[1] for p in rust_results_of_gdt]
+            rust_results_of_st = [rusty_sawyer_robot.forward_kinematics(
+                point) for point in spline_trajectory]
+            taskspace_trajectory = [p[0] + p[1] for p in rust_results_of_st]
+            
+            # convert all confniguration points to taskspace transforms for a2f analysis
+            task_space_segments = []
+            for segment in TRAJECTORY_SEGMENTS:
+                rust_results = [rusty_sawyer_robot.forward_kinematics(point) for point in segment]
+                task_space_segments.append([pose2trans(p[0] + p[1]) for p in rust_results])
 
             # Update trial evaluation data.
             eval_trial.path_length = eval_trial.eval_path_length(
@@ -1030,7 +1038,7 @@ if __name__ == "__main__":
             eval_trial.a2s_taskspace_distance = eval_trial.eval_a2s(
                 taskspace_trajectory, taskspace_gold_demo_traj)
             eval_trial.a2f_percentage = eval_trial.eval_a2f(
-                TRAJECTORY_SEGMENTS, cs2tsr_object_map, EVAL_CONSTRAINT_ORDER)
+                task_space_segments, cs2tsr_object_map, EVAL_CONSTRAINT_ORDER, PLANNING_TSR_EPSILON)
             eval_trial.ip_gen_times = IP_GEN_TIMES
             eval_trial.ip_gen_types = IP_GEN_TYPES
             eval_trial.ip_tsr_distances = IP_TSR_DISTANCES
@@ -1049,19 +1057,35 @@ if __name__ == "__main__":
                 interp_fn = partial(parametric_lerp, steps=20)
 
                 sawyer_robot.set_joint_state(start_configuration)
-
-                try:
-                    prior_time = 0
-                    for i, point in enumerate(timed_spline_trajectory):
-                        if not svc.validate(point[1]):
-                            print("Invalid point: {}".format(point[1]))
-                            continue
-                        sawyer_robot.set_joint_state(point[1])
-                        time.sleep(point[0] - prior_time)
-                        prior_time = point[0]
-                except KeyboardInterrupt:
-                    sim_context.disconnect()
-                sim_context.disconnect()
+                while True:
+                    key = input("Press s key to excute plan, p to preview waypoints, or q to quit.")
+                    if key == 'p':
+                        sawyer_robot.set_joint_state(start_configuration)
+                        for index in keyframe_planning_order:
+                            p1 = planning_G.nodes[index]['point']
+                            print(index, p1)
+                            sawyer_robot.set_joint_state(p1)
+                            time.sleep(2)
+                    if key == 's':
+                        sawyer_robot.set_joint_state(start_configuration)
+                        # splining uses numpy so needs to be converted
+                        planning_path = [np.array(p) for p in final_path]
+                        # Create a MinJerk spline trajectory using JointTrajectoryCurve and execute
+                        jtc = JointTrajectoryCurve()
+                        traj = jtc.generate_trajectory(planning_path, move_time=10)
+                        try:
+                            prior_time = 0
+                            for i, point in enumerate(traj):
+                                if not svc.validate(point[1]):
+                                    print("Invalid point: {}".format(point[1]))
+                                    continue
+                                sawyer_robot.set_joint_state(point[1])
+                                time.sleep(point[0] - prior_time)
+                                prior_time = point[0]
+                        except KeyboardInterrupt:
+                            break
+                    elif key == 'q':
+                        break
         else:
             # Update trial evaluation data with failure-style data. Many defaults are already set.
             eval_trial.success = "X"
