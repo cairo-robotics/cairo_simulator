@@ -943,8 +943,6 @@ if __name__ == "__main__":
                         edge_tsr_config = edge_config.get(
                             'tsr', unconstrained_TSR)
                         print(edge_tsr_config)
-                        if e1 == 0:
-                            time.sleep(10)
                         T0_w = xyzrpy2trans(
                             edge_tsr_config['T0_w'], degrees=edge_tsr_config['degrees'])
                         Tw_e = xyzrpy2trans(
