@@ -493,7 +493,7 @@ if __name__ == "__main__":
                 # The foliation constraint ids combines both start and end keyframes of the planning segment. In other words, we need to
                 # ensure the start point and ending steering point are in the same foliation, so we utilize the constraints from both keyframes.
                 foliation_constraint_ids = list(set(
-                    keyframe_data["applied_constraints"] + keyframes[str(upcoming_id)]["applied_constraints"]))
+                    constraint_ids + keyframes[str(upcoming_id)]["applied_constraints"]))
 
                 # we use the current upcoming TSR as the planning TSR...
                 planning_G.nodes[keyframe_id]["constraint_ids"] = constraint_ids
