@@ -119,7 +119,7 @@ if __name__ == "__main__":
     MAX_SEGMENT_PLANNING_TIME = 60
     MAX_ITERS = 5000
     PLANNING_TSR_EPSILON = .15
-    Q_STEP = .05
+    Q_STEP = .15
     # Controls the error signal effect size when mapped back into configuration space.
     E_STEP = .25
     MOVE_TIME = 15
@@ -952,8 +952,8 @@ if __name__ == "__main__":
                         Bw = bounds_matrix(
                             edge_tsr_config['Bw'][0], edge_tsr_config['Bw'][1])
                         planning_tsr = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw)
-                        # Use parametric linear interpolation with 10 steps between points.
-                        interp = partial(parametric_lerp, steps=50)
+                        # Use parametric linear interpolation with 5 steps between points.
+                        interp = partial(parametric_lerp, steps=100)
                         # See params for CBiRRT2 specific parameters
                         cbirrt = CBiRRT2(sawyer_robot, planning_state_space, svc, interp, params={
                                          'off_manifold_endpoints': True, 'smooth_path': SMOOTH, 'smoothing_time': SMOOTHING_TIME, 'epsilon': PLANNING_TSR_EPSILON, 'q_step': Q_STEP, 'e_step': E_STEP, 'iters': MAX_ITERS, 'max_time': MAX_SEGMENT_PLANNING_TIME})
