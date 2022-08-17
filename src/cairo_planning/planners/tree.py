@@ -49,7 +49,11 @@ class CBiRRT2():
             goal_q (array-like): Ending configuration.
         """
         self.log.debug("Initializing trees...")
+       
         self._initialize_trees(start_q, goal_q)
+        if self._equal(start_q, goal_q):
+            self.tree = self._join_trees(self.forwards_tree, start_q, self.backwards_tree, goal_q)
+            return self._extract_graph_path()
         self.log.debug("Running Constrained Bidirectional RRT...")
         self.tree = self.cbirrt(tsr)
         print("Size of tree: {}".format(len(self.tree.vs)))
@@ -83,7 +87,14 @@ class CBiRRT2():
                 self._insert_off_manifold_point(self.forwards_tree, self.forwards_tree.vs.find(name=self.start_name)['value'], tsr)
             if not self._within_manifold(self.backwards_tree.vs.find(name=self.goal_name)['value'], tsr):
                 self._insert_off_manifold_point(self.backwards_tree, self.backwards_tree.vs.find(name=self.goal_name)['value'], tsr)
-            
+        
+        # See if interopolated path is valid
+        q_forward_reach, path, interpolation_valid = self._interpolated_extend(self.forwards_tree, tsr, self.start_q, self.goal_q)
+        if interpolation_valid:
+            if self._equal(q_forward_reach, self.goal_q):
+                self.connected_tree = self._join_trees(self.forwards_tree, q_forward_reach, self.backwards_tree, self.goal_q)
+                return self.connected_tree 
+        
         while continue_to_plan:
             iters += 1
             if iters > self.iters:
@@ -130,15 +141,20 @@ class CBiRRT2():
         self.backwards_tree = ig.Graph(directed=True)
     
     def _interpolated_extend(self, tree, tsr, q_near, q_target):
-        interpolated_path = self.interp_fn(q_near, q_target)
+        interpolated_path = list(self.interp_fn(q_near, q_target))
         path_tsr_valid = all([self._within_manifold(q, tsr) for q in interpolated_path])
         path_svc_valid =  all([self._validate(q) for q in interpolated_path])
+        
         if path_tsr_valid and path_svc_valid:
-            self._add_vertex(tree, q_target)
-            if tree['name'] == 'forwards' or tree['name'] == 'smoothing':
-                self._add_edge(tree, q_near, q_target, self._distance(q_near, q_target))
-            else:
-                self._add_edge(tree, q_target, q_near, self._distance(q_target, q_near))
+            points_to_add = interpolated_path
+            q_prior = q_near
+            for point in points_to_add:
+                self._add_vertex(tree, point)
+                if tree['name'] == 'forwards' or tree['name'] == 'smoothing':
+                    self._add_edge(tree, q_prior, point, self._distance(q_prior, point))
+                else:
+                    self._add_edge(tree, point, q_prior, self._distance(point, q_prior))
+                q_prior = point
             return q_target, interpolated_path, True
         else:
             return None, [], False
@@ -411,11 +427,13 @@ class CBiRRT2():
 
     def _initialize_trees(self, start_q, goal_q):
         self.start_name = utils.val2str(start_q)
+        self.start_q = start_q
         self.forwards_tree.add_vertex(self.start_name)
         self.forwards_tree.vs.find(name=self.start_name)['value'] = start_q
         self.forwards_tree['name'] = 'forwards'
 
         self.goal_name = utils.val2str(goal_q)
+        self.goal_q = goal_q
         self.backwards_tree.add_vertex(self.goal_name)
         self.backwards_tree.vs.find(name=self.goal_name)['value'] = goal_q
         self.backwards_tree['name'] = 'backwards'
@@ -428,7 +446,7 @@ class CBiRRT2():
     def _within_manifold(self, q_s, tsr):
         trans, quat = self.robot.solve_forward_kinematics(q_s)[0]
         T0_s = pose2trans(np.hstack([trans + quat]))
-        min_distance_new, x_err = distance_from_TSR(T0_s, tsr)
+        min_distance_new, _ = distance_from_TSR(T0_s, tsr)
         if min_distance_new < self.epsilon:
             return True
         else:
