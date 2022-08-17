@@ -107,16 +107,16 @@ if __name__ == "__main__":
         FILE_DIR, "participant_{}/output".format(participant))
 
     # IPD RELAX PARAMS
-    KEYFRAME_KDE_BANDWIDTH = .05
-    SAMPLING_BIAS_KDE_BANDWIDTH = .2
+    KEYFRAME_KDE_BANDWIDTH = .1
+    SAMPLING_BIAS_KDE_BANDWIDTH = .1
     OPTIMIZATION_ITERS = 1000
-    OMEGA_TSR_EPSILON = .1
+    OMEGA_TSR_EPSILON = .025
     MAX_STEERING_POINT_ITERS = 500
 
     # PLANNING PARAMS
     SMOOTH = False
     SMOOTHING_TIME = 10
-    MAX_SEGMENT_PLANNING_TIME = 60
+    MAX_SEGMENT_PLANNING_TIME = 20
     MAX_ITERS = 5000
     PLANNING_TSR_EPSILON = .1
     Q_STEP = .1
@@ -297,7 +297,7 @@ if __name__ == "__main__":
         'degrees': False,
         "T0_w":  [0.62, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
-        "Bw": [[(-.05, .05), (-.05, .05), (-100, 100)],  
+        "Bw": [[(-.01, .01), (-.01, .01), (-100, 100)],  
                 [(-100, 100), (-100, 100), (-100, 100)]]
     }
     # height only (3)
@@ -389,7 +389,7 @@ if __name__ == "__main__":
         start_configuration = [0.4523310546875, 0.8259462890625, -1.3458369140625,
                                0.3512138671875, 1.7002646484375, -0.7999306640625, -1.324783203125]
 
-        goal_configuration = [-1.2878615302834704, 0.4737969861660154, -3.0046681128251356, -0.131247803315478, 1.8728637401416828, -1.1557164172559131, 2.223391799846654]
+        goal_configuration = [-1.4510115401238712, 0.3556961708975238, -2.623559659304614, -0.4808112606870916, 1.2937066083909363, -1.2104798296899641, 2.055752750451038]
 
         planning_G = nx.Graph()
 
@@ -747,7 +747,7 @@ if __name__ == "__main__":
                                 if svc.validate(candidate_sample):
                                     # We create an Agent used for OmegaOptimization from planning_core_rust.
                                     rusty_sawyer_robot = Agent(
-                                        rusty_agent_settings_path, True, True)
+                                        rusty_agent_settings_path, False, False)
                                     # To assist in optimization, we seed the optimizaition with a point generated using inverse kinematics based on the ideal TSR point.
                                     # seed_start = sawyer_robot.solve_inverse_kinematics(planning_tsr_config["T0_w"][0:3], planning_tsr_config["T0_w"][3:])
                                     # We update the optimization variables with the seed start and the current TSR used for optimization.
@@ -755,11 +755,11 @@ if __name__ == "__main__":
                                         candidate_sample)
                                     rusty_sawyer_robot.update_planning_tsr(
                                         e1_tsr_config['T0_w'], e1_tsr_config['Tw_e'], e1_tsr_config['Bw'][0] + e1_tsr_config['Bw'][1])
+                                    rusty_sawyer_robot.update_keyframe_mean(candidate_sample)
                                     # The optimization is based on CollisionIK which maintains feasibility with the starting seed start. This feasibility might aid in the optimization staying reasonably close to the ideal TSR sample.
-                                    for _ in range(0, 100):
+                                    for _ in range(0, OPTIMIZATION_ITERS):
                                         # The sample we are optimizing is passed as an argument to omega_optimize. This feeds the optimization call to bias staying close to this sample.
-                                        q_constrained = rusty_sawyer_robot.omega_optimize(
-                                            candidate_sample).data
+                                        q_constrained = rusty_sawyer_robot.omega_optimize().data
                                     if any([np.isnan(val) for val in q_constrained]):
                                         continue
                                     normalized_q_constrained = []
@@ -782,12 +782,13 @@ if __name__ == "__main__":
                                             # We've generated a point so lets use it moving forward for all other planning segments.
                                             planning_G.nodes[e1]['point'] = start
                                             script_logger.info(
-                                                "Original point that was optimized: {}".format(candidate_sample))
-                                            script_logger.info(
                                                 "Omega Optimized Start Point for constraints: {}.".format(constraint_list))
                                             script_logger.info(
+                                                "Original point that was optimized: {}".format(candidate_sample))
+                                            script_logger.info(
+                                                "Optimized_point: {}".format(normalized_q_constrained))
+                                            script_logger.info(
                                                 "Omega Optimized Point TSR Errors: {} {}".format(err, deltas))
-                                            script_logger.info("{}", start)
                                             found = True
                                             IP_GEN_TYPES.append("optimization")
                                         else:
@@ -897,10 +898,10 @@ if __name__ == "__main__":
                                         candidate_sample)
                                     rusty_sawyer_robot.update_planning_tsr(
                                         e2_tsr_config['T0_w'], e2_tsr_config['Tw_e'], e2_tsr_config['Bw'][0] + e2_tsr_config['Bw'][1])
+                                    rusty_sawyer_robot.update_keyframe_mean(candidate_sample)
                                     # we use the planning TSR used for the constrained planner as a secondary target.
-                                    for _ in range(0, 1000):
-                                        q_constrained = rusty_sawyer_robot.omega_optimize(
-                                            candidate_sample).data
+                                    for _ in range(0, OPTIMIZATION_ITERS):
+                                        q_constrained = rusty_sawyer_robot.omega_optimize().data
                                     normalized_q_constrained = []
                                     if any([np.isnan(val) for val in q_constrained]):
                                         continue
@@ -919,13 +920,13 @@ if __name__ == "__main__":
                                             # We've generated a point so lets use it moving forward for all other planning segments.
                                             planning_G.nodes[e2]['point'] = end
                                             script_logger.info(
-                                                "Original point that was optimized: {}".format(candidate_sample))
-                                            script_logger.info(
                                                 "Omega Optimized End Point for constraints: {}.".format(constraint_list))
                                             script_logger.info(
-                                                "Omega Optimized Point TSR Errors: {} {}".format(err, deltas))
+                                                "Original point that was optimized: {}".format(candidate_sample))
                                             script_logger.info(
-                                                "{}".format(end))
+                                                "Optimized_point: {}".format(normalized_q_constrained))
+                                            script_logger.info(
+                                                "Omega Optimized Point TSR Errors: {} {}".format(err, deltas))
                                             found = True
                                             IP_GEN_TYPES.append("optimization")
                                         else:
@@ -935,7 +936,7 @@ if __name__ == "__main__":
                                 else:
                                     continue
                             elif ip_style == "kf":
-                                end = canididate_sample
+                                end = candidate_sample
                                 planning_G.nodes[e2]['point'] = end
                                 script_logger.info(
                                     "KF-only condition, using KF sampled point!")
@@ -982,10 +983,10 @@ if __name__ == "__main__":
                             edge_tsr_config['Bw'][0], edge_tsr_config['Bw'][1])
                         planning_tsr = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw)
                         # Use parametric linear interpolation with 5 steps between points.
-                        interp = partial(parametric_lerp, steps=5)
+                        interp = partial(parametric_lerp, steps=25)
                         # See params for CBiRRT2 specific parameters
                         cbirrt = CBiRRT2(sawyer_robot, planning_state_space, svc, interp, params={
-                                         'off_manifold_endpoints': True, 'smooth_path': SMOOTH, 'smoothing_time': SMOOTHING_TIME, 'epsilon': PLANNING_TSR_EPSILON, 'q_step': Q_STEP, 'e_step': E_STEP, 'iters': MAX_ITERS, 'max_time': MAX_SEGMENT_PLANNING_TIME})
+                                         'off_manifold_endpoints': False, 'smooth_path': SMOOTH, 'smoothing_time': SMOOTHING_TIME, 'epsilon': PLANNING_TSR_EPSILON, 'q_step': Q_STEP, 'e_step': E_STEP, 'iters': MAX_ITERS, 'max_time': MAX_SEGMENT_PLANNING_TIME})
                         logger.info("Planning....")
                         print("Start, end: ", start, end)
                         logger.info("Constraints: {}".format(

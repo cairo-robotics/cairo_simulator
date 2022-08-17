@@ -111,6 +111,7 @@ class CBiRRT2():
                 # extend tree at as far as possible to generate qa_reach
                 qa_reach, _, valid = self._constrained_extend(a_tree, tsr, qa_near, q_rand)
                 if not valid:
+                    a_tree, b_tree = next(tree_swp)
                     continue
             # closest leaf value of B to qa_reach
             qb_near = self._neighbors(b_tree, qa_reach) 
@@ -123,6 +124,7 @@ class CBiRRT2():
             # otherwise tree B is extended as far as possible to qa_reach
                 qb_reach, _, valid = self._constrained_extend(b_tree, tsr, qb_near, qa_reach)
                 if not valid:
+                    a_tree, b_tree = next(tree_swp)
                     continue
             # if the qa_reach and qb_reach are equivalent, the trees are connectable. 
             if self._equal(qa_reach, qb_reach):
