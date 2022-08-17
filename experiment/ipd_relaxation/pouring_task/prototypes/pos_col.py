@@ -1,23 +1,34 @@
 import os
 import time
-
+from pathlib import Path
 
 import pybullet as p
+
 if os.environ.get('ROS_DISTRO'):
     import rospy
-import numpy as np
 
-from cairo_simulator.core.sim_context import SawyerBiasedSimContext
-from cairo_simulator.core.utils import ASSETS_PATH
+import numpy as np
 from cairo_planning.collisions import DisabledCollisionsContext
-from cairo_planning.geometric.transformation import pose2trans, quat2rpy
-from cairo_planning.geometric.transformation import xyzrpy2trans, bounds_matrix
+from cairo_planning.constraints.projection import distance_from_TSR
+from cairo_planning.geometric.transformation import (bounds_matrix, pose2trans,
+                                                     quat2rpy, xyzrpy2trans)
 from cairo_planning.geometric.tsr import TSR
 from cairo_planning.local.interpolation import parametric_lerp
-from cairo_planning.constraints.projection import distance_from_TSR
+from cairo_planning_core import Agent
+from cairo_simulator.core.sim_context import SawyerBiasedSimContext
+from cairo_simulator.core.utils import ASSETS_PATH
+
 
 def distance_to_TSR_config(manipulator, q_s, tsr):
     world_pose, _ = manipulator.solve_forward_kinematics(q_s)
+    trans, quat = world_pose[0], world_pose[1]
+    T0_s = pose2trans(np.hstack([trans + quat]))
+    # generates the task space distance and error/displacement vector
+    min_distance_new, x_err = distance_from_TSR(T0_s, tsr)
+    return min_distance_new, x_err
+
+def distance_to_TSR_config_rusty(manipulator, q_s, tsr):
+    world_pose = manipulator.forward_kinematics(q_s)
     trans, quat = world_pose[0], world_pose[1]
     T0_s = pose2trans(np.hstack([trans + quat]))
     # generates the task space distance and error/displacement vector
@@ -94,9 +105,9 @@ def main():
 
     base_config["tsr"] = {
         'degrees': False,
-        "T0_w":  [0.62, -0.6324, 0., np.pi/2, -np.pi/2, np.pi/2],
-        "Tw_e": [0, 0, 0, 0, 0, 0],
-        "Bw": [[(-.01, .01), (-.01, .01), (-100, 100)],  
+        "T0_w":  [0.65, -0.62, 0.0, np.pi/2, -np.pi/2, np.pi/2],
+        "Tw_e": [.1, 0, 0, 0, 0, 0],
+        "Bw": [[(-.05, .05), (-.05, .05), (-100, 100)],  
                 [(-100, 100), (-100, 100), (-100, 100)]]
     }
 
@@ -105,10 +116,10 @@ def main():
     T0_w2 = xyzrpy2trans(tsr_config['T0_w'], degrees=tsr_config['degrees'])
     Tw_e2 = xyzrpy2trans(tsr_config['Tw_e'], degrees=tsr_config['degrees'])
     Bw2 = bounds_matrix(tsr_config['Bw'][0], tsr_config['Bw'][1])
-    tsr = TSR(T0_w=T0_w2, Tw_e=Tw_e2, Bw=Bw2)
+    test_tsr = TSR(T0_w=T0_w2, Tw_e=Tw_e2, Bw=Bw2)
     
-    start = [-0.9068902174310702, 0.24170020065351006, -1.424444888226277, 0.4625597337076468, 0.004462281336602203, -1.4439890507784587, -0.22574803516662412] 
-    end = [-1.0562578693980615, 0.4425656502088584, -1.340903806282369, -0.10538647286195246, -0.35988860566031144, -0.8794354483887821, 2.104055796302678]
+    start =  [-1.3398607144964494, 0.8231213955192667, -1.2037232269091596, -0.7834563354192796, -0.720630859318435, -0.6042099766220739, 2.810006376887417] 
+    end = [-1.1888351774804171, 0.49594296180328623, -1.0103399653384697, -0.9091811467106865, -0.5827138805989467, -0.16510206473298306, 2.824106533215846]
     sim_context = SawyerBiasedSimContext(configuration=base_config)
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
@@ -117,19 +128,36 @@ def main():
     # _ = sawyer_robot.get_simulator_id()
     _ = sim_context.get_sim_objects(['Ground'])[0]
     svc = sim_context.get_state_validity()
+    
+    rusty_agent_settings_path = str(
+            Path(__file__).parent.absolute()) + "/../settings.yaml"
+    print(rusty_agent_settings_path)
+    rusty_sawyer_robot = Agent(rusty_agent_settings_path, False, False)
+    
     time.sleep(2)
     while True:
         print("Moving to start")
         sawyer_robot.set_joint_state(start)
         print(svc.validate(start))
-        print(distance_to_TSR_config(sawyer_robot, start, tsr))
+        fk_results = sawyer_robot.solve_forward_kinematics(joint_configuration=start)
+        print(fk_results)
+        print(distance_to_TSR_config(sawyer_robot, start, test_tsr))
+
+        rusty_fk_results = rusty_sawyer_robot.forward_kinematics(start)
+        print(rusty_fk_results)
+        print(distance_to_TSR_config_rusty(rusty_sawyer_robot, start, test_tsr))
         key = input("Press any key to switch to end position, or c to continue")
         if key == 'c':
             break
         print("Moving to end")
         sawyer_robot.set_joint_state(end)
         print(svc.validate(end))
-        print(distance_to_TSR_config(sawyer_robot, end, tsr))
+        print(distance_to_TSR_config(sawyer_robot, end, test_tsr))
+        fk_results = sawyer_robot.solve_forward_kinematics(joint_configuration=end)
+        print(fk_results)
+        rusty_fk_results = rusty_sawyer_robot.forward_kinematics(end)
+        print(rusty_fk_results)
+        print(distance_to_TSR_config_rusty(rusty_sawyer_robot, end, test_tsr))
         key = input("Press any key to switch to start position, or c to continue")
         if key == 'c':
             break
@@ -160,9 +188,9 @@ def main():
                         continue
                     sawyer_robot.set_joint_state(point)
                     print(sawyer_robot.solve_forward_kinematics(point)[0][0],  quat2rpy(sawyer_robot.solve_forward_kinematics(point)[0][1]))
-                    print(distance_to_TSR_config(sawyer_robot, point, tsr))
+                    print(distance_to_TSR_config(sawyer_robot, point, test_tsr))
                     time.sleep(.1)
-                
+        sawyer_robot.set_joint_state(end)
         key_u = ord('u') #y up
         key_h = ord('h') #x down
         key_j = ord('j') #y down
@@ -206,42 +234,42 @@ def main():
                     xyz = [xcurrent, ycurrent, zcurrent]
                     joint_config = sawyer_robot.solve_inverse_kinematics(xyz, orientation)
                     sawyer_robot.move_to_joint_pos(joint_config)
-                    print("TSR VALID: {}".format(tsr.is_valid(xyz+list(quat2rpy(orientation)))))
+                    print("TSR VALID: {}".format(test_tsr.is_valid(xyz+list(quat2rpy(orientation)))))
                     print_info(joint_config)
                 if key_u in keys and keys[key_u] & p.KEY_WAS_TRIGGERED:
                     xcurrent-=dist
                     xyz = [xcurrent, ycurrent, zcurrent]
                     joint_config = sawyer_robot.solve_inverse_kinematics(xyz, orientation)
                     sawyer_robot.move_to_joint_pos(joint_config)
-                    print("TSR VALID: {}".format(tsr.is_valid(xyz+list(quat2rpy(orientation)))))
+                    print("TSR VALID: {}".format(test_tsr.is_valid(xyz+list(quat2rpy(orientation)))))
                     print_info(joint_config)
                 if key_h in keys and keys[key_h] & p.KEY_WAS_TRIGGERED:
                     ycurrent-=dist
                     xyz = [xcurrent, ycurrent, zcurrent]
                     joint_config = sawyer_robot.solve_inverse_kinematics(xyz, orientation)
                     sawyer_robot.move_to_joint_pos(joint_config)
-                    print("TSR VALID: {}".format(tsr.is_valid(xyz+list(quat2rpy(orientation)))))
+                    print("TSR VALID: {}".format(test_tsr.is_valid(xyz+list(quat2rpy(orientation)))))
                     print_info(joint_config)
                 if key_j in keys and keys[key_j] & p.KEY_WAS_TRIGGERED:
                     xcurrent+=dist
                     xyz = [xcurrent, ycurrent, zcurrent]
                     joint_config = sawyer_robot.solve_inverse_kinematics(xyz, orientation)
                     sawyer_robot.move_to_joint_pos(joint_config)
-                    print("TSR VALID: {}".format(tsr.is_valid(xyz+list(quat2rpy(orientation)))))
+                    print("TSR VALID: {}".format(test_tsr.is_valid(xyz+list(quat2rpy(orientation)))))
                     print_info(joint_config)
                 if key_o in keys and keys[key_o] & p.KEY_WAS_TRIGGERED:
                     zcurrent+=dist
                     xyz = [xcurrent, ycurrent, zcurrent]
                     joint_config = sawyer_robot.solve_inverse_kinematics(xyz, orientation)
                     sawyer_robot.move_to_joint_pos(joint_config)
-                    print("TSR VALID: {}".format(tsr.is_valid(xyz+list(quat2rpy(orientation)))))
+                    print("TSR VALID: {}".format(test_tsr.is_valid(xyz+list(quat2rpy(orientation)))))
                     print_info(joint_config)
                 if key_l in keys and keys[key_l] & p.KEY_WAS_TRIGGERED:
                     zcurrent-=dist
                     xyz = [xcurrent, ycurrent, zcurrent]
                     joint_config = sawyer_robot.solve_inverse_kinematics(xyz, orientation)
                     sawyer_robot.move_to_joint_pos(joint_config)
-                    print("TSR VALID: {}".format(tsr.is_valid(xyz+list(quat2rpy(orientation)))))
+                    print("TSR VALID: {}".format(test_tsr.is_valid(xyz+list(quat2rpy(orientation)))))
                     print_info(joint_config)
                 if key_d in keys and keys[key_d] & p.KEY_WAS_TRIGGERED:
                     set_distance()
