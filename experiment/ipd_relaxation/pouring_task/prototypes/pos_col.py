@@ -80,7 +80,7 @@ def main():
             "sim_object_configs": 
                 {
                     "object_name": "cylinder",
-                    "position": [.75, -.6, -.3],
+                    "position": [.85, -.65, -.3],
                     "orientation":  [0, 0, 0],
                     "fixed_base": 1    
                 }
@@ -91,7 +91,7 @@ def main():
             "sim_object_configs": 
                 {
                     "object_name": "box",
-                    "position": [.75, -.34, -.2],
+                    "position": [.85, -.34, -.2],
                     "orientation":  [0, 0, 0],
                     "fixed_base": 1    
                 }
@@ -105,8 +105,8 @@ def main():
 
     base_config["tsr"] = {
         'degrees': False,
-        "T0_w":  [0.65, -0.62, 0.0, np.pi/2, -np.pi/2, np.pi/2],
-        "Tw_e": [.1, 0, 0, 0, 0, 0],
+        "T0_w":  [0.62, -0.62, 0.0, np.pi/2, -np.pi/2, np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-.05, .05), (-.05, .05), (-100, 100)],  
                 [(-100, 100), (-100, 100), (-100, 100)]]
     }
@@ -117,8 +117,8 @@ def main():
     Tw_e2 = xyzrpy2trans(tsr_config['Tw_e'], degrees=tsr_config['degrees'])
     Bw2 = bounds_matrix(tsr_config['Bw'][0], tsr_config['Bw'][1])
     test_tsr = TSR(T0_w=T0_w2, Tw_e=Tw_e2, Bw=Bw2)
-    start = [-1.3421662279333992, 0.5160743040923554, -1.2507062720984303, -1.0129650005992499, -0.42678505089460117, -0.6687608250010779, 2.8177312925574443] 
-    end = [-1.4510115401238712, 0.3556961708975238, -2.623559659304614, -0.4808112606870916, 1.2937066083909363, -1.2104798296899641, 2.055752750451038]
+    start = [-1.336333999064423, 0.4961848214635953, -1.144690904029653, -0.8698170584074552, -0.4825495488527842, -0.48185836002655913, -3.069352822247669] 
+    end = [-1.37492578125, 0.990703125, -1.281103515625, -1.1638359375, -2.092994140625, 0.08253125, -1.9249736328125]
 
     sim_context = SawyerBiasedSimContext(configuration=base_config)
     sim = sim_context.get_sim_instance()
@@ -214,6 +214,7 @@ def main():
             print(joint_config)
             result = sawyer_robot.solve_forward_kinematics(joint_configuration=joint_config)
             print(result)
+            print(distance_to_TSR_config(sawyer_robot, start, test_tsr))
             print(quat2rpy(result[0][1]))
             print(svc.validate(joint_config))
             print()

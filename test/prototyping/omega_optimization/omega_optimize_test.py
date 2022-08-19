@@ -71,10 +71,10 @@ def main():
     target = sawyer_robot.solve_inverse_kinematics(tsr_config["T0_w"][0:2] + [-.2], tsr_config["T0_w"][3:])
     sawyer_robot.set_joint_state(seed_start)
     # rusty_sawyer_robot.update_xopt(seed_start)
-    rusty_sawyer_robot.update_tsr(tsr_config["T0_w"], tsr_config["Tw_e"], tsr_config["Bw"][0] + tsr_config["Bw"][1])
+    rusty_sawyer_robot.update_planning_tsr(tsr_config["T0_w"], tsr_config["Tw_e"], tsr_config["Bw"][0] + tsr_config["Bw"][1])
     try:
         while True:    
-            joint_config_relaxed_ik = rusty_sawyer_robot.omega_optimize(seed_start).data
+            joint_config_relaxed_ik = rusty_sawyer_robot.omega_optimize().data
             sawyer_robot.set_joint_state(joint_config_relaxed_ik)
     except KeyboardInterrupt:
         p.disconnect()

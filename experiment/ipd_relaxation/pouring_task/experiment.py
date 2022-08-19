@@ -108,9 +108,9 @@ if __name__ == "__main__":
 
     # IPD RELAX PARAMS
     KEYFRAME_KDE_BANDWIDTH = .1
-    SAMPLING_BIAS_KDE_BANDWIDTH = .1
+    SAMPLING_BIAS_KDE_BANDWIDTH = .15
     OPTIMIZATION_ITERS = 1000
-    OMEGA_TSR_EPSILON = .025
+    OMEGA_TSR_EPSILON = .075
     MAX_STEERING_POINT_ITERS = 500
 
     # PLANNING PARAMS
@@ -185,7 +185,7 @@ if __name__ == "__main__":
             "sim_object_configs":
                 {
                     "object_name": "cylinder",
-                    "position": [.85, -.6, -.3],
+                    "position": [.85, -.65, -.3],
                     "orientation":  [0, 0, 0],
                     "fixed_base": 1
             }
@@ -268,6 +268,7 @@ if __name__ == "__main__":
     # the skill remains centered.
     c2f_map = {}
     c2f_map[(1,)] = orientation_foliation_model
+    c2f_map[(2,)] = orientation_foliation_model
     c2f_map[(1, 2)] = orientation_foliation_model
     c2f_map[(1, 3)] = orientation_foliation_model
     c2f_map[(1, 2, 3)] = orientation_foliation_model
@@ -297,7 +298,7 @@ if __name__ == "__main__":
         'degrees': False,
         "T0_w":  [0.62, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
-        "Bw": [[(-.01, .01), (-.01, .01), (-100, 100)],  
+        "Bw": [[(-.05, .05), (-.05, .05), (-100, 100)],  
                 [(-100, 100), (-100, 100), (-100, 100)]]
     }
     # height only (3)
@@ -389,7 +390,7 @@ if __name__ == "__main__":
         start_configuration = [0.4523310546875, 0.8259462890625, -1.3458369140625,
                                0.3512138671875, 1.7002646484375, -0.7999306640625, -1.324783203125]
 
-        goal_configuration = [-1.4510115401238712, 0.3556961708975238, -2.623559659304614, -0.4808112606870916, 1.2937066083909363, -1.2104798296899641, 2.055752750451038]
+        goal_configuration = [-1.37492578125, 0.990703125, -1.281103515625, -1.1638359375, -2.092994140625, 0.08253125, -1.9249736328125]
 
         planning_G = nx.Graph()
 
@@ -397,6 +398,8 @@ if __name__ == "__main__":
         start_keyframe_id = list(keyframes.keys())[0]
         end_keyframe_id = list(keyframes.keys())[-1]
 
+        keyframe_planning_order = []
+        
         ###############################################################################
         # Insert last keyframe into planning graph before looping over keyframe model #
         ###############################################################################
@@ -420,6 +423,8 @@ if __name__ == "__main__":
             keyframes[end_keyframe_id]["applied_constraints"] + keyframes[list(keyframes.keys())[-2]]["applied_constraints"]))
         planning_G.nodes[int(end_keyframe_id)
                          ]["constraint_ids"] = constraint_ids
+        planning_G.nodes[int(end_keyframe_id)
+                         ]["constraint_ids"] = constraint_ids
 
         # get the foliation model
         foliation_model = c2f_map.get(
@@ -432,7 +437,7 @@ if __name__ == "__main__":
 
             # Determine the foliation choice based on the keyframe data and assign in to the planning graph node
             # Winner takes all essentially chooses the most common foliation value base on classifying each data point
-            foliation_value = winner_takes_all(data, foliation_model)
+            foliation_value = winner_takes_all(end_data, foliation_model)
             upcoming_foliation_value = foliation_value
 
             planning_G.nodes[int(end_keyframe_id)
@@ -446,6 +451,46 @@ if __name__ == "__main__":
 
         # the end id will be the first upcoming ID
         upcoming_id = int(end_keyframe_id)
+        
+        ################################
+        #  Add goal to planning graph #
+        ################################
+
+        goal_node_id = 1000
+         # Copy the base planning config. This will be updated with specfic configurations for this planning segment (tsrs, biasing etc,.)
+        planning_config = copy.deepcopy(base_config)
+        # the most recent / last keyframe ID used in the planning grpah
+        planning_G.add_nodes_from(
+        [(goal_node_id, {"point": goal_configuration, "keyframe_space": SawyerConfigurationSpace(limits=limits)})])
+        keyframe_planning_order.append(goal_node_id)
+        # The path to the goal point will follow the previous constraints of the last keyframe.
+        planning_G.nodes[goal_node_id]['constraint_ids'] = planning_G.nodes[int(end_keyframe_id)]["constraint_ids"]
+        planning_G.nodes[goal_node_id]["unioned_constraint_ids"] = planning_G.nodes[int(end_keyframe_id)]["constraint_ids"]
+        planning_G.add_edge(goal_node_id, int(end_keyframe_id))
+        planning_config['tsr'] = c2tsr_map.get(
+                    tuple(sorted(planning_G.nodes[goal_node_id]['constraint_ids'])), unconstrained_TSR)
+        
+        foliation_constraint_ids = list(set(planning_G.nodes[goal_node_id]['constraint_ids'] + keyframes[end_keyframe_id]["applied_constraints"]))
+        
+         # get the foliation model
+        foliation_model = c2f_map.get(
+            tuple(sorted(foliation_constraint_ids)), None)
+
+        # there's a possibility that the ending goal point is not constrained and thus might not provide a foliation model to use. We use the
+        # last keyframes constraints since usually there's substantial overlap of the goal point with the ending keyframe 
+        if foliation_model is not None:
+            planning_G.nodes[goal_node_id]["foliation_model"] = foliation_model
+
+            # no data fopr goal node so we use ending keyframes foliation value
+            planning_G.nodes[goal_node_id]["foliation_value"] = upcoming_foliation_value
+        else:
+            upcoming_foliation_value = None
+        
+        # planning_G.nodes[int(start_keyframe_id)]['tsr'] = TSR_1_config
+        # Add the planning config to the planning graph edge.
+        planning_G.edges[int(end_keyframe_id), goal_node_id, ]['config'] = planning_config
+
+        
 
         ############################################################################
         # Reverse iteration over the keyframe model to populate our planning graph #
@@ -456,7 +501,6 @@ if __name__ == "__main__":
 
         # used to keep track of sequence of constraint transition, start, and end keyframe ids as
         # not all keyframes in the lfd model will be used
-        keyframe_planning_order = []
         keyframe_planning_order.insert(0, int(end_keyframe_id))
 
         # iteration over the list of keyframes in reverse order ecluding the last keyframe ID which has been handled above
@@ -592,28 +636,7 @@ if __name__ == "__main__":
         # Add the planning config to the planning graph edge.
         planning_G.edges[0, int(start_keyframe_id)]['config'] = planning_config
         
-        ################################
-        #  Add goal to planning graph #
-        ################################
-
-        goal_node_id = 1000
-         # Copy the base planning config. This will be updated with specfic configurations for this planning segment (tsrs, biasing etc,.)
-        planning_config = copy.deepcopy(base_config)
-        # the most recent / last keyframe ID used in the planning grpah
-        last_keyframe_id = keyframe_planning_order[-1]
-        planning_G.add_nodes_from(
-        [(goal_node_id, {"point": goal_configuration, "keyframe_space": SawyerConfigurationSpace(limits=limits)})])
-        keyframe_planning_order.append(goal_node_id)
-        # The path to the goal point will follow the previous constraints of the last keyframe.
-        planning_G.nodes[goal_node_id]['constraint_ids'] = planning_G.nodes[last_keyframe_id]["constraint_ids"]
-        planning_G.nodes[goal_node_id]["unioned_constraint_ids"] = planning_G.nodes[last_keyframe_id]["constraint_ids"]
-        planning_G.add_edge(goal_node_id, int(last_keyframe_id))
-        planning_config['tsr'] = c2tsr_map.get(
-                    tuple(sorted(planning_G.nodes[goal_node_id]['constraint_ids'])), unconstrained_TSR)
-        # planning_G.nodes[int(start_keyframe_id)]['tsr'] = TSR_1_config
-        # Add the planning config to the planning graph edge.
-        planning_G.edges[goal_node_id, int(last_keyframe_id)]['config'] = planning_config
-    
+       
         ###################################################
         #           SEQUENTIAL MANIFOLD PLANNING          #
         ###################################################
@@ -757,9 +780,10 @@ if __name__ == "__main__":
                                         e1_tsr_config['T0_w'], e1_tsr_config['Tw_e'], e1_tsr_config['Bw'][0] + e1_tsr_config['Bw'][1])
                                     rusty_sawyer_robot.update_keyframe_mean(candidate_sample)
                                     # The optimization is based on CollisionIK which maintains feasibility with the starting seed start. This feasibility might aid in the optimization staying reasonably close to the ideal TSR sample.
-                                    for _ in range(0, OPTIMIZATION_ITERS):
-                                        # The sample we are optimizing is passed as an argument to omega_optimize. This feeds the optimization call to bias staying close to this sample.
-                                        q_constrained = rusty_sawyer_robot.omega_optimize().data
+                                    # for _ in range(0, OPTIMIZATION_ITERS):
+                                    #     q_constrained = rusty_sawyer_robot.omega_optimize().data
+                                    q_constrained = rusty_sawyer_robot.omega_optimize().data
+
                                     if any([np.isnan(val) for val in q_constrained]):
                                         continue
                                     normalized_q_constrained = []
@@ -900,8 +924,9 @@ if __name__ == "__main__":
                                         e2_tsr_config['T0_w'], e2_tsr_config['Tw_e'], e2_tsr_config['Bw'][0] + e2_tsr_config['Bw'][1])
                                     rusty_sawyer_robot.update_keyframe_mean(candidate_sample)
                                     # we use the planning TSR used for the constrained planner as a secondary target.
-                                    for _ in range(0, OPTIMIZATION_ITERS):
-                                        q_constrained = rusty_sawyer_robot.omega_optimize().data
+                                    # for _ in range(0, OPTIMIZATION_ITERS):
+                                    #     q_constrained = rusty_sawyer_robot.omega_optimize().data
+                                    q_constrained = rusty_sawyer_robot.omega_optimize().data
                                     normalized_q_constrained = []
                                     if any([np.isnan(val) for val in q_constrained]):
                                         continue
