@@ -88,9 +88,9 @@ def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25,
         J_rpy = analytic_xyz_jacobian(J[3:6, :], quat2rpy(quat))
         Ja = np.vstack([np.array(J_t), np.array(J_rpy)])
         try:
-            delta=.01
-            # J_cross = np.dot(Ja.T, np.linalg.inv(np.dot(Ja, Ja.T)))
-            J_cross = np.dot(Ja.T, np.linalg.inv(np.dot(Ja, Ja.T) + delta**2*np.ones(6)))
+            # delta=.01
+            J_cross = np.dot(Ja.T, np.linalg.inv(np.dot(Ja, Ja.T)))
+            # J_cross = np.dot(Ja.T, np.linalg.inv(np.dot(Ja, Ja.T) + delta**2*np.ones(6)))
         except np.linalg.linalg.LinAlgError:
             # likely a singular matrix error...
             return None
