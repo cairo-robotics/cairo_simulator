@@ -92,14 +92,18 @@ class CBiRRT2():
         q_forward_reach, path, interpolation_valid = self._interpolated_extend(self.forwards_tree, tsr, self.start_q, self.goal_q)
         if interpolation_valid:
             if self._equal(q_forward_reach, self.goal_q):
-                self.connected_tree = self._join_trees(self.forwards_tree, q_forward_reach, self.backwards_tree, self.goal_q)
-                return self.connected_tree 
+                self._add_vertex(self.forwards_tree, self.goal_q)
+                self._add_edge(self.forwards_tree, q_forward_reach, self.goal_q, self._distance(q_forward_reach, self.goal_q ))
+                return self.forwards_tree 
         
         while continue_to_plan:
             iters += 1
             if iters > self.iters:
                 self.log.debug("Max iters reach...no feasbile plan.")
                 raise MaxItersException("Max CBiRRT2 iterations reached...planning failure.")
+            tock = time.perf_counter()
+            if tock - tick > self.max_planning_time:
+                raise PlanningTimeoutException()
             q_rand = self._random_config()
             qa_near = self._neighbors(a_tree, q_rand)  # closest leaf value to q_rand
             
@@ -133,9 +137,7 @@ class CBiRRT2():
             # otherwise we swap trees and repeat.
             else:
                  a_tree, b_tree = next(tree_swp)
-            tock = time.perf_counter()
-            if tock - tick > self.max_planning_time:
-                raise PlanningTimeoutException()
+           
     
     def reset_planner(self):
         self.tree = ig.Graph(directed=True)
@@ -307,11 +309,16 @@ class CBiRRT2():
 
         tree = ig.Graph(directed=True) # a new directed graph
         if a_tree['name'] == 'forwards':
+            # F is the forwards tree
             F = a_tree.copy()
+            # qf is the furthest reached node in the forwards tree. It should be equal to qb / qb_reach
             qf = qa_reach
+            # B is the backwards tree
             B = b_tree.copy()
+            # qb is the furthest reached node in the backwards tree. It should be equal to qf / qa_reach
             qb = qb_reach
         else:
+            # depending on the finishing state of the a_tree/b_tree, a_tree could actually be the backwards tree.
             F = b_tree.copy()
             qf = qb_reach
             B = a_tree.copy()
