@@ -104,8 +104,9 @@ def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25,
         #     for val in q_s:
         #         q_s_new.append(w2i(val))
         #     q_s = np.array(q_s_new)
-        if np.linalg.norm(q_s - np.array(q_old)) > 4 * q_step or not within_joint_limits(manipulator, q_s):
-                return None
+        if not ignore_termination_condtions:
+            if np.linalg.norm(q_s - np.array(q_old)) > 4 * q_step or not within_joint_limits(manipulator, q_s):
+                    return None
 
         # if not within_joint_limits(manipulator, q_s):
         #     return None
