@@ -117,14 +117,14 @@ if __name__ == "__main__":
     MAX_SEGMENT_PLANNING_TIME = 45
     MAX_ITERS = 5000
     PLANNING_TSR_EPSILON = .15
-    Q_STEP = .15
+    Q_STEP = .35
     # Controls the error signal effect size when mapped back into configuration space.
-    E_STEP = .35
+    E_STEP = .25
     MOVE_TIME = 15
 
     # EXPERIMENT PARAMS
     TRIALS = 10
-    VISUALIZE_EXECUTION = False
+    VISUALIZE_EXECUTION = True
 
     ##############
     # EVALUATION #
@@ -358,7 +358,15 @@ if __name__ == "__main__":
         start_configuration = [0.4523310546875, 0.8259462890625, -1.3458369140625,
                                0.3512138671875, 1.7002646484375, -0.7999306640625, -1.324783203125]
 
-        # goal_configuration = [-1.33125390625, 0.884373046875, -1.1850849609375, -1.1655771484375, -1.0737529296875, 0.1791435546875, 3.6191904296875]
+        goal_configuration = [
+                        -1.33238671875,
+                        0.729263671875,
+                        -1.222162109375,
+                        -0.73062109375,
+                        -0.499009765625,
+                        -0.6309658203125,
+                        -3.3995068359375
+                    ]
 
         planning_G = nx.Graph()
 
@@ -428,8 +436,8 @@ if __name__ == "__main__":
         # planning_config['union_tsr'] = c2tsr_map.get(
         #             tuple(sorted(union_constraint_ids)), unconstrained_TSR_config)
         
-        # # planning_G.nodes[int(start_keyframe_id)]['tsr'] = TSR_1_config
-        # # Add the planning config to the planning graph edge.
+        # planning_G.nodes[int(start_keyframe_id)]['tsr'] = TSR_1_config
+        # Add the planning config to the planning graph edge.
         # planning_G.edges[int(end_keyframe_id), goal_node_id, ]['config'] = planning_config
 
         ############################################################################
@@ -471,10 +479,8 @@ if __name__ == "__main__":
 
                 # get the constraint IDs
                 constraint_ids = keyframe_data["applied_constraints"]
-                if keyframe_id == 1:
-                    constraint_ids = [1]
+
                 # The union constraint ids combines both start and end keyframes of the planning segment. 
-            
                 union_constraint_ids = list(set(
                     constraint_ids + keyframes[str(upcoming_id)]["applied_constraints"]))
 
@@ -544,7 +550,7 @@ if __name__ == "__main__":
         planning_G.add_nodes_from(
             [(0, {"point": start_configuration, "keyframe_space": SawyerConfigurationSpace(limits=limits)})])
 
-        planning_G.nodes[0]['tsr'] = TSR_1_config
+        planning_G.nodes[0]['tsr'] =  planning_G.nodes[upcoming_id]['tsr']
         
         # Since the start point and initial keyframe are almost always overlapping, we use the upcoming_id (which is currently the first keyframe from the LfD model) as the constraint_ids for this start point insertion
         planning_G.nodes[0]['constraint_ids'] = planning_G.nodes[upcoming_id]["constraint_ids"]
@@ -554,7 +560,7 @@ if __name__ == "__main__":
         # let's connect the starting point to the node associated with the starting keyframe
         planning_G.add_edge(0, int(start_keyframe_id))
         keyframe_planning_order.insert(0, 0)
-        planning_config['tsr'] = TSR_1_config
+        planning_config['tsr'] = planning_G.nodes[upcoming_id]['tsr']
         # planning_G.nodes[int(start_keyframe_id)]['tsr'] = TSR_1_config
         # Add the planning config to the planning graph edge.
         planning_G.edges[0, int(start_keyframe_id)]['config'] = planning_config
@@ -760,13 +766,14 @@ if __name__ == "__main__":
                         print("Constraints {}: {}".format(
                             e2, planning_G.nodes[e2].get("unioned_constraint_ids", [])))
 
-                           # CANIDIDATE POINT FROM KEYFRAME OR PLANNING SPACE
+                        # CANIDIDATE POINT FROM KEYFRAME OR PLANNING SPACE
                         if ip_style == "kf" or ip_style == "optkf":
                             script_logger.info(
                                 "We're using keyframe planning space for KF-Only or Optimization + KF")
                             steering_point_space_e2 = planning_G.nodes[e2]['keyframe_space']
                         else:
                             steering_point_space_e2 = planning_state_space
+                
                         found = False
                         eval_trial.start_timer("steering_point_generation_2")
                         ip_iters = 0
@@ -816,7 +823,10 @@ if __name__ == "__main__":
                                     # we use the planning TSR used for the constrained planner as a secondary target.
                                     # for _ in range(0, OPTIMIZATION_ITERS):
                                     #     q_constrained = rusty_sawyer_robot.omega_optimize().data
-                                    q_constrained = rusty_sawyer_robot.omega_optimize().data
+                                    if  ip_style == "opt":
+                                        q_constrained = rusty_sawyer_robot.tsr_optimize().data
+                                    else: 
+                                        q_constrained = rusty_sawyer_robot.omega_optimize().data
                                     
                                     if any(np.isnan(q_constrained)): continue
                                     normalized_q_constrained = []
@@ -872,7 +882,7 @@ if __name__ == "__main__":
                         end = planning_G.nodes[e2]['point']
                         script_logger.info("Reusing previously acquired point")
                         script_logger.info("{}".format(end))
-
+                
                     print("\n\nSTART AND END\n")
                     print(start, end)
                     script_logger.info(
@@ -899,7 +909,7 @@ if __name__ == "__main__":
                         interp = partial(parametric_lerp, steps=10)
                         # See params for CBiRRT2 specific parameters
                         cbirrt = CBiRRT2(sawyer_robot, planning_state_space, svc, interp, params={
-                                         'off_manifold_endpoints': False, 'smooth_path': SMOOTH, 'smoothing_time': SMOOTHING_TIME, 'epsilon': PLANNING_TSR_EPSILON, 'q_step': Q_STEP, 'e_step': E_STEP, 'iters': MAX_ITERS, 'max_time': MAX_SEGMENT_PLANNING_TIME})
+                                         'off_manifold_endpoints': True, 'smooth_path': SMOOTH, 'smoothing_time': SMOOTHING_TIME, 'epsilon': PLANNING_TSR_EPSILON, 'q_step': Q_STEP, 'e_step': E_STEP, 'iters': MAX_ITERS, 'max_time': MAX_SEGMENT_PLANNING_TIME})
                         logger.info("Planning....")
                         print("Start, end: ", start, end)
                         logger.info("Constraints: {}".format(
@@ -982,8 +992,7 @@ if __name__ == "__main__":
             # Update trial evaluation data.
             eval_trial.path_length = eval_trial.eval_path_length(
                 spline_trajectory)
-            # TODO: Get goal points for planning
-            #eval_trial.success = eval_trial.eval_success(spline_trajectory, goal, EPSILON)
+            eval_trial.success = True
             eval_trial.a2s_cspace_distance = eval_trial.eval_a2s(
                 spline_trajectory, gold_demo_traj)
             eval_trial.a2s_taskspace_distance = eval_trial.eval_a2s(
@@ -1032,8 +1041,10 @@ if __name__ == "__main__":
                                 time.sleep(point[0] - prior_time)
                                 prior_time = point[0]
                         except KeyboardInterrupt:
+                            sim_context.disconnect()
                             break
                     elif key == 'q':
+                        sim_context.disconnect()
                         break
         else:
             # Update trial evaluation data with failure-style data. Many defaults are already set.

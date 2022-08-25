@@ -47,7 +47,7 @@ from cairo_planning.geometric.utils import wrap_to_interval as w2i
 from numpy.core.numeric import identity
 
 
-def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25, iter_count=10000, wrap_to_interval=False):
+def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25, iter_count=10000, ignore_termination_condtions=False):
     """
     This function projects a sampled configuration point down to a constraint manifold defined implicitly by a 
     Task Space Region representation. http://cs.brown.edu/courses/csci2951-k/papers/berenson12.pdf
@@ -80,7 +80,6 @@ def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25,
         if min_distance_new < epsilon:
             return q_s  # we've reached the manifold within epsilon error
         elif count > iter_count:
-            print("max iters")
             return None
         J = manipulator.get_jacobian(q_s) 
         J_t = J[0:3, :]
@@ -88,10 +87,10 @@ def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25,
         J_rpy = analytic_xyz_jacobian(J[3:6, :], quat2rpy(quat))
         Ja = np.vstack([np.array(J_t), np.array(J_rpy)])
         try:
-            delta=.01
-            # J_cross = np.dot(Ja.T, np.linalg.inv(np.dot(Ja, Ja.T)))
+            # delta=.01
+            J_cross = np.dot(Ja.T, np.linalg.inv(np.dot(Ja, Ja.T)))
             # this helps limit value explosion when near singularities.
-            J_cross = np.dot(Ja.T, np.linalg.inv(np.dot(Ja, Ja.T) + delta**2*np.ones(6)))
+            # J_cross = np.dot(Ja.T, np.linalg.inv(np.dot(Ja, Ja.T) + delta**2*np.ones(6)))
         except np.linalg.linalg.LinAlgError:
             # likely a singular matrix error...
             return None
