@@ -80,14 +80,17 @@ class CBiRRT2():
         continue_to_plan = True
         tree_swp = self._tree_swap_gen()
         a_tree, b_tree = next(tree_swp)
-        tick = time.perf_counter()
         
         if self.allow_off_manifold_endpoints:
             if not self._within_manifold(self.forwards_tree.vs.find(name=self.start_name)['value'], tsr):
+                self.log.debug("Projecting off-manifold start point onto manifold to insert into forward tree...")
                 self._insert_off_manifold_point(self.forwards_tree, self.forwards_tree.vs.find(name=self.start_name)['value'], tsr)
             if not self._within_manifold(self.backwards_tree.vs.find(name=self.goal_name)['value'], tsr):
+                self.log.debug("Projecting off-manifold end point onto manifold to insert into backwards tree...")
                 self._insert_off_manifold_point(self.backwards_tree, self.backwards_tree.vs.find(name=self.goal_name)['value'], tsr)
         
+        tick = time.perf_counter()
+
         # See if interopolated path is valid
         q_forward_reach, path, interpolation_valid = self._interpolated_extend(self.forwards_tree, tsr, self.start_q, self.goal_q)
         if interpolation_valid:
@@ -210,10 +213,12 @@ class CBiRRT2():
                 # the current q_s is not valid or couldn't be projected so we return the last best value qs_old
                 return qs_old, generated_values, False
 
-    def _insert_off_manifold_point(self, tree, point, tsr, n=10):
+    def _insert_off_manifold_point(self, tree, point, tsr, n=5):
         projected_points = []
-        for _ in range(0, n):
-            q_constrained = project_config(self.robot, tsr, q_s=point, q_old=point, epsilon=self.epsilon, q_step=.5, e_step=self.e_step, iter_count=10000, wrap_to_interval=True)
+        attempts = 0
+        while len(projected_points) < n and attempts < 10:
+            attempts += 1
+            q_constrained = project_config(self.robot, tsr, q_s=point, q_old=point, epsilon=self.epsilon, q_step=self.q_step, e_step=self.e_step, iter_count=1000, ignore_termination_condtions=True)
             if q_constrained is not None:
                 projected_points.append(q_constrained)
         for proj_point in projected_points:
@@ -223,7 +228,7 @@ class CBiRRT2():
     def _constrain_config(self, qs_old, q_s, tsr):
         # these functions can be very problem specific. For now we'll just assume the most very basic form.
         # futre implementations might favor injecting the constrain_config function 
-        q_constrained = project_config(self.robot, tsr, q_s=q_s, q_old=qs_old, epsilon=self.epsilon, q_step=self.q_step, e_step=self.e_step, iter_count=10000, wrap_to_interval=True)
+        q_constrained = project_config(self.robot, tsr, q_s=q_s, q_old=qs_old, epsilon=self.epsilon, q_step=self.q_step, e_step=self.e_step, iter_count=10000, ignore_termination_condtions=False)
         if q_constrained is None:
             return None
         if self.svc.validate(q_constrained):
