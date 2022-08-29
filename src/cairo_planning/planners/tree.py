@@ -218,7 +218,7 @@ class CBiRRT2():
         attempts = 0
         while len(projected_points) < n and attempts < 10:
             attempts += 1
-            q_constrained = project_config(self.robot, tsr, q_s=point, q_old=point, epsilon=self.epsilon, q_step=self.q_step, e_step=self.e_step, iter_count=1000, ignore_termination_condtions=True)
+            q_constrained = project_config(self.robot, tsr, q_s=point, q_old=point, epsilon=self.epsilon, q_step=self.q_step, e_step=self.e_step, iter_count=100, ignore_termination_condtions=True)
             if q_constrained is not None:
                 projected_points.append(q_constrained)
         for proj_point in projected_points:
@@ -228,7 +228,7 @@ class CBiRRT2():
     def _constrain_config(self, qs_old, q_s, tsr):
         # these functions can be very problem specific. For now we'll just assume the most very basic form.
         # futre implementations might favor injecting the constrain_config function 
-        q_constrained = project_config(self.robot, tsr, q_s=q_s, q_old=qs_old, epsilon=self.epsilon, q_step=self.q_step, e_step=self.e_step, iter_count=10000, ignore_termination_condtions=False)
+        q_constrained = project_config(self.robot, tsr, q_s=q_s, q_old=qs_old, epsilon=self.epsilon, q_step=self.q_step, e_step=self.e_step, iter_count=500, ignore_termination_condtions=False)
         if q_constrained is None:
             return None
         if self.svc.validate(q_constrained):
