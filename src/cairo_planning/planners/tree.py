@@ -87,11 +87,14 @@ class CBiRRT2():
                 proj_points = self._insert_off_manifold_point(self.forwards_tree, self.forwards_tree.vs.find(name=self.start_name)['value'], tsr, epsilon_factor=4)
                 for point in proj_points:
                     _ = self._insert_off_manifold_point(self.forwards_tree, point, tsr, epsilon_factor=2)
+                self.log.debug("Start point injected via {} points".format(len(proj_points)))
             if not self._within_manifold(self.backwards_tree.vs.find(name=self.goal_name)['value'], tsr):
                 self.log.debug("Projecting off-manifold end point onto manifold to insert into backwards tree...")
                 proj_points = self._insert_off_manifold_point(self.backwards_tree, self.backwards_tree.vs.find(name=self.goal_name)['value'], tsr)
                 for point in proj_points:
                     _ = self._insert_off_manifold_point(self.backwards_tree, point, tsr, epsilon_factor=2)
+                self.log.debug("End point injected via {} points".format(len(proj_points)))
+
         
         tick = time.perf_counter()
 
@@ -217,10 +220,10 @@ class CBiRRT2():
                 # the current q_s is not valid or couldn't be projected so we return the last best value qs_old
                 return qs_old, generated_values, False
 
-    def _insert_off_manifold_point(self, tree, point, tsr, n=5, epsilon_factor=4):
+    def _insert_off_manifold_point(self, tree, point, tsr, n=10, epsilon_factor=4):
         projected_points = []
         attempts = 0
-        while len(projected_points) < n and attempts < 10:
+        while len(projected_points) < n and attempts < 20:
             attempts += 1
             q_constrained = project_config(self.robot, tsr, q_s=point, q_old=point, epsilon=epsilon_factor*self.epsilon, q_step=self.q_step, e_step=self.e_step, iter_count=100, ignore_termination_condtions=True)
             if q_constrained is not None:
