@@ -38,12 +38,10 @@ def import_data_as_dataframe(data_path):
             ]))
     return pd.concat(dfs)
 
+class PlanningSuccessAnalysis():
 
-class PlanningTimeAnalysis():
-
-    def __init__(self, data_directory):
-        self.data_directory = data_directory
-        self.dataframe = self._import_data()
+    def __init__(self, dataframe):
+        self.dataframe = dataframe
 
 
     # def bar_chart(self):
@@ -55,19 +53,32 @@ class PlanningTimeAnalysis():
     #     plt.legend(bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0)
     #     plt.close()
         
-    def stats(self):
+    def analyze(self):
+        df = self.dataframe[["participant", "planning_bias", "ip_style", "success"]]
+        return df.groupby(['participant', 'planning_bias', 'ip_style']).mean()
+class PlanningTimeAnalysis():
+
+    def __init__(self, dataframe):
+        self.dataframe = dataframe
+
+
+    # def bar_chart(self):
+
+    #     df = self.dataframe[["participant", "planning_bias", "ip_style", "planning_time"]]
+    #     df = df.set_index(['participant', 'planning_bias', 'ip_style'])     
+    #     # plot dfl
+    #     ax = sns.barplot(data=df)  # RUN PLOT   
+    #     plt.legend(bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0)
+    #     plt.close()
+        
+    def analyze(self):
         df = self.dataframe[["participant", "planning_bias", "ip_style", "planning_time"]]
         return df.groupby(['participant', 'planning_bias', 'ip_style']).mean()
-
-    
-    def _import_data(self):
-        return import_data_as_dataframe(self.data_directory)
     
 class PathLengthAnalysis():
 
-    def __init__(self, data_directory):
-        self.data_directory = data_directory
-        self.dataframe = self._import_data()
+    def __init__(self, dataframe):
+        self.dataframe = dataframe
 
 
     # def bar_chart(self):
@@ -79,20 +90,14 @@ class PathLengthAnalysis():
     #     plt.legend(bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0)
     #     plt.close()
         
-    def stats(self):
+    def analyze(self):
         df = self.dataframe[["participant", "planning_bias", "ip_style", "path_length"]]
         return df.groupby(['participant', 'planning_bias', 'ip_style']).mean()
 
-    
-    def _import_data(self):
-        return import_data_as_dataframe(self.data_directory)
-    
-class A2SAnalysis():
+class A2SConfigSpaceAnalysis():
 
-    def __init__(self, data_directory):
-        self.data_directory = data_directory
-        self.dataframe = self._import_data()
-
+    def __init__(self, dataframe):
+        self.dataframe = dataframe
 
     # def bar_chart(self):
 
@@ -103,20 +108,32 @@ class A2SAnalysis():
     #     plt.legend(bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0)
     #     plt.close()
         
-    def stats(self):
-        df = self.dataframe[["participant", "planning_bias", "ip_style", "a2s_distance"]]
+    def analyze(self):
+        df = self.dataframe[["participant", "planning_bias", "ip_style", "a2s_cspace_distance"]]
         return df.groupby(['participant', 'planning_bias', 'ip_style']).mean()
-
     
-    def _import_data(self):
-        return import_data_as_dataframe(self.data_directory)
+class A2STaskSpaceAnalysis():
+
+    def __init__(self, dataframe):
+        self.dataframe = dataframe
+
+    # def bar_chart(self):
+
+    #     df = self.dataframe[["participant", "planning_bias", "ip_style", "path_length"]]
+    #     df = df.set_index(['participant', 'planning_bias', 'ip_style'])     
+    #     # plot dfl
+    #     ax = sns.barplot(data=df)  # RUN PLOT   
+    #     plt.legend(bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0)
+    #     plt.close()
+        
+    def analyze(self):
+        df = self.dataframe[["participant", "planning_bias", "ip_style", "a2s_taskspace_distance"]]
+        return df.groupby(['participant', 'planning_bias', 'ip_style']).mean()
     
 class A2FAnalysis():
 
-    def __init__(self, data_directory):
-        self.data_directory = data_directory
-        self.dataframe = self._import_data()
-
+    def __init__(self, dataframe):
+        self.dataframe = dataframe
 
     # def bar_chart(self):
 
@@ -127,10 +144,7 @@ class A2FAnalysis():
     #     plt.legend(bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0)
     #     plt.close()
         
-    def stats(self):
+    def analyze(self):
         df = self.dataframe[["participant", "planning_bias", "ip_style", "a2f_percentage"]]
         return df.groupby(['participant', 'planning_bias', 'ip_style']).mean()
-
-    def _import_data(self):
-        return import_data_as_dataframe(self.data_directory)
 
