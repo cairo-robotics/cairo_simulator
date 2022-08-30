@@ -124,7 +124,7 @@ if __name__ == "__main__":
 
     # EXPERIMENT PARAMS
     TRIALS = 10
-    VISUALIZE_EXECUTION = True
+    VISUALIZE_EXECUTION = False
 
     ##############
     # EVALUATION #
@@ -1048,7 +1048,7 @@ if __name__ == "__main__":
                         break
         else:
             # Update trial evaluation data with failure-style data. Many defaults are already set.
-            eval_trial.success = "X"
+            eval_trial.success = False
             evaluation.add_trial(eval_trial)
 
     evaluation.export()
