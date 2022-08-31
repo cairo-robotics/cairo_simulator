@@ -35,6 +35,7 @@ class CBiRRT2():
         self.iters = params.get('iters', 20000)
         self.max_planning_time = params.get('max_time', 60)
         self.smoothing_time = params.get('smoothing_time', 10)
+        self.epsilon_extension_factors = [3, 1.5]
         self.allow_off_manifold_endpoints = params.get('off_manifold_endpoints', False)
         self.log =  logger if logger is not None else Logger(name="CBiRRT2", handlers=['logging'], level=params.get('log_level', 'debug'))
         self.log.info("q_step: {}, epsilon: {}, e_step: {}, BiRRT Iters {}".format(self.q_step, self.epsilon, self.e_step, self.iters))
@@ -84,16 +85,22 @@ class CBiRRT2():
         if self.allow_off_manifold_endpoints:
             if not self._within_manifold(self.forwards_tree.vs.find(name=self.start_name)['value'], tsr):
                 self.log.debug("Projecting off-manifold start point onto manifold to insert into forward tree...")
-                proj_points = self._insert_off_manifold_point(self.forwards_tree, self.forwards_tree.vs.find(name=self.start_name)['value'], tsr, epsilon_factor=4)
+                self.forwards_tree.vs.find(name=self.start_name)['injected_point'] = True
+                proj_points = self._insert_off_manifold_point(self.forwards_tree, self.forwards_tree.vs.find(name=self.start_name)['value'], tsr, epsilon_factor=self.epsilon_extension_factors[1])
+                n_ext_points = 0
                 for point in proj_points:
-                    _ = self._insert_off_manifold_point(self.forwards_tree, point, tsr, epsilon_factor=2)
-                self.log.debug("Start point injected via {} points".format(len(proj_points)))
+                    ext_points = self._insert_off_manifold_point(self.forwards_tree, point, tsr, epsilon_factor=self.epsilon_extension_factors[0])
+                    n_ext_points += len(ext_points)
+                self.log.debug("Start point injected via {} epsilon relaxed & {} extension points".format(len(proj_points, n_ext_points)))
             if not self._within_manifold(self.backwards_tree.vs.find(name=self.goal_name)['value'], tsr):
                 self.log.debug("Projecting off-manifold end point onto manifold to insert into backwards tree...")
-                proj_points = self._insert_off_manifold_point(self.backwards_tree, self.backwards_tree.vs.find(name=self.goal_name)['value'], tsr)
+                self.backwards_tree.vs.find(name=self.goal_name)['injected_point'] = True
+                proj_points = self._insert_off_manifold_point(self.backwards_tree, self.backwards_tree.vs.find(name=self.goal_name)['value'], tsr, epsilon_factor=self.epsilon_extension_factors[1])
+                n_ext_points = 0
                 for point in proj_points:
-                    _ = self._insert_off_manifold_point(self.backwards_tree, point, tsr, epsilon_factor=2)
-                self.log.debug("End point injected via {} points".format(len(proj_points)))
+                    ext_points = self._insert_off_manifold_point(self.backwards_tree, point, tsr, epsilon_factor=self.epsilon_extension_factors[0])
+                    n_ext_points += len(ext_points)
+                self.log.debug("End point injected via {} relaxed & {} extension points".format(len(proj_points), n_ext_points))
 
         
         tick = time.perf_counter()
@@ -117,26 +124,37 @@ class CBiRRT2():
             q_rand = self._random_config()
             qa_near = self._neighbors(a_tree, q_rand)  # closest leaf value to q_rand
             
+            # If we're trying to attech / extend to an injected point we relax the TSR requrement by multipling the epsilon tolerance by a factor.
+            if a_tree.vs.find(name=utils.val2str(qa_near))['injected_point']:
+                epsilon_factor = self.epsilon_extension_factors[0]
+            else:
+                epsilon_factor = 1
+       
             # Try interpolation first:
             qa_int, path, interpolation_valid = self._interpolated_extend(a_tree, tsr, qa_near, q_rand)
             if interpolation_valid:
                 qa_reach = qa_int
             else:
                 # extend tree at as far as possible to generate qa_reach
-                qa_reach, _, valid = self._constrained_extend(a_tree, tsr, qa_near, q_rand)
+                qa_reach, _, valid = self._constrained_extend(a_tree, tsr, qa_near, q_rand, epsilon_factor=epsilon_factor)
                 if not valid:
                     a_tree, b_tree = next(tree_swp)
                     continue
             # closest leaf value of B to qa_reach
             qb_near = self._neighbors(b_tree, qa_reach) 
-             
+            
+            # If we're trying to attech / extend to an injected point we relax the TSR requrement by multipling the epsilon tolerance by a factor.
+            if b_tree.vs.find(name=utils.val2str(qb_near))['injected_point']:
+                epsilon_factor = self.epsilon_extension_factors[0]
+            else:
+                epsilon_factor = 1
             # Try interpolation first:
             qb_int, path, interpolation_valid = self._interpolated_extend(b_tree, tsr, qb_near, qa_reach)
             if interpolation_valid:
                 qb_reach = qb_int
             else: 
             # otherwise tree B is extended as far as possible to qa_reach
-                qb_reach, _, valid = self._constrained_extend(b_tree, tsr, qb_near, qa_reach)
+                qb_reach, _, valid = self._constrained_extend(b_tree, tsr, qb_near, qa_reach, epsilon_factor=epsilon_factor)
                 if not valid:
                     a_tree, b_tree = next(tree_swp)
                     continue
@@ -173,7 +191,7 @@ class CBiRRT2():
         else:
             return None, [], False
                   
-    def _constrained_extend(self, tree, tsr, q_near, q_target):
+    def _constrained_extend(self, tree, tsr, q_near, q_target, epsilon_factor):
         generated_values = []
         q_s = np.array(q_near)
         qs_old = np.array(q_near)
@@ -195,7 +213,7 @@ class CBiRRT2():
             # More problem sepcific versions of constrained_extend use constraint value information 
             # constraints = self._get_constraint_values(tree, qs_old)
             
-            q_s = self._constrain_config(qs_old=qs_old, q_s=q_s, tsr=tsr)
+            q_s = self._constrain_config(qs_old=qs_old, q_s=q_s, tsr=tsr, epsilon_factor=epsilon_factor)
             if q_s is not None:
                 # this function will occasionally osscilate between to projection values.
                 if utils.val2str(q_s) in tree.vs['name']:
@@ -234,10 +252,10 @@ class CBiRRT2():
         return projected_points
             
 
-    def _constrain_config(self, qs_old, q_s, tsr):
+    def _constrain_config(self, qs_old, q_s, tsr, epsilon_factor=1):
         # these functions can be very problem specific. For now we'll just assume the most very basic form.
         # futre implementations might favor injecting the constrain_config function 
-        q_constrained = project_config(self.robot, tsr, q_s=q_s, q_old=qs_old, epsilon=self.epsilon, q_step=self.q_step, e_step=self.e_step, iter_count=500, ignore_termination_condtions=False)
+        q_constrained = project_config(self.robot, tsr, q_s=q_s, q_old=qs_old, epsilon=epsilon_factor * self.epsilon, q_step=self.q_step, e_step=self.e_step, iter_count=500, ignore_termination_condtions=False)
         if q_constrained is None:
             return None
         if self.svc.validate(q_constrained):
@@ -453,12 +471,14 @@ class CBiRRT2():
         self.start_q = start_q
         self.forwards_tree.add_vertex(self.start_name)
         self.forwards_tree.vs.find(name=self.start_name)['value'] = start_q
+        self.forwards_tree.vs.find(name=self.start_name)['injected_point'] = False
         self.forwards_tree['name'] = 'forwards'
 
         self.goal_name = utils.val2str(goal_q)
         self.goal_q = goal_q
         self.backwards_tree.add_vertex(self.goal_name)
         self.backwards_tree.vs.find(name=self.goal_name)['value'] = goal_q
+        self.backwards_tree.vs.find(name=self.goal_name)['injected_point'] = False
         self.backwards_tree['name'] = 'backwards'
 
     def _equal(self, q1, q2):
@@ -486,8 +506,8 @@ class CBiRRT2():
             yield trees[idx_1], trees[idx_2]
             i += 1
 
-    def _add_vertex(self, tree, q):
-        tree.add_vertex(utils.val2str(q), **{'value': q})
+    def _add_vertex(self, tree, q, injection_point=False):
+        tree.add_vertex(utils.val2str(q), **{'value': q, 'injection_point': injection_point})
 
 
     def _add_edge(self, tree, q_from, q_to, weight):
