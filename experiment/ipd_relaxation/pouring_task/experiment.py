@@ -123,7 +123,7 @@ if __name__ == "__main__":
     MOVE_TIME = 15
 
     # EXPERIMENT PARAMS
-    TRIALS = 10
+    TRIALS = 20
     VISUALIZE_EXECUTION = False
 
     ##############
@@ -917,6 +917,8 @@ if __name__ == "__main__":
                         script_logger.info("Planning with constraints: {}".format(
                             planning_G.nodes[e1].get('constraint_ids', None)))
                         print(edge_tsr_config)
+                        if e1 == 33 or e1 == '33':
+                            print("Pause")
                         plan = cbirrt.plan(
                             planning_tsr, np.array(start), np.array(end))
                         path = cbirrt.get_path(plan)

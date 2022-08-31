@@ -3,9 +3,10 @@ import json
 import glob
 
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
+# import matplotlib.pyplot as plt
+# import seaborn as sns
 
+__all__ = ['ip_style_to_name', 'planning_bias_to_name', 'participant_to_name', 'import_data_as_dataframe', 'PlanningSuccessAnalysis', 'PlanningTimeAnalysis', 'PathLengthAnalysis', 'A2SConfigSpaceAnalysis', 'A2STaskSpaceAnalysis', 'A2FAnalysis']
 
 def ip_style_to_name(ip_style):
     if ip_style == "kf":
@@ -72,7 +73,8 @@ class PlanningTimeAnalysis():
     #     plt.close()
         
     def analyze(self):
-        df = self.dataframe[["participant", "planning_bias", "ip_style", "planning_time"]]
+        rslt_df = self.dataframe[self.dataframe["planning_time"] > 0]
+        df = rslt_df[["participant", "planning_bias", "ip_style", "planning_time"]]
         return df.groupby(['participant', 'planning_bias', 'ip_style']).mean()
     
 class PathLengthAnalysis():
@@ -91,7 +93,8 @@ class PathLengthAnalysis():
     #     plt.close()
         
     def analyze(self):
-        df = self.dataframe[["participant", "planning_bias", "ip_style", "path_length"]]
+        rslt_df = self.dataframe[self.dataframe["path_length"] > 0]
+        df = rslt_df[["participant", "planning_bias", "ip_style", "path_length"]]
         return df.groupby(['participant', 'planning_bias', 'ip_style']).mean()
 
 class A2SConfigSpaceAnalysis():
@@ -109,7 +112,8 @@ class A2SConfigSpaceAnalysis():
     #     plt.close()
         
     def analyze(self):
-        df = self.dataframe[["participant", "planning_bias", "ip_style", "a2s_cspace_distance"]]
+        rslt_df = self.dataframe[self.dataframe["a2s_cspace_distance"] > 0]
+        df = rslt_df[["participant", "planning_bias", "ip_style", "a2s_cspace_distance"]]
         return df.groupby(['participant', 'planning_bias', 'ip_style']).mean()
     
 class A2STaskSpaceAnalysis():
@@ -127,7 +131,8 @@ class A2STaskSpaceAnalysis():
     #     plt.close()
         
     def analyze(self):
-        df = self.dataframe[["participant", "planning_bias", "ip_style", "a2s_taskspace_distance"]]
+        rslt_df = self.dataframe[self.dataframe["a2s_taskspace_distance"] > 0]
+        df = rslt_df[["participant", "planning_bias", "ip_style", "a2s_taskspace_distance"]]
         return df.groupby(['participant', 'planning_bias', 'ip_style']).mean()
     
 class A2FAnalysis():
@@ -145,6 +150,7 @@ class A2FAnalysis():
     #     plt.close()
         
     def analyze(self):
-        df = self.dataframe[["participant", "planning_bias", "ip_style", "a2f_percentage"]]
+        rslt_df = self.dataframe[self.dataframe["a2f_percentage"] > 0]
+        df = rslt_df[["participant", "planning_bias", "ip_style", "a2f_percentage"]]
         return df.groupby(['participant', 'planning_bias', 'ip_style']).mean()
 

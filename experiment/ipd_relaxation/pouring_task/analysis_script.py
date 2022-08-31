@@ -14,45 +14,45 @@ if __name__ == "__main__":
         print(INPUT_DIR)
         data[participant] = import_data_as_dataframe(INPUT_DIR)
     
-    ###########################
+    #############################
     # Planning Success Analysis #
-    ##########################
-    for participant_df in data.items():
+    #############################
+    for participant, participant_df in data.items():
         psa = PlanningSuccessAnalysis(participant_df)
-        psa.analyze()
+        print(psa.analyze())
 
-    ###########################
+    ##########################
     # Planning Time Analysis #
     ##########################
-    for participant_df in data.items():
+    for  participant, participant_df in data.items():
         pta = PlanningTimeAnalysis(participant_df)
         print(pta.analyze())
     
     ########################
     # Path Length Analysis #
     ########################
-    for participant_df in data.items():
+    for  participant, participant_df in data.items():
         pla = PathLengthAnalysis(participant_df)
         print(pla.analyze())
         
     #############################
     # A2S Config Space Analysis #
     #############################
-    for participant_df in data.items():
+    for  participant, participant_df in data.items():
         a2scs = A2SConfigSpaceAnalysis(participant_df)
         print(a2scs.analyze())
     
-    #############################
+    ###########################
     # A2S Task Space Analysis #
-    #############################
-    for participant_df in data.items():
+    ###########################
+    for  participant, participant_df in data.items():
         a2sts = A2STaskSpaceAnalysis(participant_df)
         print(a2sts.analyze())
     
     ################
     # A2F Analysis #
     ################
-    for participant_df in data.items():
+    for  participant, participant_df in data.items():
         a2f = A2FAnalysis(participant_df)
         print(a2f.analyze())
     
