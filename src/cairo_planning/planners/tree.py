@@ -91,7 +91,7 @@ class CBiRRT2():
                 for point in proj_points:
                     ext_points = self._insert_off_manifold_point(self.forwards_tree, point, tsr, epsilon_factor=self.epsilon_extension_factors[0])
                     n_ext_points += len(ext_points)
-                self.log.debug("Start point injected via {} epsilon relaxed & {} extension points".format(len(proj_points, n_ext_points)))
+                self.log.debug("Start point injected via {} epsilon relaxed & {} extension points".format(len(proj_points), n_ext_points))
             if not self._within_manifold(self.backwards_tree.vs.find(name=self.goal_name)['value'], tsr):
                 self.log.debug("Projecting off-manifold end point onto manifold to insert into backwards tree...")
                 self.backwards_tree.vs.find(name=self.goal_name)['injected_point'] = True
@@ -120,7 +120,7 @@ class CBiRRT2():
                 raise MaxItersException("Max CBiRRT2 iterations reached...planning failure.")
             tock = time.perf_counter()
             if tock - tick > self.max_planning_time:
-                raise PlanningTimeoutException()
+                raise PlanningTimeoutException("Reached max planning time...planning failure!")
             q_rand = self._random_config()
             qa_near = self._neighbors(a_tree, q_rand)  # closest leaf value to q_rand
             
