@@ -39,8 +39,8 @@ def main():
 
     config["tsr"] = {
         'degrees': False,
-        "T0_w": [0, 0, .9, 0, 0, 0],
-        "Tw_e": [0, 0, 0, np.pi/2, 0, np.pi/2], # level end-effector pointing away from sawyer's "front"
+        "T0_w": [0, 0, .9, np.pi/2, 0, np.pi/2], # level end-effector pointing away from sawyer's "front"
+        "Tw_e": [0, 0, 0, 0, 0, 0], 
         "Bw": [[[-100, 100], [-100, 100], [-100, 100]], 
               [[-.07, .07], [-.07, .07], [-3.14, 3.14]]] # full yaw allowed
     }
@@ -82,6 +82,9 @@ def main():
                 sample = state_space.sample()
                 if sample is not None:
                     count += 1
+                if time.process_time() - ptime1 >= 1000:
+                    print("Only sampled {} constraint compliant points.".format(count))
+                    break
             ptime2 = time.process_time()
             print(ptime2 - ptime1)
             fraction_time_tuples.append((fraction, ptime2 - ptime1))

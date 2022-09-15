@@ -37,7 +37,7 @@ def analytic_xyz_jacobian(J_r, rpy):
     if np.cos(rpy[1]) < TOLERANCE:
         print("Close to singularity!")
 
-    # E matrixx for XYZ / RPY
+    # E inverse matrixx for XYZ / RPY
     Ei = np.zeros([3, 3])
 
     Ei[0, 0] = 1

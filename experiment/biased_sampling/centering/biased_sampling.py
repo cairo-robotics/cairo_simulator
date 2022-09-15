@@ -36,13 +36,12 @@ def main():
             "position": [0, 0, 0]
         }
     ]
-
     config['tsr'] = {
         'degrees': False,
-        "T0_w":  [0.62, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
+        "T0_w":  [0.7728583261379568, -0.6554146019715568, 0.83529113334179133,  2.53359432, -1.38916421,  0.55644029],
         "Tw_e": [0, 0, 0, 0, 0, 0],
-        "Bw": [[(-.02, .02), (-.02, .02), (-100, 100)],  
-                [(-100, 100), (-100, 100), (-100, 100)]]
+        "Bw": [[(-.15, .15), (-.15, .15), (-100, 100)],  
+                [(-.07, .07), (-.07, .07), (-.07, .07)]]
     }
 
     sim_context = SawyerTSRSimContext(config)
@@ -82,6 +81,9 @@ def main():
                 sample = state_space.sample()
                 if sample is not None:
                     count += 1
+                if time.process_time() - ptime1 >= 1000:
+                    print("Only sampled {} constraint compliant points.".format(count))
+                    break
             ptime2 = time.process_time()
             print(ptime2 - ptime1)
             fraction_time_tuples.append((fraction, ptime2 - ptime1))
@@ -106,7 +108,7 @@ def main():
     plt.ylabel('Time (s)',  fontsize=20)
     plt.yticks(fontsize=16)
     plt.suptitle('Time to Sample {} Constrained Points vs. Fraction Uniform'.format(NUM_SAMPLES), fontsize=24)
-    plt.title('Upright Orientation Constraint'.format(NUM_SAMPLES), fontsize=22)
+    plt.title('Centering and Orientation Constraint Close to Reachable Limits'.format(NUM_SAMPLES), fontsize=22)
     plt.legend(fontsize=20)
     plt.show()
 

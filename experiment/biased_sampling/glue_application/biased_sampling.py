@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 
 def main():
     
-    NUM_SAMPLES = 100
+    NUM_SAMPLES = 1000
     fraction_uniform_increments = [0, .05, .1, .15, .2, .25, .3, .35, .4, .45, .5, .55, .6, .65, .7, .75, .8, .85, .9, .95, .99, .9999, .999999, 1]
 
     config = {}
@@ -39,8 +39,8 @@ def main():
 
     config["tsr"] = {
         'degrees': False,
-        "T0_w": [0, 0, .9, 0, 0, 0],
-        "Tw_e": [0.7435968575114487, 0.01432863156468001, -0.22159506554246, -2.35393403, -0.05157824, -1.54996543], 
+        "T0_w": [0.7435968575114487, 0.01432863156468001, 0.72159506554246, -2.35393403, -0.05157824, -1.54996543],
+        "Tw_e": [0, 0, 0, 0, 0, 0], 
         "Bw": [[[-.02, .02], [-100, 100], [0, .04]], 
               [[-.07, .07], [-.07, .07], [-.07, .07]]]
     }
@@ -82,6 +82,9 @@ def main():
                 sample = state_space.sample()
                 if sample is not None:
                     count += 1
+                if time.process_time() - ptime1 >= 1000:
+                    print("Only sampled {} constraint compliant points.".format(count))
+                    break
             ptime2 = time.process_time()
             print(ptime2 - ptime1)
             fraction_time_tuples.append((fraction, ptime2 - ptime1))
@@ -107,7 +110,7 @@ def main():
     plt.ylabel('Time (s)',  fontsize=20)
     plt.yticks(fontsize=16)
     plt.suptitle('Time to Sample {} Constrained Points vs. Fraction Uniform'.format(NUM_SAMPLES), fontsize=24)
-    plt.title('Upright Orientation Constraint'.format(NUM_SAMPLES), fontsize=22)
+    plt.title('Glue Application Constraint'.format(NUM_SAMPLES), fontsize=22)
     plt.legend(fontsize=20)
     plt.show()
 
