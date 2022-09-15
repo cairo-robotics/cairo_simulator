@@ -13,15 +13,15 @@ from cairo_simulator.core.utils import ASSETS_PATH
 
 from cairo_planning.geometric.state_space import SawyerTSRConstrainedSpace
 from cairo_planning.geometric.distribution import KernelDensityDistribution
-from cairo_planning.sampling.samplers import DistributionSampler, UniformSampler
+from cairo_planning.sampling.samplers import DistributionSampler
 
 import matplotlib.pyplot as plt
 
 
 def main():
     
-    NUM_SAMPLES = 10
-    fraction_uniform_increments = [0, .05, .1, .15, .2, .25, .3, .35, .4, .45, .5, .55, .6, .65, .7, .75, .8, .85, .9, .95, 1]
+    NUM_SAMPLES = 100
+    fraction_uniform_increments = [0, .05, .1, .15, .2, .25, .3, .35, .4, .45, .5, .55, .6, .65, .7, .75, .8, .85, .9, .95, .99, .9999, .999999, 1]
 
     config = {}
     config["sim"] = {
@@ -39,12 +39,11 @@ def main():
 
     config["tsr"] = {
         'degrees': False,
-        "T0_w": [0, 0, .9, 0, 0, 0], # the position should often be that of sawyer. usually 0, 0, .9 according to default sim_context configuration
-        "Tw_e": [0.6687, 0.1269, -0.2352, -3.1335505133609978, -0.3884907841856089, 0.0011134329847108074],
-        "Bw": [[[-100, 100], [-100, 100], [-.05, .05]],  # Tight height constraint
-              [[-.07, .07], [-.07, .07], [-.07, .07]]] # Strict orientation constraint
+        "T0_w": [0, 0, .9, 0, 0, 0],
+        "Tw_e": [0.7435968575114487, 0.01432863156468001, -0.22159506554246, -2.35393403, -0.05157824, -1.54996543], 
+        "Bw": [[[-.02, .02], [-100, 100], [0, .04]], 
+              [[-.07, .07], [-.07, .07], [-.07, .07]]]
     }
-
 
     sim_context = SawyerTSRSimContext(config)
     sawyer_robot = sim_context.get_robot()
@@ -92,20 +91,24 @@ def main():
     # Output results to unique filename
     now = datetime.datetime.today()
     nTime = now.strftime('%Y-%m-%dT%H-%M-%S')
-    results_filename = "results_" + nTime
+    results_filename = "results_" + nTime + '.json'
     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), results_filename), "w") as f:
         json.dump(results, f)
 
     # Create plots
-    for subject, subject_data in results.items():
-    
+    plt.figure(figsize=(12, 10))
+    count = 1
+    for _, subject_data in results.items():
         result_times = [result[1] for result in subject_data]
-        plt.plot(fraction_uniform_increments, result_times, label=subject)
-    plt.xlabel('Fraction Uniform Sampling')
-    plt.ylabel('Time (s)')
-    plt.suptitle('Time to Sample {} Constrained Points vs. Fraction Uniform'.format(NUM_SAMPLES), fontsize=16)
-    plt.title('Angled at Table Height Constraint'.format(NUM_SAMPLES), fontsize=12)
-    plt.legend()
+        plt.plot(fraction_uniform_increments, result_times, label="Subject {}".format(count), linewidth=5.0)
+        count += 1
+    plt.xlabel('Fraction Uniform Sampling', fontsize=20)
+    plt.xticks(fontsize=16)
+    plt.ylabel('Time (s)',  fontsize=20)
+    plt.yticks(fontsize=16)
+    plt.suptitle('Time to Sample {} Constrained Points vs. Fraction Uniform'.format(NUM_SAMPLES), fontsize=24)
+    plt.title('Upright Orientation Constraint'.format(NUM_SAMPLES), fontsize=22)
+    plt.legend(fontsize=20)
     plt.show()
 
 if __name__ == "__main__":

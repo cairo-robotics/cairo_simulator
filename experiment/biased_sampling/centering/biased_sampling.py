@@ -20,8 +20,8 @@ import matplotlib.pyplot as plt
 
 def main():
     
-    NUM_SAMPLES = 10
-    fraction_uniform_increments = [0, .05, .1, .15, .2, .25, .3, .35, .4, .45, .5, .55, .6, .65, .7, .75, .8, .85, .9, .95, 1]
+    NUM_SAMPLES = 100
+    fraction_uniform_increments = [0, .05, .1, .15, .2, .25, .3, .35, .4, .45, .5, .55, .6, .65, .7, .75, .8, .85, .9, .95, .99, .9999, .999999, 1]
 
     config = {}
     config["sim"] = {
@@ -37,12 +37,12 @@ def main():
         }
     ]
 
-    config["tsr"] = {
+    config['tsr'] = {
         'degrees': False,
-        "T0_w": [0, 0, .9, 0, 0, 0], # the position should often be that of sawyer. usually 0, 0, .9 according to default sim_context configuration
-        "Tw_e": [0.5468, -0.3946, -0.2352, -0.0515036801083644, -0.0350054025532609, 3.0945880004471826],
-        "Bw": [[[-.1, .1], [-.1, .1], [0, 100]],  # Centering around the Tw_e central point that keeps end-effector over target and at or above the table
-              [[-.07, .07], [-.07, .07], [-.07, .07]]] # Strict orientation constraint pointed downwards
+        "T0_w":  [0.62, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0],
+        "Bw": [[(-.02, .02), (-.02, .02), (-100, 100)],  
+                [(-100, 100), (-100, 100), (-100, 100)]]
     }
 
     sim_context = SawyerTSRSimContext(config)
@@ -73,7 +73,6 @@ def main():
         fraction_time_tuples = []
         
         for fraction in fraction_uniform_increments:
-            print("Sampling with uniform fraction at {}".format(fraction))
             # Create the DistributionSampler and associated SawyerTSRConstrainedSpace
             state_space = SawyerTSRConstrainedSpace(robot=sawyer_robot, TSR=tsr, svc=svc, sampler=DistributionSampler(distribution_model=model, fraction_uniform=fraction), limits=None)
             
@@ -92,20 +91,23 @@ def main():
     # Output results to unique filename
     now = datetime.datetime.today()
     nTime = now.strftime('%Y-%m-%dT%H-%M-%S')
-    results_filename = "results_" + nTime
+    results_filename = "results_" + nTime + '.json'
     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), results_filename), "w") as f:
         json.dump(results, f)
 
     # Create plots
+    plt.figure(figsize=(12, 10))
     for subject, subject_data in results.items():
     
         result_times = [result[1] for result in subject_data]
-        plt.plot(fraction_uniform_increments, result_times, label=subject)
-    plt.xlabel('Fraction Uniform Sampling')
-    plt.ylabel('Time (s)')
-    plt.suptitle('Time to Sample {} Constrained Points vs. Fraction Uniform'.format(NUM_SAMPLES), fontsize=16)
-    plt.title('Upright Orientation Constraint'.format(NUM_SAMPLES), fontsize=12)
-    plt.legend()
+        plt.plot(fraction_uniform_increments, result_times, label=subject, linewidth=5.0)
+    plt.xlabel('Fraction Uniform Sampling', fontsize=20)
+    plt.xticks(fontsize=16)
+    plt.ylabel('Time (s)',  fontsize=20)
+    plt.yticks(fontsize=16)
+    plt.suptitle('Time to Sample {} Constrained Points vs. Fraction Uniform'.format(NUM_SAMPLES), fontsize=24)
+    plt.title('Upright Orientation Constraint'.format(NUM_SAMPLES), fontsize=22)
+    plt.legend(fontsize=20)
     plt.show()
 
 if __name__ == "__main__":
