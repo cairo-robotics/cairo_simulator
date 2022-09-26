@@ -18,7 +18,7 @@ from cairo_simulator.core.utils import ASSETS_PATH
 from cairo_simulator.core.sim_context import SawyerBiasedSimContext
 
 from cairo_planning.collisions import DisabledCollisionsContext
-from cairo_planning.constraints.foliation import VGMMFoliationClustering, winner_takes_all
+# from cairo_planning.constraints.foliation import VGMMFoliationClustering, winner_takes_all
 from cairo_planning.core.serialization import load_json_files
 from cairo_planning.evaluation.eval import IPDRelaxEvaluationTrial, IPDRelaxEvaluation
 from cairo_planning.geometric.transformation import xyzrpy2trans, bounds_matrix, pose2trans
@@ -98,14 +98,14 @@ if __name__ == "__main__":
 
     # DIRECTORIES
     LFD_MODEL_FILEPATH = os.path.join(
-        FILE_DIR, "participant_{}/lfd_data/lfd_model.json".format(participant))
+        FILE_DIR, "participant_{}/lfd_data/lfd_model_{}.json".format(participant, participant))
     GOLD_DEMO_INPUT_DIRECTORY = os.path.join(
         FILE_DIR, "participant_{}/gold_demo/*.json".format(participant))
     EVAL_OUTPUT_DIRECTORY = os.path.join(
         FILE_DIR, "participant_{}/output".format(participant))
 
     # IPD RELAX PARAMS
-    KEYFRAME_KDE_BANDWIDTH = .1
+    KEYFRAME_KDE_BANDWIDTH = .15
     SAMPLING_BIAS_KDE_BANDWIDTH = .15
     OPTIMIZATION_ITERS = 1000
     OMEGA_TSR_EPSILON = .075
@@ -124,7 +124,7 @@ if __name__ == "__main__":
 
     # EXPERIMENT PARAMS
     TRIALS = 50
-    VISUALIZE_EXECUTION = False
+    VISUALIZE_EXECUTION = True
 
     ##############
     # EVALUATION #
@@ -183,7 +183,7 @@ if __name__ == "__main__":
             "sim_object_configs":
                 {
                     "object_name": "cylinder",
-                    "position": [.85, -.65, -.3],
+                    "position": [.95, -.65, -.3],
                     "orientation":  [0, 0, 0],
                     "fixed_base": 1
             }
@@ -194,7 +194,7 @@ if __name__ == "__main__":
             "sim_object_configs":
                 {
                     "object_name": "box",
-                    "position": [.85, -.34, -.2],
+                    "position": [.95, -.34, -.2],
                     "orientation":  [0, 0, 0],
                     "fixed_base": 1
             }
@@ -256,15 +256,15 @@ if __name__ == "__main__":
     # Orientation only (1)
     TSR_1_config = {
         'degrees': False,
-        "T0_w":  [0.62, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
+        "T0_w":  [0.78, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-100, 100), (-100, 100), (-100, 100)],  
-               [(-.12, .12), (-.12, .12), (-.12, .12)]]
+               [(-.12, .12), (-.12, .12), (-3.14, 3.14)]]
     }
     # centering only (2)
     TSR_2_config = {
         'degrees': False,
-        "T0_w":  [0.62, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
+        "T0_w":  [0.78, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-.02, .02), (-.02, .02), (-100, 100)],  
                 [(-100, 100), (-100, 100), (-100, 100)]]
@@ -272,7 +272,7 @@ if __name__ == "__main__":
     # height only (3)
     TSR_3_config = {
         'degrees': False,
-        "T0_w":  [0.62, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
+        "T0_w":  [0.78, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-100, 100), (-100, 100), (0, 100)],  
                  [(-100, 100), (-100, 100), (-100, 100)]]
@@ -280,23 +280,23 @@ if __name__ == "__main__":
     # Orientation AND centering constraint (1, 2)
     TSR_12_config = {
         'degrees': False,
-        "T0_w":  [0.62, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
+        "T0_w":  [0.78, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-.02, .02), (-.02, .02), (-100, 100)],  
-                [(-.12, .12), (-.12, .12), (-.12, .12)]]
+                [(-.12, .12), (-.12, .12), (-3.14, 3.14)]]
     }
     # orientation AND height constraint (1, 3)
     TSR_13_config = {
         'degrees': False,
-        "T0_w":  [0.62, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
+        "T0_w":  [0.78, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-100, 100), (-100, 100), (0, 100)],  
-               [(-.12, .12), (-.12, .12), (-.12, .12)]]
+               [(-.12, .12), (-.12, .12), (-3.14, 3.14)]]
     }
     # height AND centering constraint (2, 3)
     TSR_23_config = {
         'degrees': False,
-        "T0_w":  [0.62, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
+        "T0_w":  [0.78, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-.02, .02), (-.02, .02), (0, 100)],  
                 [(-100, 100), (-100, 100), (-100, 100)]]
@@ -304,10 +304,10 @@ if __name__ == "__main__":
     # orientation, centering, and height AND height constraint (1, 2, 3)
     TSR_123_config = {
         'degrees': False,
-        "T0_w":  [0.62, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
+        "T0_w":  [0.78, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
         "Bw": [[(-.02, .02), (-.02, .02), (0, 100)],  
-               [(-.12, .12), (-.12, .12), (-.12, .12)]]
+               [(-.12, .12), (-.12, .12), (-3.14, 3.14)]]
     }
 
     c2tsr_map = {}
@@ -467,7 +467,7 @@ if __name__ == "__main__":
                 # Create KDE distrubtion for the current keyframe.
                 data = [obsv['robot']['joint_angle']
                         for obsv in keyframe_data["observations"]]
-                keyframe_dist = KernelDensityDistribution(bandwidth=.05)
+                keyframe_dist = KernelDensityDistribution(bandwidth=KEYFRAME_KDE_BANDWIDTH)
                 keyframe_dist.fit(data)
                 # We want to fully bias sampling from keyframe distributions.
                 keyframe_space = DistributionSpace(sampler=DistributionSampler(
@@ -789,8 +789,12 @@ if __name__ == "__main__":
                                     wrap_to_interval(value))
                             err, deltas = distance_to_TSR_config(
                                 sawyer_robot, candidate_sample, e2_tsr)
+                            
                             constraint_list = planning_G.nodes[e2].get(
                                 "unioned_constraint_ids", None)
+                            if 1 in constraint_list and 2 in constraint_list and 3 in constraint_list:
+                                print(e2)
+                                print(err, deltas)
                             if constraint_list is None or constraint_list == []:
                                 if svc.validate(candidate_sample):
                                     end = candidate_sample
