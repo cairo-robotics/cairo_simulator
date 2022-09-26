@@ -80,7 +80,7 @@ def main():
             "sim_object_configs": 
                 {
                     "object_name": "cylinder",
-                    "position": [.85, -.65, -.3],
+                    "position": [.8, -.65, -.3],
                     "orientation":  [0, 0, 0],
                     "fixed_base": 1    
                 }
@@ -91,7 +91,7 @@ def main():
             "sim_object_configs": 
                 {
                     "object_name": "box",
-                    "position": [.85, -.34, -.2],
+                    "position": [.8, -.34, -.2],
                     "orientation":  [0, 0, 0],
                     "fixed_base": 1    
                 }
@@ -117,8 +117,8 @@ def main():
     Tw_e2 = xyzrpy2trans(tsr_config['Tw_e'], degrees=tsr_config['degrees'])
     Bw2 = bounds_matrix(tsr_config['Bw'][0], tsr_config['Bw'][1])
     test_tsr = TSR(T0_w=T0_w2, Tw_e=Tw_e2, Bw=Bw2)
-    start = [-1.1082147164128724, 0.4429825776848695, -1.3813456309043126, 0.05810787253520644, -0.07543105540884332, -1.3395741946740773, -0.35260096111436967] 
-    end = [-1.3022747381393345, 0.6828882825232419, -1.195260252516043, -0.6756378061646848, -0.5080752513644473, -0.6500139839245613, 2.860906291435777]
+    start = [-1.4259345906741132, 0.9928434001588364, -1.0059933839428683, -1.2695666692904755, 2.004084120043416, 0.3517138322006712, -3.068955049296903] 
+    end = [-1.707751564920822, 0.10622896220639388, -1.9640249768142801, -1.2632074087800005, 0.9879463901081049, -0.44963166001450894, -0.9431156689683755]
     sim_context = SawyerBiasedSimContext(configuration=base_config)
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
