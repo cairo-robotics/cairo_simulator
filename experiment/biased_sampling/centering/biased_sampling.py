@@ -1,7 +1,9 @@
 import os
 import json
+from re import M
 import time
 import datetime
+import statistics 
 
 import pybullet as p
 if os.environ.get('ROS_DISTRO'):
@@ -20,7 +22,7 @@ import matplotlib.pyplot as plt
 
 def main():
     
-    NUM_SAMPLES = 100
+    NUM_SAMPLES = 5
     fraction_uniform_increments = [0, .05, .1, .15, .2, .25, .3, .35, .4, .45, .5, .55, .6, .65, .7, .75, .8, .85, .9, .95, .99, .9999, .999999, 1]
 
     config = {}
@@ -99,16 +101,21 @@ def main():
 
     # Create plots
     plt.figure(figsize=(12, 10))
-    for subject, subject_data in results.items():
+
+    means = []
+    stds = []
+    for idx, _ in enumerate(fraction_uniform_increments):
     
-        result_times = [result[1] for result in subject_data]
-        plt.plot(fraction_uniform_increments, result_times, label=subject, linewidth=5.0)
+        means.append(map(statistics.mean, [result[idx] for result in results.items()]))
+        stds.append(map(statistics.stdev, [result[idx] for result in results.items()]))
+    
+    plt.errorbar(fraction_uniform_increments, means, yerr=stds, linewidth=5.0)
     plt.xlabel('Fraction Uniform Sampling', fontsize=20)
     plt.xticks(fontsize=16)
     plt.ylabel('Time (s)',  fontsize=20)
     plt.yticks(fontsize=16)
     plt.suptitle('Time to Sample {} Constrained Points vs. Fraction Uniform'.format(NUM_SAMPLES), fontsize=24)
-    plt.title('Centering and Orientation Constraint Close to Reachable Limits'.format(NUM_SAMPLES), fontsize=22)
+    plt.title('Centering and Orientation Constraint Close to Reachable Limits. '.format(NUM_SAMPLES), fontsize=22)
     plt.legend(fontsize=20)
     plt.show()
 

@@ -2,6 +2,7 @@ import os
 import json
 import time
 import datetime
+import statistics
 
 import pybullet as p
 if os.environ.get('ROS_DISTRO'):
@@ -20,7 +21,7 @@ import matplotlib.pyplot as plt
 
 def main():
     
-    NUM_SAMPLES = 1000
+    NUM_SAMPLES = 5
     fraction_uniform_increments = [0, .05, .1, .15, .2, .25, .3, .35, .4, .45, .5, .55, .6, .65, .7, .75, .8, .85, .9, .95, .99, .9999, .999999, 1]
 
     config = {}
@@ -100,11 +101,14 @@ def main():
 
     # Create plots
     plt.figure(figsize=(12, 10))
-    count = 1
-    for _, subject_data in results.items():
-        result_times = [result[1] for result in subject_data]
-        plt.plot(fraction_uniform_increments, result_times, label="Subject {}".format(count), linewidth=5.0)
-        count += 1
+    means = []
+    stds = []
+    for idx, _ in enumerate(fraction_uniform_increments):
+    
+        means.append(map(statistics.mean, [result[idx] for result in results.items()]))
+        stds.append(map(statistics.stdev, [result[idx] for result in results.items()]))
+    
+    plt.errorbar(fraction_uniform_increments, means, yerr=stds, linewidth=5.0)
     plt.xlabel('Fraction Uniform Sampling', fontsize=20)
     plt.xticks(fontsize=16)
     plt.ylabel('Time (s)',  fontsize=20)
