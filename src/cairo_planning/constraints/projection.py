@@ -87,16 +87,16 @@ def project_config(manipulator, tsr, q_s, q_old, epsilon, q_step=.5, e_step=.25,
         J_rpy = analytic_xyz_jacobian(J[3:6, :], quat2rpy(quat))
         Ja = np.vstack([np.array(J_t), np.array(J_rpy)])
         try:
-            # delta=.001
-            J_cross = np.dot(Ja.T, np.linalg.inv(np.dot(Ja, Ja.T)))
+            delta=.001
+            # J_cross = np.dot(Ja.T, np.linalg.inv(np.dot(Ja, Ja.T)))
             # this helps limit value explosion when near singularities.
-            # J_cross = np.dot(Ja.T, np.linalg.inv(np.dot(Ja, Ja.T) + delta**2*np.ones(6)))
+            J_cross = np.dot(Ja.T, np.linalg.inv(np.dot(Ja, Ja.T) + delta**2*np.ones(6)))
         except np.linalg.linalg.LinAlgError:
             # likely a singular matrix error...
             return None
         q_error = np.dot(J_cross, x_err)
-        q_s = q_s - e_step * q_error
-        # q_s = q_s - q_error
+        # q_s = q_s - e_step * q_error
+        q_s = q_s - q_error
         
         #perform least squares error:
         # U, sigma, VT =  linalg.svd(Ja)

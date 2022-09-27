@@ -128,7 +128,7 @@ class SawyerTSRConstrainedSpace():
             xyz, quat = self.robot.solve_forward_kinematics(sample)[0]
             pose = xyz + list(quat2rpy(quat))
             if not all(self.TSR.is_valid(pose)):
-                q_constrained = project_config(self.robot, self.TSR, np.array(sample), np.array(sample), epsilon=self.epsilon, q_step=self.q_step, e_step=self.e_step, iter_count=self.iter_count, ignore_termination_condtions=True)
+                q_constrained = project_config(self.robot, self.TSR, np.array(sample), np.array(sample), epsilon=self.epsilon, q_step=self.q_step, e_step=self.e_step, iter_count=self.iter_count, ignore_termination_condtions=False)
                 normalized_q_constrained = []
                 if q_constrained is not None:
                     for value in q_constrained:

@@ -21,8 +21,8 @@ import matplotlib.pyplot as plt
 
 def main():
     
-    NUM_SAMPLES = 5
-    fraction_uniform_increments = [0, .05, .1, .15, .2, .25, .3, .35, .4, .45, .5, .55, .6, .65, .7, .75, .8, .85, .9, .95, .99, .9999, .999999, 1]
+    NUM_SAMPLES = 1000
+    fraction_biased_increments = [1, .95, .9, .85, .8, .75, .7, .65, .6, .55, .5, .45, .4, .35, .3, .25, .2, .15, .1, .05, .04, .03, .02, .01, 0]
 
     config = {}
     config["sim"] = {
@@ -73,20 +73,20 @@ def main():
         
         fraction_time_tuples = []
         
-        for fraction in fraction_uniform_increments:
+        for fraction in fraction_biased_increments:
             # Create the DistributionSampler and associated SawyerTSRConstrainedSpace
-            state_space = SawyerTSRConstrainedSpace(robot=sawyer_robot, TSR=tsr, svc=svc, sampler=DistributionSampler(distribution_model=model, fraction_uniform=fraction), limits=None)
+            state_space = SawyerTSRConstrainedSpace(robot=sawyer_robot, TSR=tsr, svc=svc, sampler=DistributionSampler(distribution_model=model, fraction_uniform=1 - fraction), limits=None)
             
-            ptime1 = time.process_time()
+            ptime1 = time.perf_counter()
             count = 0
             while count != NUM_SAMPLES:
                 sample = state_space.sample()
                 if sample is not None:
                     count += 1
-                if time.process_time() - ptime1 >= 1000:
+                if time.perf_counter() - ptime1 >= 1000:
                     print("Only sampled {} constraint compliant points.".format(count))
                     break
-            ptime2 = time.process_time()
+            ptime2 = time.perf_counter()
             print(ptime2 - ptime1)
             fraction_time_tuples.append((fraction, ptime2 - ptime1))
 
@@ -101,22 +101,17 @@ def main():
 
     # Create plots
     plt.figure(figsize=(12, 10))
+
+    means = list(map(statistics.mean, [[result[1][idx][1] for result in results.items()] for idx, _ in enumerate(fraction_biased_increments)]))
+    stds = list(map(statistics.stdev, [[result[1][idx][1] for result in results.items()] for idx, _ in enumerate(fraction_biased_increments)]))
     
-    means = []
-    stds = []
-    for idx, _ in enumerate(fraction_uniform_increments):
-    
-        means.append(map(statistics.mean, [result[idx] for result in results.items()]))
-        stds.append(map(statistics.stdev, [result[idx] for result in results.items()]))
-    
-    plt.errorbar(fraction_uniform_increments, means, yerr=stds, linewidth=5.0)
-    plt.xlabel('Fraction Uniform Sampling', fontsize=20)
+    plt.errorbar(fraction_biased_increments, means, yerr=stds, fmt='-o', ecolor='lightgray', linewidth=3, elinewidth=1, capsize=2, capthick=2)
+    plt.xlabel('Fraction of Candidate Points Drawn from Biased Distribution', fontsize=18)
     plt.xticks(fontsize=16)
-    plt.ylabel('Time (s)',  fontsize=20)
+    plt.ylabel('Time (s)',  fontsize=18)
     plt.yticks(fontsize=16)
-    plt.suptitle('Time to Sample {} Constrained Points vs. Fraction Uniform'.format(NUM_SAMPLES), fontsize=24)
-    plt.title('Glue Application Constraint'.format(NUM_SAMPLES), fontsize=22)
-    plt.legend(fontsize=20)
+    plt.title('Mean Time (w/ std) to Project {} Samples \n onto Glue Application Constraint Manifold'.format(NUM_SAMPLES), fontsize=22)
+    # plt.legend(fontsize=20)
     plt.show()
 
 if __name__ == "__main__":
