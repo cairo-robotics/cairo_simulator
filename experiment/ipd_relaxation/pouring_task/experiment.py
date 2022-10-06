@@ -68,7 +68,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=arg_fmt)
     parser.add_argument(
         "-p", "--participant", dest="participant", default="1",
-        choices=["1", "2", "3"],
+        choices=["1", "2", "3", "4", "5"],
         help='Which of the three participants to run: "1", "2" or "3"'
     )
     parser.add_argument(
@@ -98,11 +98,11 @@ if __name__ == "__main__":
 
     # DIRECTORIES
     LFD_MODEL_FILEPATH = os.path.join(
-        FILE_DIR, "participant_{}/lfd_data/lfd_model_{}.json".format(participant, participant))
+        FILE_DIR, "data/participant_{}/lfd_data/lfd_model_{}.json".format(participant, participant))
     GOLD_DEMO_INPUT_DIRECTORY = os.path.join(
-        FILE_DIR, "participant_{}/gold_demo/*.json".format(participant))
+        FILE_DIR, "data/participant_{}/gold_demo/*.json".format(participant))
     EVAL_OUTPUT_DIRECTORY = os.path.join(
-        FILE_DIR, "participant_{}/output".format(participant))
+        FILE_DIR, "data/participant_{}/output".format(participant))
 
     # IPD RELAX PARAMS
     KEYFRAME_KDE_BANDWIDTH = .15
@@ -112,9 +112,9 @@ if __name__ == "__main__":
     MAX_STEERING_POINT_ITERS = 500
 
     # PLANNING PARAMS
-    SMOOTH = False
-    SMOOTHING_TIME = 10
-    MAX_SEGMENT_PLANNING_TIME = 60
+    SMOOTH = True
+    SMOOTHING_TIME = 5
+    MAX_SEGMENT_PLANNING_TIME = 30
     MAX_ITERS = 5000
     PLANNING_TSR_EPSILON = .15
     Q_STEP = .35
@@ -123,8 +123,8 @@ if __name__ == "__main__":
     MOVE_TIME = 15
 
     # EXPERIMENT PARAMS
-    TRIALS = 50
-    VISUALIZE_EXECUTION = True
+    TRIALS = 25
+    VISUALIZE_EXECUTION = False
 
     ##############
     # EVALUATION #
@@ -183,18 +183,18 @@ if __name__ == "__main__":
             "sim_object_configs":
                 {
                     "object_name": "cylinder",
-                    "position": [.95, -.65, -.3],
+                    "position": [.75, -.65, -.3],
                     "orientation":  [0, 0, 0],
                     "fixed_base": 1
             }
         },
         {
             "type": "box",
-            "primitive_configs": {"w": .25, "l": .25, "h": .45},
+            "primitive_configs": {"w": .25, "l": .25, "h": .6},
             "sim_object_configs":
                 {
                     "object_name": "box",
-                    "position": [.95, -.34, -.2],
+                    "position": [.75, -.34, -.2],
                     "orientation":  [0, 0, 0],
                     "fixed_base": 1
             }
@@ -206,11 +206,11 @@ if __name__ == "__main__":
     conditional_collision_objects = [
         {
             "type": "cylinder",
-            "primitive_configs": {"radius": .12, "height": .15},
+            "primitive_configs": {"radius": .12, "height": .35},
             "sim_object_configs":
                 {
                     "object_name": "cylinder",
-                    "position": [.2, -.6, -.3],
+                    "position": [.75, 0, .1],
                     "orientation":  [0, 0, 0],
                     "fixed_base": 1
             }
@@ -921,16 +921,15 @@ if __name__ == "__main__":
                         script_logger.info("Planning with constraints: {}".format(
                             planning_G.nodes[e1].get('constraint_ids', None)))
                         print(edge_tsr_config)
-                        if e1 == 33 or e1 == '33':
-                            print("Pause")
                         plan = cbirrt.plan(
                             planning_tsr, np.array(start), np.array(end))
                         path = cbirrt.get_path(plan)
-                        script_logger.info("Start path point: {}".format(path[0]))
-                        script_logger.info("End path point: {}".format(path[-1]))
                         if len(path) == 0:
                             logger.info("Planning failed....")
                             PLANNING_FAILURE = True
+                            break
+                        script_logger.info("Start path point: {}".format(path[0]))
+                        script_logger.info("End path point: {}".format(path[-1]))
                         logger.info("Plan found....")
                         script_logger.info(
                             "Plan found for {} to {}".format(e1, e2))
@@ -995,6 +994,9 @@ if __name__ == "__main__":
                 task_space_segments.append(
                     [pose2trans(p[0] + p[1]) for p in rust_results])
 
+            eval_trial.segments = TRAJECTORY_SEGMENTS
+            eval_trial.segment_constraint_ids = EVAL_CONSTRAINT_ORDER
+            
             # Update trial evaluation data.
             eval_trial.path_length = eval_trial.eval_path_length(
                 spline_trajectory)

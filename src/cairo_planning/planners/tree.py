@@ -293,7 +293,7 @@ class CBiRRT2():
             q_s_name = utils.val2str(q_s)
             q_s_idx = utils.name2idx(smoothing_tree, q_s_name)
             # constrained extend to the potential shortcut point.
-            q_reached, added_q_values, valid = self._constrained_extend(smoothing_tree, tsr, q_old, q_s)
+            q_reached, added_q_values, valid = self._constrained_extend(smoothing_tree, tsr, q_old, q_s, epsilon_factor=self.epsilon_extension_factors[0])
             if valid and self._distance(q_reached, q_s) < .01 and len(added_q_values) > 0:
                # since constrain extend does not connect the last point to the target q_s we need to do so.
                 self._add_edge(smoothing_tree, added_q_values[-1], q_s, self._distance(added_q_values[-1], q_s))

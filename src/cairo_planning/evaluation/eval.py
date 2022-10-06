@@ -39,6 +39,8 @@ class IPDRelaxEvaluation():
             trial_data["ip_generation_times"] = trial.ip_gen_times
             trial_data["ip_generation_types"] = trial.ip_gen_types
             trial_data["ip_tsr_distances"] = trial.ip_tsr_distances
+            trial_data["segment_constraint_ids"] = trial.segment_constraint_ids
+            trial_data["trajectory_segments"] = trial.segments
             trial_data["trajectory"] = trial.trajectory
             trial_data["notes"] = trial.notes
             trials_data["trials"].append(trial_data)
@@ -60,6 +62,8 @@ class IPDRelaxEvaluationTrial():
         self.a2f_percentage = -1
         self.planning_time = -1
         self.ip_gen_times = []
+        self.segments = []
+        self.segment_constraint_ids = []
         self.trajectory = []
         self.ip_gen_types = []
         self.ip_tsr_distances = []
