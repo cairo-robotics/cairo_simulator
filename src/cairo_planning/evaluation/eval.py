@@ -50,7 +50,7 @@ class IPDRelaxEvaluation():
             json.dump(trials_data, f)
 
     def _snake_case_name(self):
-        return "{}_{}_{}_{}".format(self.particpant, self.planning_bias, self.ip_style)
+        return "{}_{}_{}_{}".format(self.particpant, self.planning_bias, self.collisions, self.ip_style)
 
 
 class IPDRelaxEvaluationTrial():
@@ -84,7 +84,7 @@ class IPDRelaxEvaluationTrial():
         return dist
 
     def eval_success(self, last_point_transform, tsr, epsilon=5):
-        dist = distance_from_TSR(last_point_transform, tsr)
+        dist, _ = distance_from_TSR(last_point_transform, tsr)
         if dist < epsilon:
             return True
         else:
@@ -93,7 +93,7 @@ class IPDRelaxEvaluationTrial():
     def eval_a2f(self, trajectory_segments, constraint_eval_map, constraint_ordering, epsilon):
         results = []
         for idx, segment in enumerate(trajectory_segments):
-            if constraint_ordering[idx] is not None:
+            if constraint_ordering[idx] is not None or constraint_ordering[idx] == []:
                 tsr = constraint_eval_map.get(
                     tuple(constraint_ordering[idx]), None)
                 if tsr is not None:

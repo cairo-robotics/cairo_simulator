@@ -29,7 +29,7 @@ from cairo_planning.geometric.distribution import KernelDensityDistribution
 from cairo_planning.local.interpolation import parametric_lerp
 from cairo_planning.local.curve import JointTrajectoryCurve
 from cairo_planning.planners import CBiRRT2
-from cairo_planning.planners.exceptions import PlanningTimeoutException, MaxItersException
+from cairo_planning.planners.exceptions import PlanningTimeoutException, MaxItersException, OffManifoldInsertException
 from cairo_planning.sampling.samplers import DistributionSampler
 
 from cairo_planning.constraints.projection import distance_from_TSR
@@ -939,7 +939,6 @@ if __name__ == "__main__":
                             break
                         script_logger.info("Start path point: {}".format(path[0]))
                         script_logger.info("End path point: {}".format(path[-1]))
-                        logger.info("Plan found....")
                         script_logger.info(
                             "Plan found for {} to {}".format(e1, e2))
                     else:
@@ -964,6 +963,11 @@ if __name__ == "__main__":
             print("MAX ITERS REACHED. PLANNING FAILURE!")
             PLANNING_FAILURE = True
             eval_trial.notes = str(e)
+            sim_context.disconnect()
+        except OffManifoldInsertException as e:
+            print("Failed to insert off manifold point for start or end.")
+            PLANNING_FAILURE = True
+            eval_trial.notes = "Off manifold insert failure for start or end."
             sim_context.disconnect()
 
 
@@ -1015,13 +1019,14 @@ if __name__ == "__main__":
             # Update trial evaluation data.
             eval_trial.path_length = eval_trial.eval_path_length(
                 spline_trajectory)
-            eval_trial.success = eval_trial.eval_success(task_space_segments[-1][-1], success_TSR, epsilon=.15)
+            eval_trial.success = eval_trial.eval_success(pose2trans(taskspace_trajectory[-1]), success_TSR, epsilon=.15)
             eval_trial.a2s_cspace_distance = eval_trial.eval_a2s(
                 spline_trajectory, gold_demo_traj)
             eval_trial.a2s_taskspace_distance = eval_trial.eval_a2s(
                 taskspace_trajectory, taskspace_gold_demo_traj)
+            # we use a threshold TSR since in the high dimensional manipulator case, a2f is rarely exactly on manifold
             eval_trial.a2f_percentage = eval_trial.eval_a2f(
-                task_space_segments, cs2tsr_object_map, EVAL_CONSTRAINT_ORDER, .01)
+                task_space_segments, cs2tsr_object_map, EVAL_CONSTRAINT_ORDER, PLANNING_TSR_EPSILON)
             eval_trial.ip_gen_times = IP_GEN_TIMES
             eval_trial.ip_gen_types = IP_GEN_TYPES
             eval_trial.ip_tsr_distances = IP_TSR_DISTANCES
