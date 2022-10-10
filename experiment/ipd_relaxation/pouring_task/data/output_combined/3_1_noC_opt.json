@@ -2,6 +2,7 @@
     "participant": "3",
     "planning_bias": "1",
     "ip_style": "opt",
+    "collision_objects": "noC",
     "trials": [
         {
             "path_length": -1,
