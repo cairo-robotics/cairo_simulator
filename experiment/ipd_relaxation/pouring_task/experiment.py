@@ -1021,7 +1021,7 @@ if __name__ == "__main__":
             eval_trial.a2s_taskspace_distance = eval_trial.eval_a2s(
                 taskspace_trajectory, taskspace_gold_demo_traj)
             eval_trial.a2f_percentage = eval_trial.eval_a2f(
-                task_space_segments, cs2tsr_object_map, EVAL_CONSTRAINT_ORDER, PLANNING_TSR_EPSILON)
+                task_space_segments, cs2tsr_object_map, EVAL_CONSTRAINT_ORDER, .01)
             eval_trial.ip_gen_times = IP_GEN_TIMES
             eval_trial.ip_gen_types = IP_GEN_TYPES
             eval_trial.ip_tsr_distances = IP_TSR_DISTANCES
