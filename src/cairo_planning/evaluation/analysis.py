@@ -33,7 +33,6 @@ def import_data_as_dataframe(data_path):
         with open(filene_name, 'r') as f:
             data = json.loads(f.read())
             dfs.append(pd.json_normalize(data, record_path=['trials'], meta=[
-                'participant',
                 'planning_bias',
                 'ip_style'
             ]))
