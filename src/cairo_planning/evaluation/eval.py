@@ -28,6 +28,7 @@ class IPDRelaxEvaluation():
         trials_data["participant"] = self.particpant
         trials_data["planning_bias"] = self.planning_bias
         trials_data["ip_style"] = self.ip_style
+        trials_data["collision_objects"] = self.collisions
         trials_data["trials"] = []
         for trial in self.trials:
             trial_data = {}
