@@ -10,11 +10,12 @@ from cairo_planning.constraints.projection import distance_from_TSR
 
 class IPDRelaxEvaluation():
 
-    def __init__(self, output_dir, participant, biased_planning, ip_style):
+    def __init__(self, output_dir, participant, biased_planning, ip_style, collision_objects):
         self.output_dir = output_dir
         self.particpant = participant
         self.planning_bias = str(biased_planning) # comes in as an int
         self.ip_style = ip_style
+        self.collisions = "C" if collision_objects else "noC"
         self.trials = []
 
     def add_trial(self, trial):
@@ -49,7 +50,7 @@ class IPDRelaxEvaluation():
             json.dump(trials_data, f)
 
     def _snake_case_name(self):
-        return "{}_{}_{}".format(self.particpant, self.planning_bias, self.ip_style)
+        return "{}_{}_{}_{}".format(self.particpant, self.planning_bias, self.ip_style)
 
 
 class IPDRelaxEvaluationTrial():

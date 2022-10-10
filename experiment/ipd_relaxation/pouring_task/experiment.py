@@ -17,7 +17,7 @@ import networkx as nx
 from cairo_simulator.core.utils import ASSETS_PATH
 from cairo_simulator.core.sim_context import SawyerBiasedSimContext
 
-from cairo_planning.collisions import DisabledCollisionsContext
+from cairo_planning.collisions import DisabledCollisionsContext, collision
 # from cairo_planning.constraints.foliation import VGMMFoliationClustering, winner_takes_all
 from cairo_planning.core.serialization import load_json_files
 from cairo_planning.evaluation.eval import IPDRelaxEvaluationTrial, IPDRelaxEvaluation
@@ -132,7 +132,7 @@ if __name__ == "__main__":
 
     # The evaluation object.
     evaluation = IPDRelaxEvaluation(
-        EVAL_OUTPUT_DIRECTORY, participant=participant, biased_planning=biased_planning, ip_style=ip_style)
+        EVAL_OUTPUT_DIRECTORY, participant=participant, biased_planning=biased_planning, ip_style=ip_style, collision_objects=use_collision_objects)
 
     # Create the gold demonstration trajectory
     gold_demo_data = load_json_files(GOLD_DEMO_INPUT_DIRECTORY)["data"][0]
