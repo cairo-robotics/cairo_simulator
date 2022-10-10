@@ -309,6 +309,15 @@ if __name__ == "__main__":
         "Bw": [[(-.02, .02), (-.02, .02), (0, 100)],  
                [(-.12, .12), (-.12, .12), (-3.14, 3.14)]]
     }
+    
+    # success TSR, this can be used to see if the end point of the trial is within a reasonable targeting position and height.
+    success_TSR_config = {
+        'degrees': False,
+        "T0_w":  [0.78, -0.6324, 0.2, np.pi/2, -np.pi/2, np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0],
+        "Bw": [[(-.05, .05), (-.05, .05), (-100, 0)],  
+                [(-100, 100), (-100, 100), (-100, 100)]]
+    }
 
     c2tsr_map = {}
     c2tsr_map[(1,)] = TSR_1_config
@@ -976,6 +985,12 @@ if __name__ == "__main__":
                 Bw = bounds_matrix(config['Bw'][0], config['Bw'][1])
                 cs2tsr_object_map[key] = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw)
 
+            # build success TSR
+            T0_w = xyzrpy2trans(success_TSR_config['T0_w'], degrees=success_TSR_config['degrees'])
+            Tw_e = xyzrpy2trans(success_TSR_config['Tw_e'], degrees=success_TSR_config['degrees'])
+            Bw = bounds_matrix(success_TSR_config['Bw'][0], success_TSR_config['Bw'][1])
+            success_TSR = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw)
+            
             # get taskspace trajectory of gold and planned path:
             rusty_sawyer_robot = Agent(rusty_agent_settings_path, False, False)
             rust_results_of_gdt = [rusty_sawyer_robot.forward_kinematics(
@@ -1000,7 +1015,7 @@ if __name__ == "__main__":
             # Update trial evaluation data.
             eval_trial.path_length = eval_trial.eval_path_length(
                 spline_trajectory)
-            eval_trial.success = True
+            eval_trial.success = eval_trial.eval_success(task_space_segments[-1][-1], success_TSR, epsilon=.15)
             eval_trial.a2s_cspace_distance = eval_trial.eval_a2s(
                 spline_trajectory, gold_demo_traj)
             eval_trial.a2s_taskspace_distance = eval_trial.eval_a2s(

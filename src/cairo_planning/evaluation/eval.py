@@ -83,8 +83,8 @@ class IPDRelaxEvaluationTrial():
         dist, _ = fastdtw(t1, t2)
         return dist
 
-    def eval_success(self, trajectory, goal_point, epsilon=5):
-        dist = euclidean(trajectory[-1], goal_point)
+    def eval_success(self, last_point_transform, tsr, epsilon=5):
+        dist = distance_from_TSR(last_point_transform, tsr)
         if dist < epsilon:
             return True
         else:
