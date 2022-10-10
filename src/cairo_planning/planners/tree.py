@@ -11,7 +11,7 @@ from cairo_planning.constraints.projection import project_config, distance_from_
 from cairo_planning.geometric.transformation import quat2rpy, pose2trans
 
 from cairo_planning.planners import utils
-from cairo_planning.planners.exceptions import MaxItersException, PlanningTimeoutException
+from cairo_planning.planners.exceptions import MaxItersException, PlanningTimeoutException, OffManifoldInsertException
 from cairo_simulator.core.log import Logger
 
 __all__ = ['CBiRRT2']
@@ -35,7 +35,7 @@ class CBiRRT2():
         self.iters = params.get('iters', 20000)
         self.max_planning_time = params.get('max_time', 60)
         self.smoothing_time = params.get('smoothing_time', 10)
-        self.epsilon_extension_factors = [3, 1.5]
+        self.epsilon_extension_factors = [4, 2]
         self.allow_off_manifold_endpoints = params.get('off_manifold_endpoints', False)
         self.log =  logger if logger is not None else Logger(name="CBiRRT2", handlers=['logging'], level=params.get('log_level', 'debug'))
         self.log.info("q_step: {}, epsilon: {}, e_step: {}, BiRRT Iters {}".format(self.q_step, self.epsilon, self.e_step, self.iters))
@@ -91,7 +91,11 @@ class CBiRRT2():
                 for point in proj_points:
                     ext_points = self._insert_off_manifold_point(self.forwards_tree, point, tsr, epsilon_factor=self.epsilon_extension_factors[0])
                     n_ext_points += len(ext_points)
-                self.log.debug("Start point injected via {} epsilon relaxed & {} extension points".format(len(proj_points), n_ext_points))
+                if len(proj_points) == 0:
+                    self.log.debug("Could not insert off manifold start point!")
+                    raise OffManifoldInsertException("Could not insert off manifold start point!")
+                else:
+                    self.log.debug("Start point injected via {} epsilon relaxed & {} extension points".format(len(proj_points), n_ext_points))
             if not self._within_manifold(self.backwards_tree.vs.find(name=self.goal_name)['value'], tsr):
                 self.log.debug("Projecting off-manifold end point onto manifold to insert into backwards tree...")
                 self.backwards_tree.vs.find(name=self.goal_name)['injected_point'] = True
@@ -100,7 +104,11 @@ class CBiRRT2():
                 for point in proj_points:
                     ext_points = self._insert_off_manifold_point(self.backwards_tree, point, tsr, epsilon_factor=self.epsilon_extension_factors[0])
                     n_ext_points += len(ext_points)
-                self.log.debug("End point injected via {} relaxed & {} extension points".format(len(proj_points), n_ext_points))
+                if len(proj_points) == 0:
+                    self.log.debug("Could not insert off manifold end point!")
+                    raise OffManifoldInsertException("Could not insert off manifold end point!")
+                else:
+                    self.log.debug("End point injected via {} relaxed & {} extension points".format(len(proj_points), n_ext_points))
 
         
         tick = time.perf_counter()

@@ -3,3 +3,6 @@ class PlanningTimeoutException(Exception):
 
 class MaxItersException(Exception):
     pass
+
+class OffManifoldInsertException(Exception):
+    pass
