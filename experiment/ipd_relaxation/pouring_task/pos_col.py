@@ -76,22 +76,33 @@ def main():
     base_config["primitives"] = [
         {
             "type": "cylinder",
-            "primitive_configs": {"radius": .12, "height": .05},
+            "primitive_configs": {"radius": .12, "height": .1},
             "sim_object_configs": 
                 {
                     "object_name": "cylinder",
-                    "position": [.8, -.65, -.3],
+                    "position": [.78, -.34, -.28],
+                    "orientation":  [0, 0, 0],
+                    "fixed_base": 1    
+                }
+        },
+         {
+            "type": "box",
+            "primitive_configs": {"w": .25, "l": .25, "h": .6},
+            "sim_object_configs": 
+                {
+                    "object_name": "box",
+                    "position": [.8, -.1, -.2],
                     "orientation":  [0, 0, 0],
                     "fixed_base": 1    
                 }
         },
         {
             "type": "box",
-            "primitive_configs": {"w": .25, "l": .25, "h": .45},
+            "primitive_configs": {"w": .1, "l": .25, "h": .8},
             "sim_object_configs": 
                 {
                     "object_name": "box",
-                    "position": [.8, -.34, -.2],
+                    "position": [.65, -.1, .8],
                     "orientation":  [0, 0, 0],
                     "fixed_base": 1    
                 }
@@ -103,12 +114,12 @@ def main():
         "self_collision_exclusions": [("mug", "right_gripper_l_finger"), ("mug", "right_gripper_r_finger")]
     }
 
-    base_config["tsr"] = {
+    base_config['tsr'] = {
         'degrees': False,
-        "T0_w":  [0.62, -0.62, 0.0, np.pi/2, -np.pi/2, np.pi/2],
+        "T0_w":  [0.678, -0.336, 0.15, np.pi/2, -np.pi/2, np.pi/2],
         "Tw_e": [0, 0, 0, 0, 0, 0],
-        "Bw": [[(-.05, .05), (-.05, .05), (-100, 100)],  
-                [(-100, 100), (-100, 100), (-100, 100)]]
+        "Bw": [[(-.05, .05), (-.05, .05), (0, 100)],  
+               [(-3.14, 3.14), (-.12, .12), (-.12, .12)]]
     }
 
     
@@ -117,8 +128,8 @@ def main():
     Tw_e2 = xyzrpy2trans(tsr_config['Tw_e'], degrees=tsr_config['degrees'])
     Bw2 = bounds_matrix(tsr_config['Bw'][0], tsr_config['Bw'][1])
     test_tsr = TSR(T0_w=T0_w2, Tw_e=Tw_e2, Bw=Bw2)
-    start = [-1.4259345906741132, 0.9928434001588364, -1.0059933839428683, -1.2695666692904755, 2.004084120043416, 0.3517138322006712, -3.068955049296903] 
-    end = [-1.707751564920822, 0.10622896220639388, -1.9640249768142801, -1.2632074087800005, 0.9879463901081049, -0.44963166001450894, -0.9431156689683755]
+    start = [-0.9918521618209191, 0.9060637724002749, -0.7635243101421403, -1.4080319295439943, 0.09645480853961352, 1.8331631430888766, -1.6366016328858535]
+    end = [-0.83257183, -0.09976377, -0.4409819,    0.34119334,   0.63135326,  -0.1303746, -1.78333081]
     sim_context = SawyerBiasedSimContext(configuration=base_config)
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()
@@ -129,7 +140,7 @@ def main():
     svc = sim_context.get_state_validity()
     
     rusty_agent_settings_path = str(
-            Path(__file__).parent.absolute()) + "/../settings.yaml"
+            Path(__file__).parent.absolute()) + "/settings.yaml"
     print(rusty_agent_settings_path)
     rusty_sawyer_robot = Agent(rusty_agent_settings_path, False, False)
     
@@ -139,7 +150,7 @@ def main():
         sawyer_robot.set_joint_state(start)
         print(svc.validate(start))
         fk_results = sawyer_robot.solve_forward_kinematics(joint_configuration=start)
-        print(fk_results)
+        print("FK RESULTS:", fk_results)
         print(distance_to_TSR_config(sawyer_robot, start, test_tsr))
 
         rusty_fk_results = rusty_sawyer_robot.forward_kinematics(start)
