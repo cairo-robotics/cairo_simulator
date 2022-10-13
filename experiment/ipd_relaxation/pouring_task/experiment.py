@@ -123,8 +123,8 @@ if __name__ == "__main__":
     MOVE_TIME = 15
 
     # EXPERIMENT PARAMS
-    TRIALS = 5
-    VISUALIZE_EXECUTION = True
+    TRIALS = 25
+    VISUALIZE_EXECUTION = False
 
     ##############
     # EVALUATION #
