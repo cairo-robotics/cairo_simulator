@@ -182,8 +182,20 @@ class CBiRRT2():
     
     def _interpolated_extend(self, tree, tsr, q_near, q_target):
         interpolated_path = list(self.interp_fn(q_near, q_target))
-        path_tsr_valid = all([self._within_manifold(q, tsr) for q in interpolated_path])
-        path_svc_valid =  all([self._validate(q) for q in interpolated_path])
+        
+        for q in interpolated_path:
+            if not self._within_manifold(q, tsr):
+                path_tsr_valid = False
+                break
+            else:
+                path_tsr_valid = True
+                
+        for q in interpolated_path:
+            if not self._validate(q):
+                path_svc_valid = False
+                break
+            else:
+                path_svc_valid = True
         
         if path_tsr_valid and path_svc_valid:
             points_to_add = interpolated_path
@@ -301,7 +313,7 @@ class CBiRRT2():
             q_s_name = utils.val2str(q_s)
             q_s_idx = utils.name2idx(smoothing_tree, q_s_name)
             # constrained extend to the potential shortcut point.
-            q_reached, added_q_values, valid = self._constrained_extend(smoothing_tree, tsr, q_old, q_s, epsilon_factor=self.epsilon_extension_factors[0])
+            q_reached, added_q_values, valid = self._constrained_extend(smoothing_tree, tsr, q_old, q_s, epsilon_factor=1)
             if valid and self._distance(q_reached, q_s) < .01 and len(added_q_values) > 0:
                # since constrain extend does not connect the last point to the target q_s we need to do so.
                 self._add_edge(smoothing_tree, added_q_values[-1], q_s, self._distance(added_q_values[-1], q_s))
