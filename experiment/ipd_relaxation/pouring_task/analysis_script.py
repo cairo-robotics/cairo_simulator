@@ -19,36 +19,45 @@ if __name__ == "__main__":
     #############################
     psa = PlanningSuccessAnalysis(df)
     print(psa.analyze())
-
+    print()
     ##########################
     # Planning Time Analysis #
     ##########################
     pta = PlanningTimeAnalysis(df)
-    print(pta.analyze())
-    
+    pts_mean, pta_std = pta.analyze()
+    print(pts_mean)
+    print(pta_std)
+    print()
     ########################
     # Path Length Analysis #
     ########################
-  
     pla = PathLengthAnalysis(df)
-    print(pla.analyze())
-        
+    pla_mean, pla_std = pla.analyze()
+    print(pla_mean)
+    print(pla_std)
+    print()
     #############################
     # A2S Config Space Analysis #
     #############################
     a2scs = A2SConfigSpaceAnalysis(df)
-    print(a2scs.analyze())
-    
+    a2scs_mean, a2scs_std = a2scs.analyze()
+    print(a2scs_mean)
+    print(a2scs_std)
+    print()
     ###########################
     # A2S Task Space Analysis #
     ###########################
     a2sts = A2STaskSpaceAnalysis(df)
-    print(a2sts.analyze())
-    
+    a2sts_mean, a2sts_std = a2sts.analyze()
+    print(a2sts_mean)
+    print(a2sts_std)
+    print()
     ################
     # A2F Analysis #
     ################
     a2f = A2FAnalysis(df)
-    print(a2f.analyze())
+    a2f_mean, a2f_std = a2f.analyze()
+    print(a2f_mean)
+    print(a2f_std)
     
     
