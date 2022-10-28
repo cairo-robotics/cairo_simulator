@@ -11,7 +11,7 @@ from cairo_planning.constraints.projection import project_config, distance_from_
 from cairo_planning.geometric.transformation import quat2rpy, pose2trans
 
 from cairo_planning.planners import utils
-from cairo_planning.planners.exceptions import MaxItersException, PlanningTimeoutException
+from cairo_planning.planners.exceptions import MaxItersException, PlanningTimeoutException, OffManifoldInsertException
 from cairo_simulator.core.log import Logger
 
 __all__ = ['CBiRRT2']
@@ -35,7 +35,7 @@ class CBiRRT2():
         self.iters = params.get('iters', 20000)
         self.max_planning_time = params.get('max_time', 60)
         self.smoothing_time = params.get('smoothing_time', 10)
-        self.epsilon_extension_factors = [3, 1.5]
+        self.epsilon_extension_factors = [4, 2]
         self.allow_off_manifold_endpoints = params.get('off_manifold_endpoints', False)
         self.log =  logger if logger is not None else Logger(name="CBiRRT2", handlers=['logging'], level=params.get('log_level', 'debug'))
         self.log.info("q_step: {}, epsilon: {}, e_step: {}, BiRRT Iters {}".format(self.q_step, self.epsilon, self.e_step, self.iters))
@@ -91,7 +91,11 @@ class CBiRRT2():
                 for point in proj_points:
                     ext_points = self._insert_off_manifold_point(self.forwards_tree, point, tsr, epsilon_factor=self.epsilon_extension_factors[0])
                     n_ext_points += len(ext_points)
-                self.log.debug("Start point injected via {} epsilon relaxed & {} extension points".format(len(proj_points), n_ext_points))
+                if len(proj_points) == 0:
+                    self.log.debug("Could not insert off manifold start point!")
+                    raise OffManifoldInsertException("Could not insert off manifold start point!")
+                else:
+                    self.log.debug("Start point injected via {} epsilon relaxed & {} extension points".format(len(proj_points), n_ext_points))
             if not self._within_manifold(self.backwards_tree.vs.find(name=self.goal_name)['value'], tsr):
                 self.log.debug("Projecting off-manifold end point onto manifold to insert into backwards tree...")
                 self.backwards_tree.vs.find(name=self.goal_name)['injected_point'] = True
@@ -100,7 +104,11 @@ class CBiRRT2():
                 for point in proj_points:
                     ext_points = self._insert_off_manifold_point(self.backwards_tree, point, tsr, epsilon_factor=self.epsilon_extension_factors[0])
                     n_ext_points += len(ext_points)
-                self.log.debug("End point injected via {} relaxed & {} extension points".format(len(proj_points), n_ext_points))
+                if len(proj_points) == 0:
+                    self.log.debug("Could not insert off manifold end point!")
+                    raise OffManifoldInsertException("Could not insert off manifold end point!")
+                else:
+                    self.log.debug("End point injected via {} relaxed & {} extension points".format(len(proj_points), n_ext_points))
 
         
         tick = time.perf_counter()
@@ -174,8 +182,20 @@ class CBiRRT2():
     
     def _interpolated_extend(self, tree, tsr, q_near, q_target):
         interpolated_path = list(self.interp_fn(q_near, q_target))
-        path_tsr_valid = all([self._within_manifold(q, tsr) for q in interpolated_path])
-        path_svc_valid =  all([self._validate(q) for q in interpolated_path])
+        
+        for q in interpolated_path:
+            if not self._within_manifold(q, tsr):
+                path_tsr_valid = False
+                break
+            else:
+                path_tsr_valid = True
+                
+        for q in interpolated_path:
+            if not self._validate(q):
+                path_svc_valid = False
+                break
+            else:
+                path_svc_valid = True
         
         if path_tsr_valid and path_svc_valid:
             points_to_add = interpolated_path
@@ -293,7 +313,7 @@ class CBiRRT2():
             q_s_name = utils.val2str(q_s)
             q_s_idx = utils.name2idx(smoothing_tree, q_s_name)
             # constrained extend to the potential shortcut point.
-            q_reached, added_q_values, valid = self._constrained_extend(smoothing_tree, tsr, q_old, q_s, epsilon_factor=self.epsilon_extension_factors[0])
+            q_reached, added_q_values, valid = self._constrained_extend(smoothing_tree, tsr, q_old, q_s, epsilon_factor=1)
             if valid and self._distance(q_reached, q_s) < .01 and len(added_q_values) > 0:
                # since constrain extend does not connect the last point to the target q_s we need to do so.
                 self._add_edge(smoothing_tree, added_q_values[-1], q_s, self._distance(added_q_values[-1], q_s))

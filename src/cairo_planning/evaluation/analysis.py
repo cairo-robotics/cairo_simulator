@@ -33,7 +33,9 @@ def import_data_as_dataframe(data_path):
         with open(filene_name, 'r') as f:
             data = json.loads(f.read())
             dfs.append(pd.json_normalize(data, record_path=['trials'], meta=[
+                'participant',
                 'planning_bias',
+                'collision_objects',
                 'ip_style'
             ]))
     return pd.concat(dfs)
@@ -54,8 +56,8 @@ class PlanningSuccessAnalysis():
     #     plt.close()
         
     def analyze(self):
-        df = self.dataframe[["participant", "planning_bias", "ip_style", "success"]]
-        return df.groupby(['participant', 'planning_bias', 'ip_style']).mean()
+        df = self.dataframe[["planning_bias", "collision_objects", "ip_style", "success"]]
+        return df.groupby(['planning_bias', "collision_objects", 'ip_style']).mean()
 class PlanningTimeAnalysis():
 
     def __init__(self, dataframe):
@@ -73,8 +75,10 @@ class PlanningTimeAnalysis():
         
     def analyze(self):
         rslt_df = self.dataframe[self.dataframe["planning_time"] > 0]
-        df = rslt_df[["participant", "planning_bias", "ip_style", "planning_time"]]
-        return df.groupby(['participant', 'planning_bias', 'ip_style']).mean()
+        df = rslt_df[["participant", "planning_bias", "collision_objects", "ip_style", "planning_time"]]
+        mean = df.groupby(['planning_bias', "collision_objects", 'ip_style']).mean()
+        std = df.groupby(['planning_bias', "collision_objects", 'ip_style']).std()
+        return mean, std
     
 class PathLengthAnalysis():
 
@@ -93,8 +97,10 @@ class PathLengthAnalysis():
         
     def analyze(self):
         rslt_df = self.dataframe[self.dataframe["path_length"] > 0]
-        df = rslt_df[["participant", "planning_bias", "ip_style", "path_length"]]
-        return df.groupby(['participant', 'planning_bias', 'ip_style']).mean()
+        df = rslt_df[["participant", "planning_bias", "collision_objects", "ip_style", "path_length"]]
+        mean = df.groupby(['planning_bias', "collision_objects", 'ip_style']).mean()
+        std = df.groupby(['planning_bias', "collision_objects", 'ip_style']).std()
+        return mean, std
 
 class A2SConfigSpaceAnalysis():
 
@@ -112,8 +118,10 @@ class A2SConfigSpaceAnalysis():
         
     def analyze(self):
         rslt_df = self.dataframe[self.dataframe["a2s_cspace_distance"] > 0]
-        df = rslt_df[["participant", "planning_bias", "ip_style", "a2s_cspace_distance"]]
-        return df.groupby(['participant', 'planning_bias', 'ip_style']).mean()
+        df = rslt_df[["participant", "planning_bias", "collision_objects", "ip_style", "a2s_cspace_distance"]]
+        mean = df.groupby(['planning_bias', "collision_objects", 'ip_style']).mean()
+        std = df.groupby(['planning_bias', "collision_objects", 'ip_style']).std()
+        return mean, std
     
 class A2STaskSpaceAnalysis():
 
@@ -131,8 +139,10 @@ class A2STaskSpaceAnalysis():
         
     def analyze(self):
         rslt_df = self.dataframe[self.dataframe["a2s_taskspace_distance"] > 0]
-        df = rslt_df[["participant", "planning_bias", "ip_style", "a2s_taskspace_distance"]]
-        return df.groupby(['participant', 'planning_bias', 'ip_style']).mean()
+        df = rslt_df[["participant", "planning_bias", "collision_objects", "ip_style", "a2s_taskspace_distance"]]
+        mean = df.groupby(['planning_bias', "collision_objects", 'ip_style']).mean()
+        std = df.groupby(['planning_bias', "collision_objects", 'ip_style']).std()
+        return mean, std
     
 class A2FAnalysis():
 
@@ -150,6 +160,8 @@ class A2FAnalysis():
         
     def analyze(self):
         rslt_df = self.dataframe[self.dataframe["a2f_percentage"] > 0]
-        df = rslt_df[["participant", "planning_bias", "ip_style", "a2f_percentage"]]
-        return df.groupby(['participant', 'planning_bias', 'ip_style']).mean()
+        df = rslt_df[["participant", "planning_bias", "collision_objects", "ip_style", "a2f_percentage"]]
+        mean = df.groupby(['planning_bias', "collision_objects", 'ip_style']).mean()
+        std = df.groupby(['planning_bias', "collision_objects", 'ip_style']).std()
+        return mean, std
 
