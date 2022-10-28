@@ -311,7 +311,7 @@ class TSR(object):
         # Extract XYZ and RPY components of input and TSR.
         Bw_xyz, Bw_rpy = self._Bw_cont[0:3, :], self._Bw_cont[3:6, :]
         xyz, rpy = xyzrpy[0:3], xyzrpy[3:6]
-
+        xyz = [val - TSR.trans_to_xyzrpy(self.Tw_e)[i] - TSR.trans_to_xyzrpy(self.T0_w)[i] for i, val in enumerate(xyz)]
         # Check bounds condition on XYZ component.
         xyzcheck = TSR.xyz_within_bounds(xyz, Bw_xyz)
 

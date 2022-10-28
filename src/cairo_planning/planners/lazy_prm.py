@@ -4,6 +4,9 @@ from functools import partial
 import multiprocessing as mp
 import random
 from timeit import default_timer as timer
+from decimal import Decimal, localcontext, ROUND_DOWN
+import time
+import types
 
 import numpy as np
 import igraph as ig
@@ -12,7 +15,10 @@ from cairo_planning.planners.tree import CBiRRT2
 from cairo_planning.local.evaluation import subdivision_evaluate
 from cairo_planning.local.interpolation import cumulative_distance
 from cairo_planning.local.neighbors import NearestNeighbors
-from cairo_planning.planners.parallel_workers import parallel_projection_worker, parallel_cbirrt_worker
+from cairo_planning.planners.parallel_workers import parallel_projection_worker
+from cairo_planning.planners import utils
+from cairo_simulator.core.log import Logger
+
 
 __all__ = ['LazyPRM', 'LazyCPRM']
 
@@ -20,36 +26,46 @@ __all__ = ['LazyPRM', 'LazyCPRM']
 class LazyPRM():
 
     def __init__(self, state_space, state_validity_checker, interpolation_fn, params):
+        self.preloaded = False
         self.graph = ig.Graph()
         self.state_space = state_space
         self.svc = state_validity_checker
         self.interp_fn = interpolation_fn
         self.n_samples = params.get('n_samples', 4000)
-        self.k = params.get('k', 5)
+        self.k = params.get('k', 10)
         self.attempts = params.get('planning_attempts', 5)
         self.ball_radius = params.get('ball_radius', .55)
         self.samples = []
         print("N: {}, k: {}, r: {}".format(
             self.n_samples, self.k, self.ball_radius))
+    
+    def preload(self, samples, graph):
+        self.samples = samples
+        self.graph = graph
+        for sample in self.samples:
+            self.graph.vs[utils.val2idx(self.graph, sample)]['value'] = np.array(sample)
+        self.preloaded = True
 
     def plan(self, q_start, q_goal):
         # Initial sampling of roadmap and NN data structure.
-        print("Initializing roadmap...")
-        self._init_roadmap(q_start, q_goal)
-        if len(self.samples) > 0:
-            print("Using provided samples...")
-        else:
+        if self.preloaded is False:
             print("Generating valid random samples...")
             self.samples = self._generate_samples()
+            print("Initializing roadmap...")
+            self._init_roadmap(q_start, q_goal)
+        else:
+            print("Adding start and goal points into existing graph structure..")
+            self._init_roadmap(q_start, q_goal)
         # Create NN datastructure
         print("Creating NN datastructure...")
         self.nn = NearestNeighbors(X=np.array(
             self.samples), model_kwargs={"leaf_size": 100})
         # Generate NN connectivity.
-        print("Generating nearest neighbor connectivity...")
-        self.connections = self._generate_connections(samples=self.samples)
-        print("Generating graph from samples and connections...")
-        self._build_graph(self.samples, self.connections)
+        if self.preloaded is False:
+            print("Generating nearest neighbor connectivity...")
+            self.connections = self._generate_connections(samples=self.samples)
+            print("Generating graph from samples and connections...")
+            self._build_graph(self.samples, self.connections)
         print("Attaching start and end to graph...")
         self._attach_start_and_end()
         print("Finding feasible best path in graph through lazy evaluation if available...")
@@ -126,7 +142,7 @@ class LazyPRM():
                         point_id)]['value']
                     if self._validate(point_value):  # validate the point value
                         # If its valid, set the validity to true to bypass future collision/validity checks.
-                        self.graph.vs.find(self._value_to_name(list(point_value)))[
+                        self.graph.vs.find(utils.val2str(list(point_value)))[
                             'validity'] = True
                     else:
                         # if the point is invalid, then we remove it and associated edges from the graph
@@ -158,7 +174,7 @@ class LazyPRM():
                 # validate the 'to' point value, This is probably redundant right now.
                 if self._validate(to_value):
                     # If its valid, set the validity to true to bypass future collision/validity checks.
-                    self.graph.vs.find(self._value_to_name(list(to_value)))[
+                    self.graph.vs.find(utils.val2str(list(to_value)))[
                         'validity'] = True
                     # generate an interpolated path between 'from' and 'to'
                     segment = self.interp_fn(
@@ -178,10 +194,10 @@ class LazyPRM():
                         if to_id == goal_idx:
                             success = True  # if we made a path to goal, then planning was a success and we can break out
                             break
-                        current_best_plan = self._get_best_path(
-                            self.start_name, self.goal_name)
+                        # current_best_plan = self._get_best_path(
+                        #     self.start_name, self.goal_name)
                     else:
-                        self._remove_edge(self.graph, from_id, to_id)
+                        self._remove_edge(from_id, to_id)
                         current_best_plan = self._get_best_path(
                             self.start_name, self.goal_name)
                         successful_vertex_sequence = []
@@ -203,8 +219,6 @@ class LazyPRM():
             indexed_plan = list(zip(idx_range, plan))
             for curr_idx, vid1 in indexed_plan:
                 for test_idx, vid2 in indexed_plan[::-1]:
-                    v1 = self.graph.vs[vid1]
-                    v2 = self.graph.vs[vid2]
                     p1 = self.graph.vs[vid1]["value"]
                     p2 = self.graph.vs[vid2]["value"]
                     segment = self.interp_fn(
@@ -247,13 +261,18 @@ class LazyPRM():
             graph_idx1, graph_idx2, directed=False, error=True))
 
     def _init_roadmap(self, q_start, q_goal):
-        self.graph.add_vertices(2)
-        # Start is always at the 0 index.
-        self.graph.vs["name"] = [self._value_to_name(
-            list(q_start)), self._value_to_name(list(q_goal))]
-        self.graph.vs["value"] = [list(q_start), list(q_goal)]
-        self.start_name, self.goal_name = self._value_to_name(
-            list(q_start)), self._value_to_name(list(q_goal))
+        self.samples = [q_start, q_goal] + self.samples
+        self.start_name = utils.val2str(q_start)
+        self.goal_name = utils.val2str(q_goal)
+        if 'name' not in self.graph.vs.attributes() or self.start_name not in self.graph.vs['name']:
+            self.graph.add_vertex(self.start_name)
+            self.graph.vs[utils.name2idx(self.graph, self.start_name)]["value"] = q_start
+            self.graph.vs.find(self.start_name)['id'] = self.graph.vs.find(self.start_name).index
+        if 'name' not in self.graph.vs.attributes() or self.goal_name not in self.graph.vs['name']:
+            self.graph.add_vertex(utils.val2str(q_goal))
+            self.graph.vs[utils.name2idx(self.graph, self.goal_name)]["value"] = q_goal
+            self.graph.vs.find(self.goal_name)['id'] = self.graph.vs.find(self.goal_name).index
+
 
     def _generate_samples(self):
         """In the LazyPRM implementation, we do not check for collision / state validity of sampled points until attempting to traverse a path in the graph.
@@ -288,14 +307,14 @@ class LazyPRM():
     def _build_graph(self, samples, connections):
         values = [self.graph.vs.find(self.start_name)["value"],
                   self.graph.vs.find(self.goal_name)["value"]] + samples
-        str_values = [self._value_to_name(list(value)) for value in values]
+        str_values = [utils.val2str(list(value)) for value in values]
         values = [list(value) for value in values]
         self.graph.add_vertices(len(values))
         self.graph.vs["name"] = str_values
         self.graph.vs["value"] = values
         self.graph.vs['id'] = list(range(0, self.graph.vcount()))
         # This below step is BY FAR the slowest part of the the graph building since it has to do lookups by attribute which is quite slow for python igrpah.
-        edges = [(self._idx_of_point(self._value_to_name(c[0])), self._idx_of_point(self._value_to_name(c[1])))
+        edges = [(utils.name2idx(self.graph, utils.val2str(c[0])), utils.name2idx(self.graph, utils.val2str(c[1])))
                  for c in connections]
         weights = [c[2] for c in connections]
         self.graph.add_edges(edges)
@@ -310,14 +329,14 @@ class LazyPRM():
         start_added = False
         end_added = False
         for q_near in self._neighbors(start_value, k_override=30, within_ball=True):
-            if self._idx_of_point(self._value_to_name(q_near)) != 0:
+            if utils.name2idx(self.graph, utils.val2str(q_near)) != 0:
                 successful, local_path = self._extend(start_value, q_near)
                 if successful:
                     start_added = True
                     self._add_edge_to_graph(
                         start_value, q_near, self._weight(local_path))
         for q_near in self._neighbors(end_value, k_override=30, within_ball=True):
-            if self._idx_of_point(self._value_to_name(q_near)) != 1:
+            if utils.name2idx(self.graph, utils.val2str(q_near)) != 1:
                 successful, local_path = self._extend(q_near, end_value)
                 if successful:
                     end_added = True
@@ -336,7 +355,7 @@ class LazyPRM():
 
     def _validate(self, sample):
         # We keep track of whether or not a node is valid.
-        if self.graph.vs.find(self._value_to_name(list(sample))).attributes().get('validity', False) == True:
+        if self.graph.vs.find(utils.val2str(list(sample))).attributes().get('validity', False) == True:
             return True
         else:
             return self.svc.validate(sample)
@@ -370,9 +389,9 @@ class LazyPRM():
         return np.array(self.state_space.sample())
 
     def _add_edge_to_graph(self, q_near, q_sample, edge_weight):
-        q_near_idx = self._idx_of_point(self._value_to_name(q_near))
-        q_sample_idx = self._idx_of_point(
-            self._value_to_name(q_sample))
+        q_near_idx = utils.name2idx(self.graph, utils.val2str(q_near))
+        q_sample_idx = utils.name2idx(self.graph,
+            utils.val2str(q_sample))
         if tuple(sorted([q_near_idx, q_sample_idx])) not in set([tuple(sorted(edge.tuple)) for edge in self.graph.es]):
             self.graph.add_edge(q_near_idx, q_sample_idx,
                                 **{'weight': edge_weight})
@@ -380,16 +399,11 @@ class LazyPRM():
     def _weight(self, local_path):
         return cumulative_distance(local_path)
 
-    def _idx_of_point(self, name):
-        return self.graph.vs.find(name).index
-
-    def _value_to_name(self, value):
-        return str(["{:.4f}".format(val) for val in value])
-
 
 class LazyCPRM():
 
-    def __init__(self, sim_context_cls, sim_config, robot, tsr, state_space, tree_state_space, state_validity_checker, interpolation_fn, params, tree_params):
+    def __init__(self, sim_context_cls, sim_config, robot, tsr, state_space, tree_state_space, state_validity_checker, interpolation_fn, params, tree_params, logger = None):
+        self.preloaded = False
         self.sim_context = sim_context_cls
         self.sim_config = sim_config
         self.robot = robot
@@ -401,41 +415,78 @@ class LazyCPRM():
         self.n_samples = params.get('n_samples', 600)
         self.k = params.get('k', 5)
         self.ball_radius = params.get('ball_radius', .55)
+        self.smooth_path = params.get('smooth_path', False)
+        self.smoothing_time = params.get('smoothing_time', 10)
+        self.cbirrt2_sampling_space = params.get('cbirrt2_sampling_space', 'hyperball')
         self.tree_params = tree_params
+        self.tree_params['smooth_path'] = False
+        self.tree_params['log_level'] = 'info'
+        self.cbirrt2 = CBiRRT2(self.robot, self.tree_state_space,
+                          self.svc, self.interp_fn, params=self.tree_params)
         self.graph = ig.Graph()
         self.samples = []
-        print("PRM Params: N: {}, k: {}, r: {}".format(
-            self.n_samples, self.k, self.ball_radius))
+        self.log =  logger if logger is not None else Logger(name='LazyCPRM', handlers=['logging'], level=params.get('log_level', 'debug'))
+        self.log.debug("LazyCPRM Params: N: {}, k: {}, r: {}, smoothing: {}, smoothing_time: {}".format(
+            self.n_samples, self.k, self.ball_radius, self.smooth_path, self.smoothing_time))
+
+    def preload(self, samples, graph):
+        self.samples = []
+        self.graph = graph
+        for sample in samples:
+            if utils.val2idx(self.graph, sample) is not None:
+                try:
+                    self.graph.vs[utils.val2idx(self.graph, sample)]['value'] = np.array(sample)
+                    self.samples.append(np.array(sample))
+                except TypeError as e:
+                    print(e)
+        self.preloaded = True
 
     def plan(self, q_start, q_goal):
+        if not self.svc.validate(q_start) and not self.svc.validate(q_goal):
+            raise Exception("Starting and ending for planning is invalid according to state validity checker.)")
+        if not self.svc.validate(q_start):
+            raise Exception("Starting point for planning is invalid according to state validity checker.")
+        if not self.svc.validate(q_goal):
+                    raise Exception("Ending point for planning is invalid according to state validity checker.)")
+        self.generate_roadmap(q_start, q_goal)
+        self.log.debug("Finding feasible best path in graph if available...")
+        vertex_sequence, path = self.get_lazy_path()
+        self.log.debug(vertex_sequence)
+        if self.smooth_path:
+            self.log.debug("Smoothing path...")
+            vertex_sequence, path = self._smooth_path(vertex_sequence, self.smoothing_time)
+        return path
+    
+    def generate_roadmap(self, q_start, q_goal):
         # Initial sampling of roadmap and NN data structure.
-        print("Initializing roadmap...")
-        self._init_roadmap(q_start, q_goal)
-        print("Generating valid random samples...")
-        if len(self.samples) > 0:
-            print("Using provided samples...")
-        else:
-            print("Generating valid random samples...")
+        if self.preloaded is False:
+            self.log.debug("Generating valid random samples...")
             if self.n_samples <= 100:
                 self.samples = self._generate_samples()
             else:
                 self.samples = self._generate_samples_parallel()
-        print("Attaching start and end to graph...")
-        self._attach_start_and_end()
+            self.log.debug("Initializing roadmap with start and goal...")
+            self._init_roadmap(q_start, q_goal)
+            self.log.debug(len(self.graph.vs))
+        else:
+            self.log.debug("Using provided samples...")
+            self.log.debug("Initializing roadmap with start and goal...")
+            self._init_roadmap(q_start, q_goal)
+        # print("Attaching start and end to graph...")
+        # # self._attach_start_and_end()
         # Create NN datastructure
-        print("Creating NN datastructure...")
+        self.log.debug("Creating NN datastructure...")
         self.nn = NearestNeighbors(X=np.array(
             self.samples), model_kwargs={"leaf_size": 100})
         # Generate NN connectivity.
-        print("Generating nearest neighbor connectivity...")
-        connections = self._generate_connections(samples=self.samples)
-        # Build the graph structure...
-        print("Building graph")
-        self._build_graph(self.samples, connections)
-        print("Finding feasible best path in graph if available...")
-        vertex_sequence, path = self.get_lazy_path()
-        print(vertex_sequence)
-        return path
+        if self.preloaded is False:
+            self.log.debug("Generating nearest neighbor connectivity...")
+            connections = self._generate_connections(samples=self.samples)
+            # Build the graph structure...
+            self.log.debug("Building graph")
+            self._build_graph(self.samples, connections)
+        else:
+            self.log.debug("Using provided graph...")
 
     def get_path(self, plan):
         points = [self.graph.vs[idx]['value'] for idx in plan]
@@ -459,10 +510,12 @@ class LazyCPRM():
             self.start_name, self.goal_name)
         while not success:
             if current_best_plan is None or len(current_best_plan) == 1:
-                return []
+                return [], []
 
             invalid_path = True  # we assume an invalid path
             while invalid_path:
+                # FIRST: Evaluate the nodes in the sequence for state validity
+
                 # indicator that there was an invalid node. For now we say there are no invalid nodes since hope is all nodes are valid.
                 invalid_node = False
                 # first lets validate points randomly in the path random
@@ -471,19 +524,22 @@ class LazyCPRM():
                 for point_id in shuffled_plan:
                     point_value = self.graph.vs[self.graph.vs['id'].index(
                         point_id)]['value']
-                    if self._validate(point_value):  # validate the point value
-                        # If its valid, set the validity to true to bypass future collision/validity checks.
-                        self.graph.vs.find(self._val2name(list(point_value)))[
-                            'validity'] = True
-                    else:
-                        # if the point is invalid, then we remove it and associated edges from the graph
-                        self.graph.delete_vertices(point_id)
-                        invalid_node = True
+                    # We don't need to run validity check if the point is valid.
+                    if not self.graph.vs.find(utils.val2str(list(point_value))).attributes().get('validity', False) is True:
+                        if self._validate(point_value):  # validate the point value
+                            # If its valid, set the validity to true to bypass future collision/validity checks.
+                            self.graph.vs.find(utils.val2str(list(point_value)))[
+                                'validity'] = True
+                        else:
+                            # if the point is invalid, then we remove it and associated edges from the graph
+                            self.graph.delete_vertices(self.graph.vs['id'].index(
+                            point_id))
+                            invalid_node = True
                 if invalid_node:  # if there was an invalid node, we find a new path and keep the loop going.
                     current_best_plan = self._get_best_path(
                         self.start_name, self.goal_name)
                     if current_best_plan is None or len(current_best_plan) == 1:
-                        return []
+                        return [], []
                 else:
                     # since there was no invalid path after looping, then this current_best_path is ready for edge checking.
                     invalid_path = False
@@ -503,27 +559,34 @@ class LazyCPRM():
                 if to_id in successful_vertex_sequence:
                     continue
                 # validate the 'to' point value, This is probably redundant right now.
-                if self._validate(to_value):
+                if self.graph.vs.find(utils.val2str(list(to_value)))[
+                        'validity'] is True or self._validate(to_value):
                     # If its valid, set the validity to true to bypass future collision/validity checks.
-                    self.graph.vs.find(self._val2name(list(to_value)))[
+                    self.graph.vs.find(utils.val2str(list(to_value)))[
                         'validity'] = True
-                    # generate an interpolated path between 'from' and 'to'
-                    success, segment = self._cbirrt2_connect(
-                        np.array(from_value), np.array(to_value))
-                    # perform segment evaluation for state validity etc
+                   
                     valid = False
-                    if success and self.graph.es[self.graph.get_eid(self.graph.vs['id'].index(from_id), self.graph.vs['id'].index(to_id))].attributes().get('validity', False):
+                    # first check if edge has been evaluated before ever running the expensive CBiRRT2
+                    if self.graph.es[self.graph.get_eid(self.graph.vs['id'].index(from_id), self.graph.vs['id'].index(to_id))].attributes().get('validity', False):
                         valid = True
-                    elif success:
-                        valid = subdivision_evaluate(
-                            self.svc.validate, segment)
-                    else:
-                        valid = False
+
+                    # lets try for itnerpolation first before running the expensive CBiRRT2
+                    _, segment = self._extend(from_value, to_value)
+                    segment = list(segment)
+                    valid = subdivision_evaluate(self.svc.validate, segment)
+                    if not valid:
+                         # generate an local path using CBiRRT2 between 'from_value' and 'to_value'
+                        success, segment = self._cbirrt2_connect(
+                            np.array(from_value), np.array(to_value))
+                        # perform segment evaluation for state validity etc
+                        if success:
+                            valid = subdivision_evaluate(self.svc.validate, segment)
+                        else:
+                            valid = False
                     if valid:
                         # if valid, we add the 'to' vertex id since we know we can reach it
                         successful_vertex_sequence.append(to_id)
-                        self.graph.es[self.graph.get_eid(self.graph.vs['id'].index(
-                            from_id), self.graph.vs['id'].index(to_id))]['validity'] = True
+                        self.graph.es[self.graph.get_eid(self.graph.vs['id'].index(from_id), self.graph.vs['id'].index(to_id))]['validity'] = True
                         goal_idx = self.graph.vs.find(self.goal_name).index
                         path = path + segment
                         if to_id == goal_idx:
@@ -532,7 +595,8 @@ class LazyCPRM():
                         current_best_plan = self._get_best_path(
                             self.start_name, self.goal_name)
                     else:
-                        self._remove_edge(self.graph, from_id, to_id)
+                        # edge could not be made so we remove it.
+                        self._remove_edge(from_id, to_id)
                         current_best_plan = self._get_best_path(
                             self.start_name, self.goal_name)
                         successful_vertex_sequence = []
@@ -547,6 +611,54 @@ class LazyCPRM():
         successful_vertex_sequence.insert(
             0, self.graph.vs.find(self.start_name).index)
         return [self.graph.vs['id'].index(_id) for _id in successful_vertex_sequence], path
+    
+    def _smooth_path(self, vertex_sequence, smoothing_time=10):
+        # create empty tree. 
+        smoothing_tree = ig.Graph(directed=True)
+        smoothing_tree['name'] = 'smoothing'
+        start_time = time.time()
+
+        number_of_shortcuts = 0
+        while True:
+            current_time = time.time()
+            elapsed_time = current_time - start_time
+
+            if elapsed_time > smoothing_time:
+                self.log.debug("Finished smoothing iterations in: " + str(int(elapsed_time))  + " seconds")
+                break
+            # Get two random indeces from path
+            rand_idx1, rand_idx2 = random.sample(vertex_sequence, 2)
+            if vertex_sequence.index(rand_idx1) > vertex_sequence.index(rand_idx2):
+                continue
+            q_old = self.graph.vs[rand_idx1]['value']
+            q_s = self.graph.vs[rand_idx2]['value']
+            # add points into tree
+            # self._add_vertex(smoothing_tree, q_old)
+            # self._add_vertex(smoothing_tree, q_s)
+            # q_old_name = self._val2str(q_old)
+            # q_old_idx = utils.name2idx(smoothing_tree, q_old_name)
+            # q_s_name = self._val2str(q_s)
+            # q_s_idx = utils.name2idx(smoothing_tree, q_s_name)
+            # constrain extended.
+            success, smoothed_path_values = self._cbirrt2_connect(q_old, q_s)
+            if success:
+                # smoothed_path_values = [smoothing_tree.vs[idx] for idx in self._extract_graph_path(smoothing_tree, q_old_idx, q_s_idx)]
+                curr_path_values = [self.graph.vs[idx]['value'] for idx in self._get_graph_path(rand_idx1, rand_idx2)]
+                smoothed_path_value_pairs = [(smoothed_path_values[i], smoothed_path_values[(i + 1) % len(smoothed_path_values)]) for i in range(len(smoothed_path_values))][:-1]
+                curr_path_values_pairs = [(curr_path_values[i], curr_path_values[(i + 1) % len(curr_path_values)]) for i in range(len(curr_path_values))][:-1]
+                smooth_path_distance = sum([self._distance(pair[0], pair[1]) for pair in smoothed_path_value_pairs])
+                curr_path_distance = sum([self._distance(pair[0], pair[1]) for pair in curr_path_values_pairs])
+
+                # if the newly found path between indices is shorter, lets use it and add it do the graph
+                if smooth_path_distance < curr_path_distance:
+                    number_of_shortcuts += 1
+                    for q in smoothed_path_values:
+                        self._add_vertex(self.graph, q)
+                    for pair in smoothed_path_value_pairs:
+                        self._add_edge(self.graph, pair[0], pair[1], self._distance(pair[0], pair[1]))
+        self.log.debug("Number of shortcuts made during smoothing: {}".format(number_of_shortcuts))
+        new_best_vertex_sequence = self._get_graph_path()
+        return [self.graph.vs['id'].index(_id) for _id in new_best_vertex_sequence], [self.graph.vs[_id]['value'] for _id in new_best_vertex_sequence]
 
     def _get_best_path(self, start_name, end_name):
         graph_idxs = self.graph.get_shortest_paths(
@@ -557,8 +669,14 @@ class LazyCPRM():
         else:
             return best_path
 
-    def _get_graph_path(self):
-        return self.graph.get_shortest_paths(self._name2idx(self.graph, self.start_name), self._name2idx(self.graph, self.goal_name), weights='weight', mode='ALL')[0]
+    def _get_graph_path(self, from_idx=None, to_idx=None):
+        if from_idx is None or to_idx is None:
+            from_idx = utils.name2idx(self.graph, self.start_name)
+            to_idx = utils.name2idx(self.graph, self.goal_name)
+        if 'weight' in self.graph.es.attributes():
+            return self.graph.get_shortest_paths(from_idx, to_idx, weights='weight', mode='OUT')[0]
+        else:
+            return self.graph.get_shortest_paths(from_idx, to_idx, mode='OUT')[0]
 
     def _init_roadmap(self, q_start, q_goal):
         """
@@ -568,18 +686,22 @@ class LazyCPRM():
             q_start (array-like): The starting configuration.
             q_goal (array-like): The goal configuration.
         """
-        self.start_name = self._val2name(q_start)
-        self.goal_name = self._val2name(q_goal)
-        self.graph.add_vertex(self.start_name)
-        # Start is always at the 0 index.
-        self.graph.vs[0]["value"] = q_start
-        self.graph.add_vertex(self._val2name(q_goal))
-        # Goal is always at the 1 index.
-        self.graph.vs[1]["value"] = q_goal
+        self.samples = [q_start, q_goal] + self.samples
+        self.start_name = utils.val2str(q_start)
+        self.goal_name = utils.val2str(q_goal)
+        if 'name' not in self.graph.vs.attributes() or self.start_name not in self.graph.vs['name']:
+            self.graph.add_vertex(self.start_name)
+            self.graph.vs[utils.name2idx(self.graph, self.start_name)]["value"] = q_start
+            self.graph.vs.find(self.start_name)['id'] = self.graph.vs.find(self.start_name).index
+        if 'name' not in self.graph.vs.attributes() or self.goal_name not in self.graph.vs['name']:
+            self.graph.add_vertex(utils.val2str(q_goal))
+            self.graph.vs[utils.name2idx(self.graph, self.goal_name)]["value"] = q_goal
+            self.graph.vs.find(self.goal_name)['id'] = self.graph.vs.find(self.goal_name).index
+
 
     def _attach_start_and_end(self):
-        start = self.graph.vs[self._name2idx(self.graph, self.start_name)]['value']
-        end = self.graph.vs[self._name2idx(self.graph, self.goal_name)]['value']
+        start = self.graph.vs[utils.name2idx(self.graph, self.start_name)]['value']
+        end = self.graph.vs[utils.name2idx(self.graph, self.goal_name)]['value']
         self.samples = self.samples + [start, end]
         
 
@@ -593,7 +715,7 @@ class LazyCPRM():
             if np.any(q_rand):
                 if self._validate(q_rand):
                     if count % 100 == 0:
-                        print("{} valid samples...".format(count))
+                        self.log.debug("{} valid samples...".format(count))
                     valid_samples.append(q_rand)
                     count += 1
                     # sampling_times.append(timer() - start_time)
@@ -604,10 +726,10 @@ class LazyCPRM():
         num_workers = mp.cpu_count()
         samples_per_worker = int(self.n_samples / num_workers)
         worker_fn = partial(
-            parallel_projection_worker, sim_context_cls=self.sim_context, sim_config=self.sim_config, tsr=self.tsr)
+            parallel_projection_worker, sim_context_cls=self.sim_context, sim_config=self.sim_config)
         with mp.get_context("spawn").Pool(num_workers) as p:
             results = p.map(worker_fn, [samples_per_worker] * num_workers)
-            return list(itertools.chain.from_iterable(results))
+            return list(itertools.chain.from_iterable(results))[0:self.n_samples]
 
     def _generate_connections(self, samples):
         connections = []
@@ -618,20 +740,19 @@ class LazyCPRM():
                 if valid:
                     connections.append(
                         [q_neighbor, q_rand, self._weight(local_path)])
-        print("{} connections out of {} samples".format(
+        self.log.debug("{} connections out of {} samples".format(
             len(connections), len(samples)))
         return connections
 
     def _build_graph(self, samples, connections):
-        values = [self.graph.vs.find(self.start_name)["value"],
-                  self.graph.vs.find(self.goal_name)["value"]] + samples
-        str_values = [self._val2name(list(value)) for value in values]
-        values = [list(value) for value in values]
-        self.graph.add_vertices(len(values))
+        str_values = [utils.val2str(list(value)) for value in samples]
+        values = [list(value) for value in samples]
+        # we add a bunch of new vertices for the sampled points, but we already have the graph initialized with two points (start and goal)
+        self.graph.add_vertices(len(values)-2)
         self.graph.vs["name"] = str_values
         self.graph.vs["value"] = values
-        self.graph.vs['id'] = list(range(0, self.graph.vcount()))
-        edges = [(self._val2idx(self.graph, c[0]), self._val2idx(self.graph, c[1]))
+        self.graph.vs['id'] = [v.index for v in self.graph.vs]
+        edges = [(utils.val2idx(self.graph, c[0]), utils.val2idx(self.graph, c[1]))
                  for c in connections]
         weights = [c[2] for c in connections]
         self.graph.add_edges(edges)
@@ -653,65 +774,23 @@ class LazyCPRM():
         local_path = self.interp_fn(np.array(q_near), np.array(q_rand))
         return True, local_path
 
-    
-    # def _generate_connections_parallel(self, samples):
-    #     evaluated_name_pairs = []
-    #     point_pairs = []
-    #     for q_rand in samples:
-    #         for q_neighbor in self._neighbors(q_rand):
-    #             if (self._val2name(q_rand), self._val2name(q_neighbor)) not in evaluated_name_pairs and (self._val2name(q_neighbor), self._val2name(q_rand)) not in evaluated_name_pairs:
-    #                 point_pairs.append((q_rand, q_neighbor))
-    #                 evaluated_name_pairs.append(
-    #                     (self._val2name(q_rand), self._val2name(q_neighbor)))
-    #                 evaluated_name_pairs.append(
-    #                     (self._val2name(q_neighbor), self._val2name(q_rand)))
-    #     num_workers = mp.cpu_count()
-    #     batches = np.array_split(point_pairs, num_workers)
-    #     worker_fn = partial(
-    #         parallel_cbirrt_worker, sim_context_cls=self.sim_context, sim_config=self.sim_config, tsr=self.tsr, tree_state_space=self.tree_state_space, interp_fn=self.interp_fn, tree_params=self.tree_params)
-    #     with mp.get_context("spawn").Pool(num_workers) as p:
-    #         batch_results = p.map(worker_fn, batches)
-    #         # for each set of result, we have a dictionary indexed by the evaluated_name_pairs.
-    #         # the value of each dictionary is a dictionary with keys 'points' and 'edges'
-    #         # the points are the actual points and the edges are the edges between points needed between points.
-    #         # we have to add the points to the graphs, then created edges betweenthem.
-    #         results = {}
-    #         for result in batch_results:
-    #             for named_value_tuple, value in result.items():
-    #                 results[named_value_tuple] = value
-
-    #         for named_tuple in evaluated_name_pairs:
-    #             connection = results.get(named_tuple, None)
-    #             if connection is not None:
-    #                 for point in connection['points']:
-    #                     self._add_vertex(self.graph, point)
-    #                 for edge in connection['edges']:
-    #                     self._add_edge(
-    #                         self.graph, edge[0], edge[1], self._distance(edge[0], edge[1]))
 
     def _cbirrt2_connect(self, q_near, q_target):
-        centroid = (np.array(q_near) + np.array(q_target)) / 2
-        radius = self._distance(np.array(q_near), np.array(q_target)) / 2
+        self.cbirrt2.reset_planner()
 
-        def _random_config(self):
-            return self.state_space.sample(centroid=centroid, radius=radius)
+        if self.cbirrt2_sampling_space == 'hyperball':
+            centroid = (np.array(q_near) + np.array(q_target)) / 2
+            radius = self._distance(np.array(q_near), np.array(q_target)) / 2
 
-        # monkey-patch goodness to allow for a special type of sampling via hyperball between, and containing q_near and q_target:
-        CBiRRT2._random_config = _random_config
+            def _random_config(self):
+                return self.state_space.sample(centroid=centroid, radius=radius)
 
-        cbirrt2 = CBiRRT2(self.robot, self.tree_state_space,
-                          self.svc, self.interp_fn, params=self.tree_params)
+            self.cbirrt2._random_config  = types.MethodType(_random_config, self.cbirrt2)
 
-        graph_plan = cbirrt2.plan(self.tsr, q_near, q_target)
-        if graph_plan is not None:
-            points = [cbirrt2.connected_tree.vs[idx]['value']
+        graph_plan = self.cbirrt2.plan(self.tsr, q_near, q_target)
+        if graph_plan is not None and len(graph_plan) > 1:
+            points = [self.cbirrt2.connected_tree.vs[idx]['value']
                       for idx in graph_plan]
-            edges = list(zip(points, points[1:]))
-            for point in points:
-                self._add_vertex(self.graph, point)
-            for e in edges:
-                self._add_edge(self.graph, e[0],
-                               e[1], self._distance(e[0], e[1]))
             return True, points
         else:
             return False, []
@@ -736,51 +815,42 @@ class LazyCPRM():
                 list(zip(distances, neighbors)), key=lambda x: x[0]) if distance > 0]
 
     def _add_vertex(self, graph, q):
-        start_val2name = self._val2name(self.graph.vs[self._name2idx(graph, self.start_name)]['value'])
-        goal_val2name = self._val2name(self.graph.vs[self._name2idx(graph, self.goal_name)]['value'])
-        if not self._val2name(q) in graph.vs['name']:
-            if self._val2name(q) != start_val2name and self._val2name(q) != goal_val2name:
-                graph.add_vertex(self._val2name(q), **{'value': q})
+        start_val2name = utils.val2str(self.graph.vs[utils.name2idx(graph, self.start_name)]['value'])
+        goal_val2name = utils.val2str(self.graph.vs[utils.name2idx(graph, self.goal_name)]['value'])
+        if not utils.val2str(q) in graph.vs['name']:
+            if utils.val2str(q) != start_val2name and utils.val2str(q) != goal_val2name:
+                graph.add_vertex(utils.val2str(q), **{'value': q})
+                graph.vs[utils.val2idx(graph, q)]['id'] = utils.val2idx(graph, q)
     
     def _remove_edge(self, vidx1, vidx2):
-        print(vidx1, vidx2)
-        start_val2name = self._val2name(self.graph.vs[self._name2idx(self.graph, self.start_name)]['value'])
-        goal_val2name = self._val2name(self.graph.vs[self._name2idx(self.graph, self.goal_name)]['value'])
+        start_val2name = utils.val2str(self.graph.vs[utils.name2idx(self.graph, self.start_name)]['value'])
+        goal_val2name = utils.val2str(self.graph.vs[utils.name2idx(self.graph, self.goal_name)]['value'])
         graph_idx1 = self.graph.vs['id'].index(vidx1)
         graph_idx2 = self.graph.vs['id'].index(vidx2)
-        if self._val2name(q1) not in [start_val2name, goal_val2name] and self._val2name(q2) not in [start_val2name, goal_val2name]:
+        if self.graph.vs[graph_idx1]['name'] not in [start_val2name, goal_val2name] and self.graph.vs[graph_idx2]['name'] not in [start_val2name, goal_val2name]:
             self.graph.delete_edges(self.graph.get_eid(
                 graph_idx1, graph_idx2, directed=False, error=True))
 
     def _add_edge(self, graph, q_from, q_to, weight):
-        start_val2name = self._val2name(self.graph.vs[self._name2idx(graph, self.start_name)]['value'])
-        goal_val2name = self._val2name(self.graph.vs[self._name2idx(graph, self.goal_name)]['value'])
-        if self._val2name(q_from) == start_val2name:
-            q_from_idx = self._name2idx(graph, self.start_name)
-        elif self._val2name(q_from) == goal_val2name:
-            q_from_idx = self._name2idx(graph, self.goal_name)
+        start_val2name = utils.val2str(self.graph.vs[utils.name2idx(graph, self.start_name)]['value'])
+        goal_val2name = utils.val2str(self.graph.vs[utils.name2idx(graph, self.goal_name)]['value'])
+        if utils.val2str(q_from) == start_val2name:
+            q_from_idx = utils.name2idx(graph, self.start_name)
+        elif utils.val2str(q_from) == goal_val2name:
+            q_from_idx = utils.name2idx(graph, self.goal_name)
         else:
-            q_from_idx = self._val2idx(graph, q_from)
-        if self._val2name(q_to) == start_val2name:
-            q_to_idx = self._name2idx(graph, self.start_name)
-        elif self._val2name(q_to) == goal_val2name:
-            q_to_idx = self._name2idx(graph, self.goal_name)
+            q_from_idx = utils.val2idx(graph, q_from)
+        if utils.val2str(q_to) == start_val2name:
+            q_to_idx = utils.name2idx(graph, self.start_name)
+        elif utils.val2str(q_to) == goal_val2name:
+            q_to_idx = utils.name2idx(graph, self.goal_name)
         else:
-            q_to_idx = self._val2idx(graph, q_to)
+            q_to_idx = utils.val2idx(graph, q_to)
         if tuple(sorted([q_from_idx, q_to_idx])) not in set([tuple(sorted(edge.tuple)) for edge in graph.es]):
             graph.add_edge(q_from_idx, q_to_idx, **{'weight': weight})
 
     def _delete_vertex(self, graph, value):
-        graph.delete_vertices(self._val2name(value))
-
-    def _val2idx(self, graph, value):
-        return self._name2idx(graph, self._val2name(value))
-
-    def _name2idx(self, graph, name):
-        return graph.vs.find(name).index
-
-    def _val2name(self, value):
-        return str(["{:.4f}".format(val) for val in value])
+        graph.delete_vertices(utils.val2str(value))
 
     def _weight(self, local_path):
         return cumulative_distance(local_path)

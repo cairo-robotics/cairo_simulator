@@ -7,7 +7,7 @@ if os.environ.get('ROS_DISTRO'):
 
 class Logger():
 
-    def __init__(self, handlers=['stdout'], level='debug'):
+    def __init__(self, name="cairo_sim", handlers=['stdout'], level='debug'):
         self.level = level
         self.handlers = handlers
         if 'logging' in handlers:
@@ -19,13 +19,14 @@ class Logger():
                 "crit": logging.CRITICAL
             }
             
-            self.logger = logging.getLogger("cairo_sim")
+            self.logger = logging.getLogger(name)
             formatter = logging.Formatter('[%(asctime)s - %(name)s - %(levelname)s] - %(message)s')
-            handler = logging.StreamHandler(stream=sys.stdout)
-            handler.setLevel(levels[self.level])
-            handler.setFormatter(formatter)
-            self.logger.addHandler(handler)
             self.logger.setLevel(levels[self.level])
+            if not self.logger.hasHandlers():
+                handler = logging.StreamHandler(stream=sys.stdout)
+                handler.setLevel(levels[self.level])
+                handler.setFormatter(formatter)
+                self.logger.addHandler(handler)
 
         for handler in self.handlers:
             if handler not in ['stdout', 'logging', 'ros']:
@@ -34,7 +35,8 @@ class Logger():
     def add_handler(self, handle):
         self.handlers.append(handle)
 
-    def debug(self, msg):
+    def debug(self, msg=None):
+        msg = '' if msg is None else msg
         if 'stdout' in self.handlers:
             print(msg)
         if 'ros' in self.handlers:
@@ -43,6 +45,7 @@ class Logger():
             self.logger.debug(msg)
 
     def info(self, msg):
+        msg = '' if msg is None else msg
         if 'stdout' in self.handlers:
             print(msg)
         if 'ros' in self.handlers:
@@ -51,6 +54,7 @@ class Logger():
             self.logger.info(msg)
 
     def warn(self, msg):
+        msg = '' if msg is None else msg
         if 'stdout' in self.handlers:
             print(msg)
         if 'ros' in self.handlers:
@@ -59,6 +63,7 @@ class Logger():
             self.logger.warning(msg)
 
     def err(self, msg):
+        msg = '' if msg is None else msg
         if 'stdout' in self.handlers:
             print(msg)
         if 'ros' in self.handlers:
@@ -67,6 +72,7 @@ class Logger():
             self.logger.error(msg)
 
     def crit(self, msg):
+        msg = '' if msg is None else msg
         if 'stdout' in self.handlers:
             print(msg)
         if 'ros' in self.handlers:

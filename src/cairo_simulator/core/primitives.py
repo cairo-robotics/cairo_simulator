@@ -8,6 +8,8 @@ from cairo_simulator.core.simulator import SimObject
 
 RGBA = namedtuple('RGBA', ['red', 'green', 'blue', 'alpha'])
 BLUE = RGBA(0, 0, 1, 1)
+YELLOW = RGBA(1, 1, 0, 1)
+PURPLE = RGBA(1, 0, 1, 1)
 
 def rpy2quat(rpy, degrees=False):
     """
@@ -105,7 +107,7 @@ def create_box(w, l, h, mass=0, color=BLUE, **kwargs):
     collision_id, visual_id = create_shape(get_box_geometry(w, l, h), color=color, **kwargs)
     return create_body(collision_id, visual_id, mass=mass)
 
-def create_cylinder(radius, height, mass=0, color=BLUE, **kwargs):
+def create_cylinder(radius, height, mass=0, color=YELLOW, **kwargs):
     collision_id, visual_id = create_shape(get_cylinder_geometry(radius, height), color=color, **kwargs)
     return create_body(collision_id, visual_id, mass=mass)
 
@@ -113,7 +115,7 @@ def create_capsule(radius, height, mass=0, color=BLUE, **kwargs):
     collision_id, visual_id = create_shape(get_capsule_geometry(radius, height), color=color, **kwargs)
     return create_body(collision_id, visual_id, mass=mass)
 
-def create_sphere(radius, mass=0, color=BLUE, **kwargs):
+def create_sphere(radius, mass=0, color=PURPLE, **kwargs):
     collision_id, visual_id = create_shape(get_sphere_geometry(radius), color=color, **kwargs)
     return create_body(collision_id, visual_id, mass=mass)
 
@@ -128,8 +130,9 @@ class PrimitiveBuilder():
             'sphere': create_sphere
         }
     
-    def build(self, configs):
+    def build(self, configs, client=0):
         primitive_fn = self.primitive_type_fn_map[configs['type']]
+        configs['primitive_configs']['client'] = client
         body_id = primitive_fn(**configs['primitive_configs'])
         return SimObject(**configs['sim_object_configs'], model_file_or_sim_id=body_id)
 

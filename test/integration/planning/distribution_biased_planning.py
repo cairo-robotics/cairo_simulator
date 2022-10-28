@@ -102,7 +102,7 @@ if __name__ == "__main__":
     sawyer_robot = sim_context.get_robot()
     svc = sim_context.get_state_validity()
     interp_fn = partial(parametric_lerp, steps=5)
-    sim_obj = SimObject('test', 'r2d2.urdf', (.6, 0.0, .6), fixed_base=1)
+    # sim_obj = SimObject('test', 'r2d2.urdf', (.6, 0.0, .6), fixed_base=1)
 
 
     initial_start_point = planning_G.nodes[list(planning_G.nodes)[0]]['point']

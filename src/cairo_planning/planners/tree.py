@@ -1,17 +1,18 @@
 from math import inf
-import itertools
-from functools import partial
 import multiprocessing as mp
 import random
 from timeit import default_timer as timer
+import time
 
 import numpy as np
 import igraph as ig
 
-from cairo_planning.local.evaluation import subdivision_evaluate
-from cairo_planning.local.interpolation import cumulative_distance
-from cairo_planning.local.neighbors import NearestNeighbors
-from cairo_planning.constraints.projection import project_config
+from cairo_planning.constraints.projection import project_config, distance_from_TSR
+from cairo_planning.geometric.transformation import quat2rpy, pose2trans
+
+from cairo_planning.planners import utils
+from cairo_planning.planners.exceptions import MaxItersException, PlanningTimeoutException, OffManifoldInsertException
+from cairo_simulator.core.log import Logger
 
 __all__ = ['CBiRRT2']
 
@@ -19,18 +20,25 @@ __all__ = ['CBiRRT2']
 class CBiRRT2():
 
 
-    def __init__(self, robot, state_space, state_validity_checker, interpolation_fn, params):
+    def __init__(self, robot, state_space, state_validity_checker, interpolation_fn, params, logger=None):
+        self.tree = ig.Graph(directed=True)
         self.forwards_tree = ig.Graph(directed=True)
         self.backwards_tree = ig.Graph(directed=True)
         self.robot = robot
         self.state_space = state_space
         self.svc = state_validity_checker
         self.interp_fn = interpolation_fn
-        self.q_step = params.get('q_step', .12)
+        self.smooth_path = params.get('smooth_path', False)
+        self.q_step = params.get('q_step', .1)
         self.epsilon = params.get('epsilon', .1)
         self.e_step = params.get('e_step', .25)
-        self.iters = params.get('iters', 1000)
-       # print("q_step: {}, epsilon: {}, e_step: {}, BiRRT Iters {}".format(self.q_step, self.epsilon, self.e_step, self.iters))
+        self.iters = params.get('iters', 20000)
+        self.max_planning_time = params.get('max_time', 60)
+        self.smoothing_time = params.get('smoothing_time', 10)
+        self.epsilon_extension_factors = [4, 2]
+        self.allow_off_manifold_endpoints = params.get('off_manifold_endpoints', False)
+        self.log =  logger if logger is not None else Logger(name="CBiRRT2", handlers=['logging'], level=params.get('log_level', 'debug'))
+        self.log.info("q_step: {}, epsilon: {}, e_step: {}, BiRRT Iters {}".format(self.q_step, self.epsilon, self.e_step, self.iters))
     
     def plan(self, tsr, start_q, goal_q):
         """ Top level plan function for CBiRRT2. Trees are first initialized with start and end points, constrained birrt is executed, and the path is smoothed.
@@ -41,17 +49,28 @@ class CBiRRT2():
             start_q (array-like): Starting configuration.
             goal_q (array-like): Ending configuration.
         """
-       # print("Initializing trees...")
+        self.log.debug("Initializing trees...")
+       
         self._initialize_trees(start_q, goal_q)
-        #print("Running Constrained Bidirectional RRT...")
+        if self._equal(start_q, goal_q):
+            self.tree = self._join_trees(self.forwards_tree, start_q, self.backwards_tree, goal_q)
+            return self._extract_graph_path()
+        self.log.debug("Running Constrained Bidirectional RRT...")
         self.tree = self.cbirrt(tsr)
+        print("Size of tree: {}".format(len(self.tree.vs)))
         if self.tree is not None:
-            #print("Extracting path through graph...")
+            self.log.debug("Extracting path through graph...")
             graph_path = self._extract_graph_path()
+            self.log.debug("Graph path length prior to smoothing: {}".format(len(graph_path)))
             if len(graph_path) == 1:
                 return None
             else:
+                if self.smooth_path:
+                    self.log.debug("Smoothing for {} seconds".format(self.smoothing_time))
+                    self._smooth_path(graph_path, tsr, self.smoothing_time)
                 #print("Graph path found: {}".format(graph_path))
+                graph_path = self._extract_graph_path()
+                self.log.debug("Graph path length after smoothing: {}".format(len(graph_path)))
                 return graph_path
         # plan = self.get_plan(graph_path)
         # #self._smooth(path)
@@ -62,28 +81,138 @@ class CBiRRT2():
         continue_to_plan = True
         tree_swp = self._tree_swap_gen()
         a_tree, b_tree = next(tree_swp)
+        
+        if self.allow_off_manifold_endpoints:
+            if not self._within_manifold(self.forwards_tree.vs.find(name=self.start_name)['value'], tsr):
+                self.log.debug("Projecting off-manifold start point onto manifold to insert into forward tree...")
+                self.forwards_tree.vs.find(name=self.start_name)['injected_point'] = True
+                proj_points = self._insert_off_manifold_point(self.forwards_tree, self.forwards_tree.vs.find(name=self.start_name)['value'], tsr, epsilon_factor=self.epsilon_extension_factors[1])
+                n_ext_points = 0
+                for point in proj_points:
+                    ext_points = self._insert_off_manifold_point(self.forwards_tree, point, tsr, epsilon_factor=self.epsilon_extension_factors[0])
+                    n_ext_points += len(ext_points)
+                if len(proj_points) == 0:
+                    self.log.debug("Could not insert off manifold start point!")
+                    raise OffManifoldInsertException("Could not insert off manifold start point!")
+                else:
+                    self.log.debug("Start point injected via {} epsilon relaxed & {} extension points".format(len(proj_points), n_ext_points))
+            if not self._within_manifold(self.backwards_tree.vs.find(name=self.goal_name)['value'], tsr):
+                self.log.debug("Projecting off-manifold end point onto manifold to insert into backwards tree...")
+                self.backwards_tree.vs.find(name=self.goal_name)['injected_point'] = True
+                proj_points = self._insert_off_manifold_point(self.backwards_tree, self.backwards_tree.vs.find(name=self.goal_name)['value'], tsr, epsilon_factor=self.epsilon_extension_factors[1])
+                n_ext_points = 0
+                for point in proj_points:
+                    ext_points = self._insert_off_manifold_point(self.backwards_tree, point, tsr, epsilon_factor=self.epsilon_extension_factors[0])
+                    n_ext_points += len(ext_points)
+                if len(proj_points) == 0:
+                    self.log.debug("Could not insert off manifold end point!")
+                    raise OffManifoldInsertException("Could not insert off manifold end point!")
+                else:
+                    self.log.debug("End point injected via {} relaxed & {} extension points".format(len(proj_points), n_ext_points))
+
+        
+        tick = time.perf_counter()
+
+        # See if interopolated path is valid
+        q_forward_reach, path, interpolation_valid = self._interpolated_extend(self.forwards_tree, tsr, self.start_q, self.goal_q)
+        if interpolation_valid:
+            if self._equal(q_forward_reach, self.goal_q):
+                self._add_vertex(self.forwards_tree, self.goal_q)
+                self._add_edge(self.forwards_tree, q_forward_reach, self.goal_q, self._distance(q_forward_reach, self.goal_q ))
+                return self.forwards_tree 
+        
         while continue_to_plan:
             iters += 1
             if iters > self.iters:
-                return None
+                self.log.debug("Max iters reach...no feasbile plan.")
+                raise MaxItersException("Max CBiRRT2 iterations reached...planning failure.")
+            tock = time.perf_counter()
+            if tock - tick > self.max_planning_time:
+                raise PlanningTimeoutException("Reached max planning time...planning failure!")
             q_rand = self._random_config()
             qa_near = self._neighbors(a_tree, q_rand)  # closest leaf value to q_rand
-            # extend tree at as far as possible to generate qa_reach
-            qa_reach = self._constrained_extend(a_tree, tsr, qa_near, q_rand)
+            
+            # If we're trying to attech / extend to an injected point we relax the TSR requrement by multipling the epsilon tolerance by a factor.
+            if a_tree.vs.find(name=utils.val2str(qa_near))['injected_point']:
+                epsilon_factor = self.epsilon_extension_factors[0]
+            else:
+                epsilon_factor = 1
+       
+            # Try interpolation first:
+            qa_int, path, interpolation_valid = self._interpolated_extend(a_tree, tsr, qa_near, q_rand)
+            if interpolation_valid:
+                qa_reach = qa_int
+            else:
+                # extend tree at as far as possible to generate qa_reach
+                qa_reach, _, valid = self._constrained_extend(a_tree, tsr, qa_near, q_rand, epsilon_factor=epsilon_factor)
+                if not valid:
+                    a_tree, b_tree = next(tree_swp)
+                    continue
             # closest leaf value of B to qa_reach
-            qb_near = self._neighbors(b_tree, qa_reach)  
-            # now tree B is extended as far as possible to qa_reach
-            qb_reach = self._constrained_extend(b_tree, tsr, qb_near, qa_reach)
+            qb_near = self._neighbors(b_tree, qa_reach) 
+            
+            # If we're trying to attech / extend to an injected point we relax the TSR requrement by multipling the epsilon tolerance by a factor.
+            if b_tree.vs.find(name=utils.val2str(qb_near))['injected_point']:
+                epsilon_factor = self.epsilon_extension_factors[0]
+            else:
+                epsilon_factor = 1
+            # Try interpolation first:
+            qb_int, path, interpolation_valid = self._interpolated_extend(b_tree, tsr, qb_near, qa_reach)
+            if interpolation_valid:
+                qb_reach = qb_int
+            else: 
+            # otherwise tree B is extended as far as possible to qa_reach
+                qb_reach, _, valid = self._constrained_extend(b_tree, tsr, qb_near, qa_reach, epsilon_factor=epsilon_factor)
+                if not valid:
+                    a_tree, b_tree = next(tree_swp)
+                    continue
             # if the qa_reach and qb_reach are equivalent, the trees are connectable. 
             if self._equal(qa_reach, qb_reach):
-                # print("Connecting trees...")
                 self.connected_tree = self._join_trees(a_tree, qa_reach, b_tree, qb_reach)
                 return self.connected_tree
             # otherwise we swap trees and repeat.
             else:
                  a_tree, b_tree = next(tree_swp)
+           
     
-    def _constrained_extend(self, tree, tsr, q_near, q_target):
+    def reset_planner(self):
+        self.tree = ig.Graph(directed=True)
+        self.forwards_tree = ig.Graph(directed=True)
+        self.backwards_tree = ig.Graph(directed=True)
+    
+    def _interpolated_extend(self, tree, tsr, q_near, q_target):
+        interpolated_path = list(self.interp_fn(q_near, q_target))
+        
+        for q in interpolated_path:
+            if not self._within_manifold(q, tsr):
+                path_tsr_valid = False
+                break
+            else:
+                path_tsr_valid = True
+                
+        for q in interpolated_path:
+            if not self._validate(q):
+                path_svc_valid = False
+                break
+            else:
+                path_svc_valid = True
+        
+        if path_tsr_valid and path_svc_valid:
+            points_to_add = interpolated_path
+            q_prior = q_near
+            for point in points_to_add:
+                self._add_vertex(tree, point)
+                if tree['name'] == 'forwards' or tree['name'] == 'smoothing':
+                    self._add_edge(tree, q_prior, point, self._distance(q_prior, point))
+                else:
+                    self._add_edge(tree, point, q_prior, self._distance(point, q_prior))
+                q_prior = point
+            return q_target, interpolated_path, True
+        else:
+            return None, [], False
+                  
+    def _constrained_extend(self, tree, tsr, q_near, q_target, epsilon_factor):
+        generated_values = []
         q_s = np.array(q_near)
         qs_old = np.array(q_near)
         iters = 1
@@ -91,52 +220,131 @@ class CBiRRT2():
         while True:
             iters += 1
             if iters >= 1000:
-                return q_s
+                return q_s, generated_values, True
             if self._equal(q_target, q_s):
-                return q_s
+                return q_s, generated_values, True
             # we dont bother to keep a new qs that has traversed further away from the target.
             elif self._distance(q_target, q_s) > self._distance(q_target, qs_old):
-                return qs_old
+                return qs_old, generated_values, True
             # set the qs_old to the current value then update
             qs_old = q_s
             # What this update step does is it moves qs off the manifold towards q_target. And then this is projected back down onto the manifold.
             q_s = q_s + min([self.q_step, self._distance(q_target, q_s)]) * (q_target - q_s) / self._distance(q_target, q_s)
             # More problem sepcific versions of constrained_extend use constraint value information 
-            # constraints = self._get_constraint_values(tree, qs_old) 
-            q_s = self._constrain_config(qs_old=qs_old, q_s=q_s, tsr=tsr)
+            # constraints = self._get_constraint_values(tree, qs_old)
+            
+            q_s = self._constrain_config(qs_old=qs_old, q_s=q_s, tsr=tsr, epsilon_factor=epsilon_factor)
             if q_s is not None:
                 # this function will occasionally osscilate between to projection values.
-                if self._val2str(q_s) in tree.vs['name']:
+                if utils.val2str(q_s) in tree.vs['name']:
                     # If they've already been added, return the current projection value.
-                    return q_s
+                    return q_s, generated_values, True
                 elif abs(self._distance(q_s, q_target) - prior_distance) < .005:
                     # or if the projection can no longer move closer along manifold
-                    return qs_old
+                    return qs_old, generated_values, True
                 prior_distance = self._distance(q_s, q_target)
-                self._add_vertex(tree, q_s)
-                if tree['name'] == 'forwards':
-                    self._add_edge(tree, qs_old, q_s, self._distance(qs_old, q_s))
+                # if q_s is valid AND all of the interpolated points between qs_old and q_s are valid, we add the edge.
+                interp = self.interp_fn(qs_old, q_s)
+                if self._validate(q_s) and all([self._validate(p) for p in interp]):
+                    self._add_vertex(tree, q_s)
+                    generated_values.append(q_s)
+                    if tree['name'] == 'forwards' or tree['name'] == 'smoothing':
+                        self._add_edge(tree, qs_old, q_s, self._distance(qs_old, q_s))
+                    else:
+                        self._add_edge(tree, q_s, qs_old, self._distance(q_s, qs_old))
                 else:
-                    self._add_edge(tree, q_s, qs_old, self._distance(q_s, qs_old))
+                    return qs_old, generated_values, False
             else:
-                return qs_old
+                # the current q_s is not valid or couldn't be projected so we return the last best value qs_old
+                return qs_old, generated_values, False
 
-    def _constrain_config(self, qs_old, q_s, tsr):
+    def _insert_off_manifold_point(self, tree, point, tsr, n=10, epsilon_factor=4):
+        projected_points = []
+        attempts = 0
+        while len(projected_points) < n and attempts < 50:
+            attempts += 1
+            q_constrained = project_config(self.robot, tsr, q_s=point, q_old=point, epsilon=epsilon_factor*self.epsilon, q_step=self.q_step, e_step=self.e_step, iter_count=100, ignore_termination_condtions=True)
+            if q_constrained is not None:
+                projected_points.append(q_constrained)
+        for proj_point in projected_points:
+            self._add_vertex(tree, proj_point)
+            self._add_edge(tree, point, proj_point, self._distance(point, proj_point))
+        return projected_points
+            
+
+    def _constrain_config(self, qs_old, q_s, tsr, epsilon_factor=1):
         # these functions can be very problem specific. For now we'll just assume the most very basic form.
         # futre implementations might favor injecting the constrain_config function 
-        q_constrained = project_config(self.robot, tsr, q_s=q_s, q_old=qs_old, epsilon=self.epsilon, q_step=self.q_step, e_step=self.e_step, iter_count=10000)
+        q_constrained = project_config(self.robot, tsr, q_s=q_s, q_old=qs_old, epsilon=epsilon_factor * self.epsilon, q_step=self.q_step, e_step=self.e_step, iter_count=500, ignore_termination_condtions=False)
         if q_constrained is None:
             return None
-        elif self.svc.validate(q_constrained):
+        if self.svc.validate(q_constrained):
             return q_constrained
         else:
             return None
 
-    def _extract_graph_path(self,):
-        if 'weight' in self.tree.es.attributes():
-            return self.tree.get_shortest_paths(self._name2idx(self.tree, self.start_name), self._name2idx(self.tree, self.goal_name), weights='weight', mode='OUT')[0]
+    def _smooth_path(self, graph_path, tsr, smoothing_time=6):
+        # create empty tree. 
+        smoothing_tree = ig.Graph(directed=True)
+        smoothing_tree['name'] = 'smoothing'
+        start_time = time.time()
+
+        if len(graph_path) <= 2:
+            return self._extract_graph_path()
+ 
+        while True:
+            current_time = time.time()
+            elapsed_time = current_time - start_time
+
+            if elapsed_time > smoothing_time:
+                self.log.debug("Finished iterating in: " + str(int(elapsed_time))  + " seconds")
+                break
+            # Get two random indeces from path
+            rand_idx1, rand_idx2 = random.sample(graph_path, 2)
+            if graph_path.index(rand_idx1) > graph_path.index(rand_idx2):
+                continue
+            q_old = self.tree.vs[rand_idx1]['value']
+            q_s = self.tree.vs[rand_idx2]['value']
+            # add points into tree
+            self._add_vertex(smoothing_tree, q_old)
+            self._add_vertex(smoothing_tree, q_s)
+            q_old_name = utils.val2str(q_old)
+            q_old_idx = utils.name2idx(smoothing_tree, q_old_name)
+            q_s_name = utils.val2str(q_s)
+            q_s_idx = utils.name2idx(smoothing_tree, q_s_name)
+            # constrained extend to the potential shortcut point.
+            q_reached, added_q_values, valid = self._constrained_extend(smoothing_tree, tsr, q_old, q_s, epsilon_factor=1)
+            if valid and self._distance(q_reached, q_s) < .01 and len(added_q_values) > 0:
+               # since constrain extend does not connect the last point to the target q_s we need to do so.
+                self._add_edge(smoothing_tree, added_q_values[-1], q_s, self._distance(added_q_values[-1], q_s))
+                smoothed_path_values = [smoothing_tree.vs[idx]['value'] for idx in self._extract_graph_path(smoothing_tree, q_old_idx, q_s_idx)]
+                if all([self._validate(p) for p in smoothed_path_values]):
+                    curr_path_values = [self.tree.vs[idx]['value'] for idx in self._extract_graph_path(self.tree, rand_idx1, rand_idx2)]
+                    smoothed_path_value_pairs = [(smoothed_path_values[i], smoothed_path_values[(i + 1) % len(smoothed_path_values)]) for i in range(len(smoothed_path_values))][:-1]
+                    curr_path_values_pairs = [(curr_path_values[i], curr_path_values[(i + 1) % len(curr_path_values)]) for i in range(len(curr_path_values))][:-1]
+                    smooth_path_distance = sum([self._distance(pair[0], pair[1]) for pair in smoothed_path_value_pairs])
+                    curr_path_distance = sum([self._distance(pair[0], pair[1]) for pair in curr_path_values_pairs])
+
+                    # if the newly found path between indices is shorter, lets use it and add it do the graph
+                    if smooth_path_distance < curr_path_distance:
+                        # crop off start and end since they already exist and add inbetween vertices of smoothing tree to main
+                        for q in smoothed_path_values[1:-1]:
+                            self._add_vertex(self.tree, q)
+                        for pair in smoothed_path_value_pairs:
+                            self._add_edge(self.tree, pair[0], pair[1], self._distance(pair[0], pair[1]))
+
+        return self._extract_graph_path()
+
+    def _extract_graph_path(self, tree=None, from_idx=None, to_idx=None):
+        if tree is None:
+            tree = self.tree
+        if from_idx is None or to_idx is None:
+            from_idx = utils.name2idx(tree, self.start_name)
+            to_idx = utils.name2idx(tree, self.goal_name)
+        if 'weight' in tree.es.attributes():
+            return tree.get_shortest_paths(from_idx, to_idx, weights='weight', mode='ALL')[0]
         else:
-            return self.tree.get_shortest_paths(self._name2idx(self.tree, self.start_name), self._name2idx(self.tree, self.goal_name), mode='OUT')[0]
+            return tree.get_shortest_paths(from_idx, to_idx, mode='ALL')[0]
 
     def get_path(self, plan):
         points = [self.tree.vs[idx]['value'] for idx in plan]
@@ -153,11 +361,16 @@ class CBiRRT2():
 
         tree = ig.Graph(directed=True) # a new directed graph
         if a_tree['name'] == 'forwards':
+            # F is the forwards tree
             F = a_tree.copy()
+            # qf is the furthest reached node in the forwards tree. It should be equal to qb / qb_reach
             qf = qa_reach
+            # B is the backwards tree
             B = b_tree.copy()
+            # qb is the furthest reached node in the backwards tree. It should be equal to qf / qa_reach
             qb = qb_reach
         else:
+            # depending on the finishing state of the a_tree/b_tree, a_tree could actually be the backwards tree.
             F = b_tree.copy()
             qf = qb_reach
             B = a_tree.copy()
@@ -165,37 +378,39 @@ class CBiRRT2():
 
         # In certain edge case scenarios, we have two start and goal points very close to each other
         # What this causes is essentially one of the trees to have a length of one.
-        # Wile qa_reach and qb_reach are essentially equal according to the distance
+        # While qa_reach and qb_reach are essentially equal according to the distance
         # threshold, it is not necessarily equal to the added start and end nodes
-        # hence we get a no such vertex error and potentially our edges are messed up as
+        # hence we get a 'no such vertex error' and potentially our edges are messed up as
         # a result.
         # To fix this, if one of the trees is length 1, we reset the opposite reached point 
         # as the new start/end and  viceversa. If they are both 1 it shouldn't be an issue since
-        # they are essnetially the same poitn and we don't need to create an edge between the two
+        # they are essentially the same point and we don't need to create an edge between the two
         # points. 
         if len(F.vs) == 1 and len(B.vs) > 1:
-            qf_name = self._val2str(qf)
-            qf_idx = self._name2idx(F, qf_name)
+            qf_name = utils.val2str(qf)
+            qf_idx = utils.name2idx(F, qf_name)
             qf_value = F.vs[qf_idx]['value']
 
-            qb_name = self._val2str(qb)
-            qb_idx = self._name2idx(B, qb_name)
+            qb_name = utils.val2str(qb)
+            qb_idx = utils.name2idx(B, qb_name)
             B.vs[qb_idx]['name'] = qf_name
             B.vs[qb_idx]['value'] = qf_value
+            return B
         
         if len(F.vs) > 1 and len(B.vs) == 1:
-            qb_name = self._val2str(qb)
-            qb_idx = self._name2idx(B, qb_name)
+            qb_name = utils.val2str(qb)
+            qb_idx = utils.name2idx(B, qb_name)
             qb_value = F.vs[qb_idx]['value']
 
-            qf_name = self._val2str(qf)
-            qf_idx = self._name2idx(F, qf_name)
+            qf_name = utils.val2str(qf)
+            qf_idx = utils.name2idx(F, qf_name)
             F.vs[qf_idx]['name'] = qb_name
             F.vs[qf_idx]['value'] = qb_value
+            return F
             
 
 
-        # add all the verticies and edges of the forward tree ot the directed graph
+        # add all the verticies and edges of the forward tree to the directed graph
         tree.add_vertices(len(F.vs))
         tree.vs["name"] = F.vs['name']
         tree.vs["value"] = F.vs['value']
@@ -203,20 +418,20 @@ class CBiRRT2():
         F_tree_edges = []
         for e in F.es:
             F_idxs = e.tuple
-            F_tree_edges.append((self._name2idx(tree, self._val2str(F.vs[F_idxs[0]]['value'])), self._name2idx(tree, self._val2str(F.vs[F_idxs[1]]['value']))))
+            F_tree_edges.append((utils.name2idx(tree, utils.val2str(F.vs[F_idxs[0]]['value'])), utils.name2idx(tree, utils.val2str(F.vs[F_idxs[1]]['value']))))
         tree.add_edges(F_tree_edges)
         if len(F.es) > 0:
             tree.es['weight'] = F.es['weight']
 
         # Attach qf to parents/in neighbors of qb, since those parents should be parents to qf
         # Since we built the B graph backwards, we get B's successors
-        b_parents = B.successors(self._name2idx(B, self._val2str(qb)))
+        b_parents = B.successors(utils.name2idx(B, utils.val2str(qb)))
         # collect the edges and weights of qb to parents in B. We collect by name.
         connection_edges_by_name = []
         connection_edge_weights = []
-        qb_name = self._val2str(qb)
-        qb_idx = self._name2idx(B, qb_name)
-        qf_name = self._val2str(qf)
+        qb_name = utils.val2str(qb)
+        qb_idx = utils.name2idx(B, qb_name)
+        qf_name = utils.val2str(qf)
         for parent in b_parents:
             connection_edges_by_name.append((qf_name, B.vs[parent]['name']))
             connection_edge_weights.append(B.es[B.get_eid(qb_idx,  parent)]['weight'])
@@ -232,7 +447,7 @@ class CBiRRT2():
             B_tree_edges = []
             for e in B.es:
                 B_idxs = e.tuple
-                B_tree_edges.append((self._name2idx(tree, B.vs[B_idxs[0]]['name']), self._name2idx(tree, self._val2str(B.vs[B_idxs[1]]['value']))))
+                B_tree_edges.append((utils.name2idx(tree, B.vs[B_idxs[0]]['name']), utils.name2idx(tree, utils.val2str(B.vs[B_idxs[1]]['value']))))
             if len(B.es) > 0:
                 if len(tree.es) > 0:
                     curr_edge_weights = tree.es['weight'] 
@@ -245,7 +460,7 @@ class CBiRRT2():
         connection_edges = []
         for edge_name_pair in connection_edges_by_name:
             # get the idx in the tree
-            connection_edges.append((self._name2idx(tree, edge_name_pair[0]), self._name2idx(tree, edge_name_pair[1])))
+            connection_edges.append((utils.name2idx(tree, edge_name_pair[0]), utils.name2idx(tree, edge_name_pair[1])))
         
         if 'weight' in tree.es.attributes():
             curr_edge_weights = tree.es['weight']
@@ -260,31 +475,45 @@ class CBiRRT2():
         # ig.plot(tree, **visual_style)
         return tree
 
-    def _neighbors(self, tree, q_s):
+    def _neighbors(self, tree, q_s, fraction_random=.1):
         if len(tree.vs) == 1:
             return [v for v in tree.vs][0]['value']
+        if random.random() <= fraction_random:
+            return random.choice([v for v in tree.vs])['value']
         return sorted([v for v in tree.vs], key= lambda vertex: self._distance(vertex['value'], q_s))[0]['value']
 
     def _random_config(self):
         # generate a random config to extend towards. This can be biased by whichever StateSpace and/or sampler we'd like to use.
         return np.array(self.state_space.sample())
-    
+
     def _initialize_trees(self, start_q, goal_q):
-        self.start_name = self._val2str(start_q)
+        self.start_name = utils.val2str(start_q)
+        self.start_q = start_q
         self.forwards_tree.add_vertex(self.start_name)
         self.forwards_tree.vs.find(name=self.start_name)['value'] = start_q
+        self.forwards_tree.vs.find(name=self.start_name)['injected_point'] = False
         self.forwards_tree['name'] = 'forwards'
-       
 
-        self.goal_name = self._val2str(goal_q)
+        self.goal_name = utils.val2str(goal_q)
+        self.goal_q = goal_q
         self.backwards_tree.add_vertex(self.goal_name)
         self.backwards_tree.vs.find(name=self.goal_name)['value'] = goal_q
+        self.backwards_tree.vs.find(name=self.goal_name)['injected_point'] = False
         self.backwards_tree['name'] = 'backwards'
 
     def _equal(self, q1, q2):
         if self._distance(q1, q2) <= .05:
             return True
         return False
+
+    def _within_manifold(self, q_s, tsr):
+        trans, quat = self.robot.solve_forward_kinematics(q_s)[0]
+        T0_s = pose2trans(np.hstack([trans + quat]))
+        min_distance_new, _ = distance_from_TSR(T0_s, tsr)
+        if min_distance_new < self.epsilon:
+            return True
+        else:
+            return False
 
     def _validate(self, sample):
         return self.svc.validate(sample)
@@ -297,26 +526,17 @@ class CBiRRT2():
             yield trees[idx_1], trees[idx_2]
             i += 1
 
-    def _add_vertex(self, tree, q):
-        tree.add_vertex(self._val2str(q), **{'value': q})
+    def _add_vertex(self, tree, q, injection_point=False):
+        tree.add_vertex(utils.val2str(q), **{'value': q, 'injection_point': injection_point})
 
 
     def _add_edge(self, tree, q_from, q_to, weight):
-        q_from_idx = self._name2idx(tree, self._val2str(q_from))
-        q_to_idx = self._name2idx(tree, self._val2str(q_to))
-        if self._val2str(q_from) == self.start_name and self._val2str(q_to) == self.goal_name:
+        q_from_idx = utils.name2idx(tree, utils.val2str(q_from))
+        q_to_idx = utils.name2idx(tree, utils.val2str(q_to))
+        if utils.val2str(q_from) == self.start_name and utils.val2str(q_to) == self.goal_name:
             tree.add_edge(q_from_idx, q_to_idx, **{'weight': weight})
         elif tuple(sorted([q_from_idx, q_to_idx])) not in set([tuple(sorted(edge.tuple)) for edge in tree.es]):
             tree.add_edge(q_from_idx, q_to_idx, **{'weight': weight})
-
-    def  _name2idx(self, tree, name):
-        try:
-            return tree.vs.find(name).index
-        except Exception as e:
-            print(e)
-    
-    def _val2str(self, value):
-        return str(["{:.8f}".format(val) for val in value])
     
     def _distance(self, q1, q2):
         return np.linalg.norm(np.array(q1) - np.array(q2))

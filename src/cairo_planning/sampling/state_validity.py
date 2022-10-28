@@ -2,6 +2,7 @@
 Interfaces for state validity checking.
 """
 
+
 __all__ = ['StateValidityChecker']
 
 class StateValidityChecker():

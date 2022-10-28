@@ -13,7 +13,6 @@ import networkx as nx
 
 from cairo_simulator.core.sim_context import SawyerSimContext
 from cairo_simulator.core.simulator import SimObject
-from cairo_planning.core.planning_context import SawyerPlanningContext
 from cairo_planning.collisions import DisabledCollisionsContext
 from cairo_planning.local.interpolation import parametric_lerp
 from cairo_planning.local.curve import JointTrajectoryCurve
@@ -95,7 +94,7 @@ if __name__ == "__main__":
 
 
     final_path = []
-    sim_context = SawyerSimContext(None, setup=False, planning_context=None)
+    sim_context = SawyerSimContext(None, setup=False)
     sim_context.setup(sim_overrides={"run_parallel": False})
     sim = sim_context.get_sim_instance()
     logger = sim_context.get_logger()

@@ -1,7 +1,7 @@
 import sys
 import os
 import time
-import copy
+from cairo_planning.collisions import DisabledCollisionsContext
 
 if os.environ.get('ROS_DISTRO'):
     import rospy
@@ -33,7 +33,7 @@ def main():
     configuration = {}
 
     configuration["sim"] = {
-            "use_real_time": True
+            "use_real_time": False
         }
 
     configuration["logging"] = {
@@ -53,69 +53,78 @@ def main():
             "model_file_or_sim_id": "plane.urdf",
             "position": [0, 0, 0]
         },
-        {
-            "object_name": "Table",
-            "model_file_or_sim_id": ASSETS_PATH + 'table.sdf',
-            "position": [0.9, 0, 0],
-            "orientation":  [0, 0, 1.5708]
-        },
-        {
-            "object_name": "cube0",
-            "model_file_or_sim_id": "cube_small.urdf",
-            "position": [0.75, 0, .55]
-        },
-        {
-            "object_name": "cube1",
-            "model_file_or_sim_id": "cube_small.urdf",
-            "position": [0.74, 0.05, .55]
-        },
-        {
-            "object_name": "cube2",
-            "model_file_or_sim_id": "cube_small.urdf",
-            "position": [0.67, -0.1, .55]
-        },
-        {
-            "object_name": "cube3",
-            "model_file_or_sim_id": "cube_small.urdf",
-            "position": [0.69, 0.1, .55]
-        }
+        # {
+        #     "object_name": "Table",
+        #     "model_file_or_sim_id": ASSETS_PATH + 'table.sdf',
+        #     "position": [0.9, 0, 0],
+        #     "orientation":  [0, 0, 1.5708]
+        # },
+        # {
+        #     "object_name": "cube0",
+        #     "model_file_or_sim_id": "cube_small.urdf",
+        #     "position": [0.75, 0, .55]
+        # },
+        # {
+        #     "object_name": "cube1",
+        #     "model_file_or_sim_id": "cube_small.urdf",
+        #     "position": [0.74, 0.05, .55]
+        # },
+        # {
+        #     "object_name": "cube2",
+        #     "model_file_or_sim_id": "cube_small.urdf",
+        #     "position": [0.67, -0.1, .55]
+        # },
+        # {
+        #     "object_name": "cube3",
+        #     "model_file_or_sim_id": "cube_small.urdf",
+        #     "position": [0.69, 0.1, .55]
+        # }
     ]
+    configuration["primitives"] = [
+        {
+            "type": "box",
+            "primitive_configs": {"w": .2, "l": .45, "h": .35},
+            "sim_object_configs": 
+                {
+                    "object_name": "box",
+                    "position": [.6, 0, .7],
+                    "orientation":  [0, 0, 0],
+                    "fixed_base": 1    
+                }
+        },
+        {
+            "type": "box",
+            "primitive_configs": {"w": .2, "l": .45, "h": .35},
+            "sim_object_configs": 
+                {
+                    "object_name": "box",
+                    "position": [.9, 0, .7],
+                    "orientation":  [0, 0, 0],
+                    "fixed_base": 1    
+                }
+        },
+        ]
     sim_context = SawyerSimContext(configuration)
     sim = sim_context.get_sim_instance()
     _ = sim_context.get_logger()
     _ = sim_context.get_state_space()
-    _ = sim_context.get_state_validity()
+    svc = sim_context.get_state_validity()
     sawyer_robot = sim_context.get_robot()
     _ = sawyer_robot.get_simulator_id()
     _ = sim_context.get_sim_objects(['Ground'])[0]
+    with DisabledCollisionsContext(sim, [], [], disable_visualization=False):
 
-    start_pos = [0]*7
-    sawyer_robot.move_to_joint_pos(start_pos)
+        # joint_config2 = sawyer_robot.solve_inverse_kinematics( [ 0.7074708676269519,  -0.08765564452576573, 0.9], [0, 0, 0, 1])
 
-    joint_config = sawyer_robot.solve_inverse_kinematics(
-        [0.9, 0, 1.5], [0, 0, 0, 1])
-
-    joint_config2 = sawyer_robot.solve_inverse_kinematics(
-        [0.7,0,1.5], [0,0,0,1])
-
-    sawyer_robot.set_default_joint_velocity_pct(0.5)
-    traj = ((1., joint_config), (2., joint_config2),
-            (2.5, joint_config), (5, joint_config2))
-
-    time.sleep(3)
-    while sawyer_robot.check_if_at_position(start_pos, 0.5) is False:
-        time.sleep(0.1)
-        pass
-
-    sawyer_robot.execute_trajectory(traj)
+        joint_config2 = [1.2687390680585104, 0.42044897839748835, -0.9433981870494063, 0.8327517372187107, -1.7423953093828628, -0.8348747889511391, 2.1159613577527017]
 
     # Loop until someone shuts us down
     try:
         while True:
-            sim.step()
+            sawyer_robot.set_joint_state(joint_config2)
+            time.sleep(.1)
     except KeyboardInterrupt:
-        p.disconnect()
-        sys.exit(0)
+        pass
 
 
 if __name__ == "__main__":

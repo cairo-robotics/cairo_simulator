@@ -5,6 +5,10 @@ interfaces for motion planning.
 import pybullet as p
 from collections import namedtuple
 
+from cairo_simulator.core.log import Logger
+
+logger = Logger(name="collision", handlers=['logging'])
+
 __all__ = ['DisabledCollisionsContext', 'get_closest_points', 'self_collision_test', 'robot_body_collision_test', 'multi_collision_test']
 
 
@@ -37,7 +41,7 @@ class DisabledCollisionsContext():
         simulator (simulator.Simulator): The Simulator singleton instance.
     """
     
-    def __init__(self, simulator, excluded_bodies=[], excluded_body_link_pairs=[]): 
+    def __init__(self, simulator, excluded_bodies=None, excluded_body_link_pairs=None, disable_visualization=True): 
         """
         
         Args:
@@ -46,11 +50,13 @@ class DisabledCollisionsContext():
         excluded_body_link_pairs (list): A list tuples where the first element is the PyBullet Body ID and the second elemend is the link index. 
         """
         self.simulator = simulator
-        self.excluded_bodies = excluded_bodies
-        self.excluded_body_link_pairs = excluded_body_link_pairs
-          
+        self.excluded_bodies = excluded_bodies if excluded_bodies is not None else []
+        self.excluded_body_link_pairs = excluded_body_link_pairs if excluded_body_link_pairs is not None else []
+        self.disable_visualization = disable_visualization
+
     def __enter__(self):
-        p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,0) #makes loading faster
+        if self.disable_visualization:
+            p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,0) #makes loading faster
         self._disable_robot_collisions()
         self._disable_simobj_collisions()
         self.state_id = p.saveState()
@@ -58,7 +64,8 @@ class DisabledCollisionsContext():
     def __exit__(self, exc_type, exc_value, exc_traceback): 
         self._enable_robot_collisions()
         self._enable_simobj_collisions()
-        p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,1) #re-enable rendering 
+        if self.disable_visualization:
+            p.configureDebugVisualizer(p.COV_ENABLE_RENDERING,1) #re-enable rendering 
         p.restoreState(self.state_id)
 
     def _disable_robot_collisions(self):
@@ -148,12 +155,17 @@ def self_collision_test(joint_configuration, robot, link_pairs, client_id=0):
         bool: True if no self-collision, else False.
     """
     robot_id = robot.get_simulator_id()
-
+     # Set new configuration and get link states
+    # robot.zero_joint_velocities()
+    joint_dofs = robot._arm_dof_indices + robot._gripper_dof_indices
+    gripper_pos = p.getJointStates(
+                robot_id, robot._gripper_dof_indices)
+    joint_configuration = list(joint_configuration) + [val[0] for val in list(gripper_pos)]
     # Set new configuration
-    for i, idx in enumerate(robot._arm_dof_indices):
+    for i, idx in enumerate(joint_dofs):
         p.resetJointState(robot_id, idx, targetValue=joint_configuration[i], targetVelocity=0, physicsClientId=0)
-
-
+    joint_configuration = [val[0] for val in list(p.getJointStates(
+                robot_id, joint_dofs))]
     self_collisions = []
     for link1, link2 in link_pairs:
         if link1 != link2:
@@ -165,30 +177,40 @@ def self_collision_test(joint_configuration, robot, link_pairs, client_id=0):
     if all(self_collisions):
         return True
     else:
+        #logger.warn("Self collision!")
         return False
 
 
-def robot_body_collision_test(joint_configuration, robot, object_body_id, client_id=0, max_distance=0.025):
+def robot_body_collision_test(joint_configuration, robot, object_body_id, client_id=0, max_distance=0):
     """
     Tests whether a given joint configuration will result in collision with an object. 
 
     It sets the robot state to the test configuration. There are no links test, we're testing whole body ids.
     
     Args:
-        joint_configuration (list): The joint configuration to test for self-collision
+        joint_configuration (list): The joint configuration to test for robot-object collision.
         robot (int): PyBullet body ID.
-        # link_pairs: 2D pairs of pybullet body links, in this case the pairs of potential in-self-collision pairs. 
+        object_body_id: The other object against which to test collision. 
         client_id (int): the physics server client ID.
     Returns:
         bool: True if no self-collision, else False.
     """
     robot_id = robot.get_simulator_id()
      # Set new configuration and get link states
-    for i, idx in enumerate(robot._arm_dof_indices):
-        p.resetJointState(robot._simulator_id, idx, targetValue=joint_configuration[i], targetVelocity=0, physicsClientId=client_id)
+    # robot.zero_joint_velocities()
+    joint_dofs = robot._arm_dof_indices + robot._gripper_dof_indices
+    gripper_pos = p.getJointStates(
+                robot_id, robot._gripper_dof_indices)
+    joint_configuration = list(joint_configuration) + [val[0] for val in list(gripper_pos)]
+    for i, idx in enumerate(joint_dofs):
+        p.resetJointState(robot_id, idx, targetValue=joint_configuration[i], targetVelocity=0, physicsClientId=client_id)
+    joint_configuration = [val[0] for val in list(p.getJointStates(
+                robot_id, joint_dofs))]
     if len(get_closest_points(client_id=client_id, body1=robot_id, body2=object_body_id, max_distance=max_distance)) == 0:
         return True
     else:
+        # print("Collision between {} & {}".format(robot_id, object_body_id))
+        #logger.warn("Collision between {} & {}".format(robot_id, object_body_id))
         return False
 
 def multi_collision_test(joint_configuration, robot_object_collision_fns):
