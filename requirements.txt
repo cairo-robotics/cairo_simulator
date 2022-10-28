@@ -3,7 +3,7 @@ CD==1.1.0
 cffi==1.15.1
 fastdtw==0.3.4
 ikpy==3.0.1
-joblib==1.1.0
+joblib==1.2.0
 mpmath==1.2.1
 networkx==2.6.3
 numpy==1.22.0
