@@ -2,6 +2,7 @@ import os
 import json
 import time
 import datetime
+import statistics
 
 import pybullet as p
 if os.environ.get('ROS_DISTRO'):
@@ -13,15 +14,15 @@ from cairo_simulator.core.utils import ASSETS_PATH
 
 from cairo_planning.geometric.state_space import SawyerTSRConstrainedSpace
 from cairo_planning.geometric.distribution import KernelDensityDistribution
-from cairo_planning.sampling.samplers import DistributionSampler, UniformSampler
+from cairo_planning.sampling.samplers import DistributionSampler
 
 import matplotlib.pyplot as plt
 
 
 def main():
     
-    NUM_SAMPLES = 100
-    fraction_uniform_increments = [0, .05, .1, .15, .2, .25, .3, .35, .4, .45, .5, .55, .6, .65, .7, .75, .8, .85, .9, .95, .99, .9999, .999999, 1]
+    NUM_SAMPLES = 1000
+    fraction_biased_increments = [1, .95, .9, .85, .8, .75, .7, .65, .6, .55, .5, .45, .4, .35, .3, .25, .2, .15, .1, .05, .04, .03, .02, .01, 0]
 
     config = {}
     config["sim"] = {
@@ -39,10 +40,10 @@ def main():
 
     config["tsr"] = {
         'degrees': False,
-        "T0_w": [0, 0, .9, 0, 0, 0],
-        "Tw_e": [0, 0, 0, np.pi/2, 0, np.pi/2], # level end-effector pointing away from sawyer's "front"
+        "T0_w": [0, 0, .9, np.pi/2, 0, np.pi/2], # level end-effector pointing away from sawyer's "front"
+        "Tw_e": [0, 0, 0, 0, 0, 0], 
         "Bw": [[[-100, 100], [-100, 100], [-100, 100]], 
-              [[-.07, .07], [-.07, .07], [-.07, .07]]]
+              [[-.07, .07], [-.07, .07], [-3.14, 3.14]]] # full yaw allowed
     }
 
     sim_context = SawyerTSRSimContext(config)
@@ -72,17 +73,20 @@ def main():
         
         fraction_time_tuples = []
         
-        for fraction in fraction_uniform_increments:
+        for fraction in fraction_biased_increments:
             # Create the DistributionSampler and associated SawyerTSRConstrainedSpace
-            state_space = SawyerTSRConstrainedSpace(robot=sawyer_robot, TSR=tsr, svc=svc, sampler=DistributionSampler(distribution_model=model, fraction_uniform=fraction), limits=None)
-            
-            ptime1 = time.process_time()
+            state_space = SawyerTSRConstrainedSpace(robot=sawyer_robot, TSR=tsr, svc=svc, sampler=DistributionSampler(distribution_model=model, fraction_uniform=1 - fraction), limits=None)
+            time1 = time.time()
+            ptime1 = time.perf_counter()
             count = 0
             while count != NUM_SAMPLES:
                 sample = state_space.sample()
                 if sample is not None:
                     count += 1
-            ptime2 = time.process_time()
+                if time.perf_counter() - ptime1 >= 1000:
+                    print("Only sampled {} constraint compliant points.".format(count))
+                    break
+            ptime2 = time.perf_counter()
             print(ptime2 - ptime1)
             fraction_time_tuples.append((fraction, ptime2 - ptime1))
 
@@ -91,20 +95,23 @@ def main():
     # Output results to unique filename
     now = datetime.datetime.today()
     nTime = now.strftime('%Y-%m-%dT%H-%M-%S')
-    results_filename = "results_" + nTime
+    results_filename = "results_" + nTime + '.json'
     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), results_filename), "w") as f:
         json.dump(results, f)
 
     # Create plots
-    for subject, subject_data in results.items():
+    plt.figure(figsize=(12, 10))
+
+    means = list(map(statistics.mean, [[result[1][idx][1] for result in results.items()] for idx, _ in enumerate(fraction_biased_increments)]))
+    stds = list(map(statistics.stdev, [[result[1][idx][1] for result in results.items()] for idx, _ in enumerate(fraction_biased_increments)]))
     
-        result_times = [result[1] for result in subject_data]
-        plt.plot(fraction_uniform_increments, result_times, label=subject)
-    plt.xlabel('Fraction Uniform Sampling')
-    plt.ylabel('Time (s)')
-    plt.suptitle('Time to Sample {} Constrained Points vs. Fraction Uniform'.format(NUM_SAMPLES), fontsize=16)
-    plt.title('Upright Orientation Constraint'.format(NUM_SAMPLES), fontsize=12)
-    plt.legend()
+    plt.errorbar(fraction_biased_increments, means, yerr=stds, fmt='-o', ecolor='lightgray', linewidth=3, elinewidth=1, capsize=2, capthick=2)
+    plt.xlabel('Fraction of Candidate Points Drawn from Biased Distribution', fontsize=18)
+    plt.xticks(fontsize=16)
+    plt.ylabel('Time (s)',  fontsize=18)
+    plt.yticks(fontsize=16)
+    plt.title('Mean Time (w/ std) to Project {} Samples \n onto Upright Orientation Constraint Manifold'.format(NUM_SAMPLES), fontsize=22)
+    # plt.legend(fontsize=20)
     plt.show()
 
 if __name__ == "__main__":

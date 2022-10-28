@@ -86,10 +86,10 @@ def main():
         sawyer_robot.set_joint_state(start)
         time.sleep(1.0)
         # Utilizes RPY convention
-        T0_w = xyzrpy2trans([0, 0, .9, 0, 0, 0], degrees=False)
+        T0_w = xyzrpy2trans([0, 0, .9, np.pi/2, -1.39, np.pi/2], degrees=False)
 
         # Utilizes RPY convention
-        Tw_e = xyzrpy2trans([0, 0, 0, np.pi/2, 0, np.pi/2], degrees=False)
+        Tw_e = xyzrpy2trans([0, 0, 0, 0, 0, 0], degrees=False)
         
         # Utilizes RPY convention
         Bw = bounds_matrix([(0, 100), (-100, 100), (-100, .2)],  # allow some tolerance in the z and y and only positve in x

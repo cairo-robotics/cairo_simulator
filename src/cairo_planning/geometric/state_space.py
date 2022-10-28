@@ -3,6 +3,7 @@ import multiprocessing as mp
 from functools import partial
 
 import numpy as np
+from cairo_planning.geometric.transformation import quat2rpy
 
 
 from cairo_planning.sampling.samplers import UniformSampler
@@ -76,11 +77,12 @@ class DistributionSpace():
                            'right_j3', 'right_j4', 'right_j5', 'right_j6']
         selected_limits = self._get_limits(joint_names)
         return self.sampler.sample(selected_limits)
+    
 
 
 class SawyerTSRConstrainedSpace():
 
-    def __init__(self, sampler, svc, TSR, robot, limits=None, epsilon=.1, e_step=.25):
+    def __init__(self, sampler, svc, TSR, robot, limits=None, epsilon=.1, q_step=3, e_step=.25, iter_count=500):
         self.limits = [['right_j0', (-3.0503, 3.0503)],
                        ['right_j1', (-3.8095, 2.2736)],
                        ['right_j2', (-3.0426, 3.0426)],
@@ -96,7 +98,9 @@ class SawyerTSRConstrainedSpace():
         self.TSR = TSR
         self.robot = robot
         self.epsilon = epsilon
+        self.q_step = q_step
         self.e_step = e_step
+        self.iter_count = iter_count
         self.sampler = sampler if sampler is not None else UniformSampler()
     
     def _get_limits(self, joint_names):
@@ -121,19 +125,27 @@ class SawyerTSRConstrainedSpace():
 
     def _project(self, sample):
         if self.svc.validate(sample):
-            q_constrained = project_config(self.robot, self.TSR, np.array(
-                sample), np.array(sample), epsilon=self.epsilon, e_step=self.e_step)
-            normalized_q_constrained = []
-            if q_constrained is not None:
-                for value in q_constrained:
-                    normalized_q_constrained.append(
-                        wrap_to_interval(value))
-                if self.svc.validate(normalized_q_constrained):
-                    return normalized_q_constrained
+            xyz, quat = self.robot.solve_forward_kinematics(sample)[0]
+            pose = xyz + list(quat2rpy(quat))
+            if not all(self.TSR.is_valid(pose)):
+                q_constrained = project_config(self.robot, self.TSR, np.array(sample), np.array(sample), epsilon=self.epsilon, q_step=self.q_step, e_step=self.e_step, iter_count=self.iter_count, ignore_termination_condtions=False)
+                normalized_q_constrained = []
+                if q_constrained is not None:
+                    for value in q_constrained:
+                        normalized_q_constrained.append(
+                            wrap_to_interval(value))
+                    if self.svc.validate(normalized_q_constrained):
+                        return normalized_q_constrained
+                    else:
+                        return None
                 else:
                     return None
             else:
-                return None
+                normalized_sample = []
+                for value in sample:
+                        normalized_sample.append(
+                            wrap_to_interval(value))
+                return normalized_sample
 
 
 class ParallelSawyerTSRConstrainedSpace():

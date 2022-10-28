@@ -188,41 +188,49 @@ def main():
 
          # Collect all joint configurations from all demonstration .json files.
     configurations = []
-    data_directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data/sampling_bias")
+    # data_directory = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data/sampling_bias")
   
-    print("Running biased sampling test for {}".format(data_directory))
-    for json_file in os.listdir(data_directory):
-        filename = os.path.join(data_directory, json_file)
-        with open(filename, "r") as f:
-            data = json.load(f)
-            for entry in data:
-                configurations.append(entry['robot']['joint_angle'])
+    # print("Running biased sampling test for {}".format(data_directory))
+    # for json_file in os.listdir(data_directory):
+    #     filename = os.path.join(data_directory, json_file)
+    #     with open(filename, "r") as f:
+    #         data = json.load(f)
+    #         for entry in data:
+    #             configurations.append(entry['robot']['joint_angle'])
 
     n_samples = 5
     valid_samples = []
     starttime = timeit.default_timer()
+    TSR_2_config = {
+        'degrees': False,
+        "T0_w":  [0.62, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2],
+        "Tw_e": [0, 0, 0, 0, 0, 0],
+        "Bw": [[(-.02, .02), (-.02, .02), (-100, 100)],  
+                [(-100, 100), (-100, 100), (-100, 100)]]
+    }
+    # Utilizes RPY convention
+    T0_w = xyzrpy2trans([0.62, -0.6324, 0.15, np.pi/2, -np.pi/2, np.pi/2], degrees=False)
 
     # Utilizes RPY convention
-    T0_w = xyzrpy2trans([0, 0, .9, 0, 0, 0], degrees=False)
-
-    # Utilizes RPY convention
-    Tw_e = xyzrpy2trans([0, 0, 0, 3.12266697, 0, 1.50671032], degrees=False)
+    Tw_e = xyzrpy2trans([0, 0, 0, 0, 0, 0], degrees=False)
     
     # Utilizes RPY convention
-    Bw = bounds_matrix([(-100, 100), (-100, 100), (-100, 100)],  # allow some tolerance in the z and y and only positve in x
-                       [(-.07, .07), (-.07, .07), (-.07, .07)])  # any rotation about z, with limited rotation about x, and y.
+    Bw = bounds_matrix([(-.02, .02), (-.02, .02), (-100, 100)],  
+                [(-100, 100), (-100, 100), (-100, 100)])  # any rotation about z, with limited rotation about x, and y.
     tsr = TSR(T0_w=T0_w, Tw_e=Tw_e, Bw=Bw,
               manipindex=0, bodyandlink=16)
     time.sleep(5)
-
+    start = [-1.0875129593901391, 0.43221681740571016, -1.434156290269138, -0.014856843070199854, -0.13925492871100298, -1.3577540634638976, -0.2363667344199918] 
+    test_sample = [-1.3848179487482657, 0.7146040961230544, -1.248842068927987, -0.6474293590198705, -0.5574993249372158, -0.6181778654027106, 2.8736703718739705]
     # Disabled collisions during planning with certain eclusions in place.
     with DisabledCollisionsContext(sim, [], []):
         print("Sampling start time is :", starttime)
         while len(valid_samples) < n_samples:
-            sample = scs.sample()
+            # sample = scs.sample()
+            sample = test_sample
             if svc.validate(sample):
                 q_constrained = project_config(sawyer_robot, tsr, np.array(
-                sample), np.array(sample), epsilon=.1, e_step=.25)
+                sample), np.array(sample), epsilon=.1, e_step=.25, ignore_termination_condtions=True, iter_count=500)
                 normalized_q_constrained = []
                 if q_constrained is not None:
                     for value in q_constrained:

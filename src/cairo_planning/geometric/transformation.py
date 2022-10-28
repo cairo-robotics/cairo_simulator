@@ -5,7 +5,7 @@ from scipy.spatial.transform import Rotation as R
 def pseudoinverse(M):
     """
     Moore–Penrose pseudoinverse assuming full row rank.
-    
+
     Args:
         M (ndarray): The angular Jacobian matrix.
 
@@ -23,9 +23,9 @@ def analytic_xyz_jacobian(J_r, rpy):
     Erpy = E^-1
     Ja(q) = Erpy * J(q)
     q' = Ja(q)^-1 * x'
-    
+
     Based on the E matrix for XYZ angles found on page 23 of: https://ethz.ch/content/dam/ethz/special-interest/mavt/robotics-n-intelligent-systems/rsl-dam/documents/RobotDynamics2016/RD2016script.pdf
-    
+
     Args:
         J_r (ndarray): The angular Jacobian matrix.
         rpy (array-like): The current rpy.
@@ -37,7 +37,7 @@ def analytic_xyz_jacobian(J_r, rpy):
     if np.cos(rpy[1]) < TOLERANCE:
         print("Close to singularity!")
 
-    # E matrixx for XYZ / RPY
+    # E inverse matrixx for XYZ / RPY
     Ei = np.zeros([3, 3])
 
     Ei[0, 0] = 1
@@ -47,7 +47,6 @@ def analytic_xyz_jacobian(J_r, rpy):
     Ei[1, 2] = np.sin(rpy[0])
     Ei[2, 1] = -np.sin(rpy[0]) / np.cos(rpy[1])
     Ei[2, 2] = np.cos(rpy[0]) / np.cos(rpy[1])
-
 
     return np.dot(Ei, J_r)
 
@@ -89,17 +88,15 @@ def pose2trans(xyzxyzw):
     to a transformation matrix.
 
     Args:
-        xyzxyzw (array-like): The pose vector. Quatnernion in wxyz form.
+        xyzxyzw (array-like): The pose vector. Quatnernion in xyzw form.
 
     Returns:
         ndarray: Trasnformation matrix.
     """
     trans = xyzxyzw[0:3]
-    quat = xyzxyzw[3:7]
-    rot_mat = R.from_quat(
-        np.array((quat[0], quat[1], quat[2], quat[3]))).as_matrix()
-    return np.vstack([np.hstack([rot_mat, np.array(trans).reshape(3, 1)]),
-                      np.array((0, 0, 0, 1))])
+    rpy = quat2rpy(xyzxyzw[3:7])
+    return xyzrpy2trans(list(trans) + list(rpy))
+
 
 def rot2rpy(Rt, degrees=False):
     """
@@ -113,6 +110,7 @@ def rot2rpy(Rt, degrees=False):
     """
     return R.from_matrix(Rt).as_euler('xyz', degrees=degrees)
 
+
 def rpy2rot(rpy, degrees=False):
     """
     Converts rpy / intrinsic xyz euler angles into a rotation matrix.
@@ -124,7 +122,24 @@ def rpy2rot(rpy, degrees=False):
     Returns:
         ndarray: The rotation matrix.
     """
-    return R.from_euler('xyz', rpy, degrees=degrees).as_matrix()
+
+    rot = np.zeros((3, 3))
+    r, p, y = rpy[0], rpy[1], rpy[2]
+    rot[0][0] = np.cos(p)*np.cos(y)
+    rot[1][0] = np.cos(p)*np.sin(y)
+    rot[2][0] = -np.sin(p)
+    rot[0][1] = (np.sin(r)*np.sin(p)*np.cos(y) -
+                 np.cos(r)*np.sin(y))
+    rot[1][1] = (np.sin(r)*np.sin(p)*np.sin(y) +
+                 np.cos(r)*np.cos(y))
+    rot[2][1] = np.sin(r)*np.cos(p)
+    rot[0][2] = (np.cos(r)*np.sin(p)*np.cos(y) +
+                 np.sin(r)*np.sin(y))
+    rot[1][2] = (np.cos(r)*np.sin(p)*np.sin(y) -
+                 np.sin(r)*np.cos(y))
+    rot[2][2] = np.cos(r)*np.cos(p)
+    return rot
+
 
 def xyzrpy2trans(xyzrpy, degrees=False):
     """
@@ -141,10 +156,13 @@ def xyzrpy2trans(xyzrpy, degrees=False):
     Returns:
         ndarray: 4x4 transformation matrix.
     """
-    trans = xyzrpy[0:3]
-    rpy = xyzrpy[3:6]
-    rot_mat = rpy2rot(rpy, degrees=degrees)
-    return np.vstack([np.hstack([rot_mat, np.array(trans).reshape(3, 1)]), np.array((0, 0, 0, 1))])
+    trans = np.zeros((4, 4))
+    trans[3][3] = 1.0
+    xyz, rpy = xyzrpy[0:3], xyzrpy[3:6]
+    trans[0:3, 3] = xyz
+    rot = rpy2rot(rpy)
+    trans[0:3, 0:3] = rot
+    return trans
 
 
 def bounds_matrix(translation_limits, rotation_limits):
@@ -165,3 +183,25 @@ def bounds_matrix(translation_limits, rotation_limits):
     pitch_limits = np.array(rotation_limits[1])
     yaw_limits = np.array(rotation_limits[2])
     return np.vstack([x_limits, y_limits, z_limits, roll_limits, pitch_limits, yaw_limits])
+
+
+def transform_inv(Tm):
+    """
+    Given a full transform matrix rotation and translation, computes the inverse transform
+
+    Args:
+        Tm (ndarray): 4x4 Transformation matrix
+
+
+    Returns:
+        ndarray: THe inverted transformation matrix,
+    """
+    Tv = Tm[0:3, 3]
+    Rt = Tm[0:3, 0:3]
+    Rtinv = Rt.T
+    Tvinv = -Tv
+    Rtinv_full = np.vstack(
+        [np.hstack([Rtinv, np.array([0, 0, 0]).reshape(3, 1)]), np.array((0, 0, 0, 1))])
+    Tvinv_full = np.vstack(
+        [np.hstack([np.eye(3, 3), np.array(Tvinv).reshape(3, 1)]), np.array((0, 0, 0, 1))])
+    return np.dot(Rtinv_full, Tvinv_full)

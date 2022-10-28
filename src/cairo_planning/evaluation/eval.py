@@ -1,0 +1,119 @@
+from math import dist
+import os
+import json
+import time
+
+from fastdtw import fastdtw
+from scipy.spatial.distance import euclidean
+
+from cairo_planning.constraints.projection import distance_from_TSR
+
+class IPDRelaxEvaluation():
+
+    def __init__(self, output_dir, participant, biased_planning, ip_style, collision_objects):
+        self.output_dir = output_dir
+        self.particpant = participant
+        self.planning_bias = str(biased_planning) # comes in as an int
+        self.ip_style = ip_style
+        self.collisions = "C" if collision_objects else "noC"
+        self.trials = []
+
+    def add_trial(self, trial):
+        self.trials.append(trial)
+
+    def export(self):
+        file_name = self._snake_case_name() + ".json"
+        output_path = os.path.join(self.output_dir, file_name)
+        trials_data = {}
+        trials_data["participant"] = self.particpant
+        trials_data["planning_bias"] = self.planning_bias
+        trials_data["ip_style"] = self.ip_style
+        trials_data["collision_objects"] = self.collisions
+        trials_data["trials"] = []
+        for trial in self.trials:
+            trial_data = {}
+            trial_data["path_length"] = trial.path_length
+            trial_data["a2s_cspace_distance"] = trial.a2s_cspace_distance
+            trial_data["a2s_taskspace_distance"] = trial.a2s_taskspace_distance
+            trial_data["success"] = trial.success
+            trial_data["a2f_percentage"] = trial.a2f_percentage
+            trial_data["planning_time"] = trial.planning_time
+            trial_data["ip_generation_times"] = trial.ip_gen_times
+            trial_data["ip_generation_types"] = trial.ip_gen_types
+            trial_data["ip_tsr_distances"] = trial.ip_tsr_distances
+            trial_data["segment_constraint_ids"] = trial.segment_constraint_ids
+            trial_data["trajectory_segments"] = trial.segments
+            trial_data["trajectory"] = trial.trajectory
+            trial_data["notes"] = trial.notes
+            trials_data["trials"].append(trial_data)
+
+        with open(output_path, 'w') as f:
+            json.dump(trials_data, f)
+
+    def _snake_case_name(self):
+        return "{}_{}_{}_{}".format(self.particpant, self.planning_bias, self.collisions, self.ip_style)
+
+
+class IPDRelaxEvaluationTrial():
+
+    def __init__(self):
+        self.path_length = -1
+        self.a2s_cspace_distance = -1
+        self.a2s_taskspace_distance = -1
+        self.success = False
+        self.a2f_percentage = -1
+        self.planning_time = -1
+        self.ip_gen_times = []
+        self.segments = []
+        self.segment_constraint_ids = []
+        self.trajectory = []
+        self.ip_gen_types = []
+        self.ip_tsr_distances = []
+        self.notes = "None"
+        self.timers = {}
+
+    def eval_path_length(self, trajectory):
+        total_path_length = 0
+        for i in range(len(trajectory) - 1):
+            total_path_length += euclidean(trajectory[i], trajectory[i + 1])
+        return total_path_length
+
+    def eval_a2s(self, trajectory, gold_trajectory):
+        t1 = trajectory
+        t2 = gold_trajectory
+        dist, _ = fastdtw(t1, t2)
+        return dist
+
+    def eval_success(self, last_point_transform, tsr, epsilon=5):
+        dist, _ = distance_from_TSR(last_point_transform, tsr)
+        if dist < epsilon:
+            return True
+        else:
+            return False
+
+    def eval_a2f(self, trajectory_segments, constraint_eval_map, constraint_ordering, epsilon):
+        results = []
+        for idx, segment in enumerate(trajectory_segments):
+            if constraint_ordering[idx] is not None or constraint_ordering[idx] == []:
+                tsr = constraint_eval_map.get(
+                    tuple(constraint_ordering[idx]), None)
+                if tsr is not None:
+                    for transform in segment:
+                        dist, _ = distance_from_TSR(transform, tsr)
+                        results.append(dist < epsilon)
+            else:
+                for transform in segment:
+                    results.append(True)
+        return sum(results) / len(results)
+
+    def eval_tsr_distance(self, steering_point, tsr):
+        distance = tsr.distance(steering_point)
+        return distance
+
+    def start_timer(self, name):
+        self.timers[name] = time.perf_counter()
+
+    def end_timer(self, name):
+        tic = self.timers[name]
+        toc = time.perf_counter()
+        return toc - tic

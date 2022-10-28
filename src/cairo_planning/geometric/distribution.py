@@ -16,3 +16,6 @@ class KernelDensityDistribution():
     
     def sample(self):
         return self.model.sample(1)[0]
+    
+    def score_samples(self, samples):
+        return self.model.score_samples(samples)

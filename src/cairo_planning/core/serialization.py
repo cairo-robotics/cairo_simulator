@@ -2,6 +2,39 @@ import os
 import json
 import datetime
 import igraph
+import glob
+import codecs
+from collections import OrderedDict
+
+
+def load_json_files(path):
+    """
+    Import JSON files as a Python dictionary from .json files in the directory signified by the path..
+
+    Parameters
+    ----------
+    path : string
+        Path of directory containing the ..json files.
+
+    Returns
+    -------
+    entries : dict
+        Dictionary representation of the JSON file.
+    """
+
+    entries = OrderedDict()
+    entries["data"] = []
+    files = glob.glob(path)
+    for name in files:
+        try:
+            with codecs.open(name, "r", 'utf-8') as f:
+                file_data = json.load(f, object_pairs_hook=OrderedDict)
+                entries["data"].append(file_data)
+        except IOError as exc:
+            if exc.errno != errno.EISDIR:
+                raise  # Propagate other kinds of IOError.
+    return entries
+
 
 def dump_PRM(context_config, model, directory_path="./", filename="data.json"):
     """

@@ -22,9 +22,9 @@ After sourcing the ROS environment scripts:
 `pip3 install --user -r requirements.txt`
 
 #### If using a Python virtual environment (i.e. virtualenv, pyenv etc,.):
-`pip3 install pybullet -r requirements.txt`
+`pip3 install -r requirements.txt`
 
-or from the top level directory
+and then from the top level cairo-simulator directory:
 
 `pip3 install -e ./`
 
@@ -32,6 +32,16 @@ Note that for some versions of Python, the igraph install will need to be compil
 
 `sudo apt install build-essential python-dev libxml2 libxml2-dev zlib1g-dev bison flex automake autoconf`
 
+#### Installing cairo-planning-core / planning-core-rust
+
+Clone the repo: https://github.com/cairo-robotics/planning_core_rust
+
+This repostiory is installable as a Python package, however you will need the rust compiler installed on your computer:
+https://www.rust-lang.org/tools/install
+
+With you virtual environment activated, run:
+
+`pip3 install <path_to_planning_core_rust_repo>`
 
 # Running the Simulator
 Unlike Gazebo, this is not a standalone executable program but rather is a foundation upon which a simulator can be created. The sawyer_test.py file contains a fairly minimal example showing how to use this package, initializing the simulator, a robot, and an object in the world.

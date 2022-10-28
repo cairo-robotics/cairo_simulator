@@ -6,10 +6,10 @@ def name2idx(igraph, name):
     try:
         return igraph.vs.find(name).index
     except Exception as e:
-        pass
+        return None
 
 def val2str(value, decimal_places=8):
-    def trunc(number, places=8):
+    def trunc(number, places=decimal_places):
         if not isinstance(places, int):
             raise ValueError("Decimal places must be an integer.")
         if places < 1:
