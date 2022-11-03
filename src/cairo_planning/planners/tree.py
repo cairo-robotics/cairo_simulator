@@ -261,7 +261,7 @@ class CBiRRT2():
     def _insert_off_manifold_point(self, tree, point, tsr, n=10, epsilon_factor=4):
         projected_points = []
         attempts = 0
-        while len(projected_points) < n and attempts < 20:
+        while len(projected_points) < n and attempts < 50:
             attempts += 1
             q_constrained = project_config(self.robot, tsr, q_s=point, q_old=point, epsilon=epsilon_factor*self.epsilon, q_step=self.q_step, e_step=self.e_step, iter_count=100, ignore_termination_condtions=True)
             if q_constrained is not None:
