@@ -34,10 +34,10 @@ class PRM():
         print("N: {}, k: {}, r: {}".format(
             self.n_samples, self.k, self.ball_radius))
 
-    def plan(self, q_start, q_goal):
+    def plan(self, q_start):
         # Initial sampling of roadmap and NN data structure.
         print("Initializing roadmap...")
-        self._init_roadmap(q_start, q_goal)
+        self._init_roadmap(q_start)
         print("Generating valid random samples...")
         samples = self._generate_samples()
         # Create NN datastructure
@@ -50,16 +50,14 @@ class PRM():
         print("Generating graph from samples and connections...")
         self._build_graph(samples, connections)
         print("Attaching start and end to graph...")
-        self._attach_start_and_end()
-        print("Finding feasible best path in graph if available...")
-        if self._success():
-            plan = self._smooth(self.best_sequence())
-            return plan
-        else:
-            return []
+        self.attach_start("start", q_start)
 
-    def best_sequence(self):
-        return self.graph.get_shortest_paths('start', 'goal', weights='weight', mode='ALL')[0]
+    def init_nearest_neighbor(self):
+        vertices = self.graph.vs()["value"]
+        self.nn = NearestNeighbors(X=np.array(vertices), model_kwargs={"leaf_size": 100})
+
+    def best_sequence(self, name):
+        return self.graph.get_shortest_paths('start', name, weights='weight', mode='ALL')[0]
 
     def get_path(self, plan):
         points = [self.graph.vs[idx]['value'] for idx in plan]
@@ -72,13 +70,10 @@ class PRM():
             path = path + seg
         return path
 
-    def _init_roadmap(self, q_start, q_goal):
+    def _init_roadmap(self, q_start):
         self.graph.add_vertex("start")
         # Start is always at the 0 index.
         self.graph.vs[0]["value"] = list(q_start)
-        self.graph.add_vertex("goal")
-        # Goal is always at the 1 index.
-        self.graph.vs[1]["value"] = list(q_goal)
 
     def _smooth(self, plan):
         def shortcut(plan):
@@ -137,10 +132,9 @@ class PRM():
         return connections
 
     def _build_graph(self, samples, connections):
-        values = [self.graph.vs[0]["value"],
-                  self.graph.vs[1]["value"]] + samples
+        values = [self.graph.vs[0]["value"]] + samples
         values = [list(value) for value in values]
-        self.graph.add_vertices(len(values))
+        self.graph.add_vertices(len(samples))
         self.graph.vs["value"] = values
         edges = [(self._idx_of_point(c[0]), self._idx_of_point(c[1]))
                  for c in connections]
@@ -148,28 +142,37 @@ class PRM():
         self.graph.add_edges(edges)
         self.graph.es['weight'] = weights
 
-    def _attach_start_and_end(self):
-        start = self.graph.vs[0]['value']
-        end = self.graph.vs[1]['value']
-        start_added = False
-        end_added = False
-        for q_near in self._neighbors(start, k_override=30, within_ball=True):
-            if self._idx_of_point(q_near) != 0:
-                successful, local_path = self._extend(start, q_near)
+    def attach_start(self, name, q_node):
+        self.graph.add_vertex(name)
+        self.graph.vs[-1]["value"] = list(q_node)
+        node_added = False
+
+        for q_near in self._neighbors(q_node, k_override=30, within_ball=True):
+            if q_near != q_node:
+                successful, local_path = self._extend(q_node, q_near)
                 if successful:
-                    start_added = True
+                    node_added = True
                     self._add_edge_to_graph(
-                        start, q_near, self._weight(local_path))
-        for q_near in self._neighbors(end, k_override=30, within_ball=True):
-            if self._idx_of_point(q_near) != 1:
-                successful, local_path = self._extend(q_near, end)
+                        q_node, q_near, self._weight(local_path))
+                    print("Added node {} to {}".format(name, str(q_near)))
+        if not node_added:
+            print("Planning failure! Could not add node {} successfully to graph.".format(
+                {name}))
+
+    def attach_end(self, name, q_node):
+        self.graph.add_vertex(name)
+        self.graph.vs[-1]["value"] = list(q_node)
+        node_added = False
+        for q_near in self._neighbors(q_node, k_override=30, within_ball=True):
+            if q_node != q_near:
+                successful, local_path = self._extend(q_near, q_node)
                 if successful:
-                    end_added = True
+                    node_added = True
                     self._add_edge_to_graph(
-                        q_near, end, self._weight(local_path))
-        if not start_added or not end_added:
-            raise Exception("Planning failure! Could not add either start {} and end {} successfully to graph.".format(
-                {start_added}, {end_added}))
+                        q_near, q_node, self._weight(local_path))
+        if not node_added:
+            print("Planning failure! Could not add node {} successfully to graph.".format(
+                {name}))
 
     def _success(self):
         paths = self.graph.shortest_paths_dijkstra(
