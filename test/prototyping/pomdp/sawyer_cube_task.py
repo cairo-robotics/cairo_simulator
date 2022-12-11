@@ -22,13 +22,16 @@ from cairo_planning.planners import PRM
 class Task:
 
     def __init__(self) -> None:
-        if os.environ.get('ROS_DISTRO'):
-            use_ros = True
-        else:
-            use_ros = False
-        use_real_time = True
-
-        self.sim_context = SawyerSimContext()
+        base_config = {}
+        base_config["sim"] = {
+            "use_real_time": False
+        }
+        # This configuration will exclude the two links causing invalid state validy checks
+        # for your given startup point in this script...
+        base_config["state_validity"] = {
+            "self_collision_exclusions": [("head", "right_l2")]
+        }
+        self.sim_context = SawyerSimContext(configuration=base_config)
         self.sim = self.sim_context.get_sim_instance()
         self.state_space = self.sim_context.get_state_space()
         self.svc = self.sim_context.get_state_validity()
@@ -61,7 +64,7 @@ class Task:
             interp = partial(parametric_lerp, steps=10)
             # See params for PRM specific parameters
             prm = PRM(self.state_space, self.svc, interp, params={
-                    'n_samples': 6000, 'k': 20, 'ball_radius': 2.0})
+                    'n_samples': 6000, 'k': 20, 'ball_radius': 1.75})
             prm.plan(q_start=self.default_joint_positions)
 
             for cube in self.sim_objects:
@@ -87,20 +90,27 @@ class Task:
 
 def main():
     task = Task()
-    task.move_robot_to_neutral()
     task.generate_prm()
 
-    # ee_positions = []
-    # for i in range(len(task.prm.graph.vs)):
-    #     joint_config = task.prm.graph.vs[i]["value"]
-    #     if len(task.prm.graph.neighbors(task.prm.graph.vs[i])) == 0:
-    #         ee_pos = task.sawyer_robot.solve_forward_kinematics(joint_config)[0][0]
-    #         ee_positions.append(ee_pos)
-
-    # p.addUserDebugPoints(ee_positions, [[1, 0, 0]]*len(ee_positions), pointSize=3)
+    ee_pos = task.sawyer_robot.solve_forward_kinematics(task.default_joint_positions)[0][0]
+    p.addUserDebugPoints([ee_pos], [[1, 0, 0]], pointSize=3)
 
     # task.prm.init_nearest_neighbor()
     # task.prm.attach_start("start", task.default_joint_positions)
+
+    # print(task.prm._neighbors(task.default_joint_positions, k_override=30, within_ball=True)[:5])
+
+    # dists = []
+    # for i in range(len(task.prm.graph.vs)):
+    #     if task.prm.graph.vs[i]["name"] != "start":
+    #         dists.append((task.prm.graph.vs[i]["value"], np.linalg.norm(np.array(task.default_joint_positions)-np.array(task.prm.graph.vs[i]["value"]))))
+    # print(sorted(dists, key=lambda x: x[1])[:3])      
+
+    # ee_positions = []
+    # for q_near in task.prm._neighbors(task.default_joint_positions, k_override=30, within_ball=True):
+    #     ee_pos = task.sawyer_robot.solve_forward_kinematics(q_near)[0][0]
+    #     ee_positions.append(ee_pos)
+    # p.addUserDebugPoints(ee_positions, [[1, 0, 0]]*len(ee_positions), pointSize=3)
 
     # Loop until someone shuts us down
     try:
