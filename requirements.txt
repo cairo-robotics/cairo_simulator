@@ -14,7 +14,7 @@ pycparser==2.21
 pyquaternion==0.9.5
 python-igraph==0.9.6
 scikit-learn==0.23.1
-scipy==1.8.1
+scipy==1.10.0
 seaborn==0.11.2
 socks==0
 sympy==1.10.1
